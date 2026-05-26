@@ -179,7 +179,7 @@ class AltairBehavior(Node):
         動作プログラムの周期実行ループを開始します。
         rate_hz: 周期の周波数（デフォルト 20 Hz = 50 ms 周期）
         """
-        self.timer = self.create_wall_timer(
+        self.timer = self.create_timer(
             1.0 / rate_hz, self.loop,
             callback_group=self.callback_group
         )

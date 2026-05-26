@@ -671,4 +671,6 @@ CMakeFiles/can_bridge_node.dir/src/can_bridge_node.cpp.o: \
  /home/altair/altair_framework/build/altair_interfaces/rosidl_generator_cpp/altair_interfaces/srv/detail/connect_can__struct.hpp \
  /home/altair/altair_framework/build/altair_interfaces/rosidl_generator_cpp/altair_interfaces/srv/detail/connect_can__builder.hpp \
  /home/altair/altair_framework/build/altair_interfaces/rosidl_generator_cpp/altair_interfaces/srv/detail/connect_can__traits.hpp \
- /home/altair/altair_framework/build/altair_interfaces/rosidl_generator_cpp/altair_interfaces/srv/detail/connect_can__type_support.hpp
+ /home/altair/altair_framework/build/altair_interfaces/rosidl_generator_cpp/altair_interfaces/srv/detail/connect_can__type_support.hpp \
+ /opt/ros/humble/include/ament_index_cpp/ament_index_cpp/get_package_share_directory.hpp \
+ /opt/ros/humble/include/ament_index_cpp/ament_index_cpp/visibility_control.h

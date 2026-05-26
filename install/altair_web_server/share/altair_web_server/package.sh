@@ -78,9 +78,7 @@ _colcon_package_sh_source_script() {
 }
 
 # source sh hooks
-_colcon_package_sh_source_script "$COLCON_CURRENT_PREFIX/share/altair_web_server/hook/path.sh"
 _colcon_package_sh_source_script "$COLCON_CURRENT_PREFIX/share/altair_web_server/hook/pythonpath.sh"
-_colcon_package_sh_source_script "$COLCON_CURRENT_PREFIX/share/altair_web_server/hook/pythonscriptspath.sh"
 _colcon_package_sh_source_script "$COLCON_CURRENT_PREFIX/share/altair_web_server/hook/ament_prefix_path.sh"
 _colcon_package_sh_source_script "$COLCON_CURRENT_PREFIX/../../build/altair_web_server/share/altair_web_server/hook/pythonpath_develop.sh"
 

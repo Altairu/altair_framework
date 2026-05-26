@@ -39,7 +39,7 @@ class BehaviorRunner(Node):
         self.active_behavior_name = ""
 
         # ステータス配信用のタイマー (1Hz)
-        self.status_timer = self.create_wall_timer(
+        self.status_timer = self.create_timer(
             1.0, self.publish_status,
             callback_group=self.callback_group
         )

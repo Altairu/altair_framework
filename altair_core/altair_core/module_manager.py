@@ -1,9 +1,12 @@
 import json
 import os
 import struct
+from pathlib import Path
 import rclpy
 from rclpy.node import Node
 from rclpy.callback_groups import ReentrantCallbackGroup
+from std_srvs.srv import Trigger
+from ament_index_python.packages import PackageNotFoundError, get_package_share_directory
 
 # ROS2 標準 ＆ カスタムメッセージ
 from can_msgs.msg import Frame
@@ -130,18 +133,39 @@ class ModuleManager(Node):
         """
         モジュール構成ファイルの絶対パスを探索して返す
         """
-        paths = [
-            # 1. ワークスペースのローカルソースパス
-            "c:/Users/106no/Documents/GitHub/altair_framework/altair_core/config/modules_config.json",
-            # 2. ROS2インストールシェアディレクトリ
-            os.path.join(os.path.expanduser('~'), 'ros2_ws/install/altair_core/share/altair_core/config/modules_config.json'),
-            # 3. 相対パスフォールバック
-            "./src/altair_framework/altair_core/config/modules_config.json"
-        ]
-        for p in paths:
-            if os.path.exists(p):
-                return p
-        return "modules_config.json"  # 最終フォールバック
+        candidates = []
+
+        # 明示指定があれば最優先
+        env_path = os.getenv('ALTAIR_MODULES_CONFIG')
+        if env_path:
+            candidates.append(Path(env_path).expanduser())
+
+        # ROS2インストール先 (share/altair_core/config)
+        try:
+            share_dir = Path(get_package_share_directory('altair_core'))
+            candidates.append(share_dir / 'config' / 'modules_config.json')
+        except PackageNotFoundError:
+            pass
+
+        # 開発時の代表的な相対パス
+        cwd = Path.cwd()
+        candidates.append(cwd / 'altair_core' / 'config' / 'modules_config.json')
+        candidates.append(cwd / 'config' / 'modules_config.json')
+
+        # モジュールファイル基準の相対パス
+        this_file = Path(__file__).resolve()
+        candidates.append(this_file.parent.parent / 'config' / 'modules_config.json')
+
+        # build/配下のモジュールから実行された場合のフォールバック
+        if len(this_file.parents) >= 5:
+            candidates.append(this_file.parents[4] / 'altair_core' / 'config' / 'modules_config.json')
+
+        for path in candidates:
+            if path.exists():
+                return str(path)
+
+        # 見つからない場合は先頭候補を返して、呼び出し側のエラーログに実パスを出す
+        return str(candidates[0]) if candidates else 'config/modules_config.json'
 
     # --- 1. MDDモータ指令の送信処理 (ROS2 ➔ CAN) ---
     def make_mdd_cmd_callback(self, name, base_id):

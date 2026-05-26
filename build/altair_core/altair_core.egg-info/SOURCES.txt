@@ -1,4 +1,5 @@
 package.xml
+setup.cfg
 setup.py
 altair_core/__init__.py
 altair_core/base_behavior.py

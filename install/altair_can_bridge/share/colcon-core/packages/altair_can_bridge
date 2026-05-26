@@ -1,1 +1,1 @@
-altair_interfaces:can_msgs:rclcpp
+altair_interfaces:ament_index_cpp:can_msgs:rclcpp

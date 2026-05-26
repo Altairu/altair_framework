@@ -82,7 +82,7 @@ class WebServerROSNode(Node):
         self.publishers_dict = {}
 
         # 1秒周期でモジュール設定ファイルを監視し、動的にMDDフィードバックサブスクライバを作成
-        self.create_wall_timer(2.0, self.sync_mdd_subscriptions, callback_group=self.callback_group)
+        self.create_timer(2.0, self.sync_mdd_subscriptions, callback_group=self.callback_group)
 
     def sync_mdd_subscriptions(self):
         """

@@ -1,4 +1,5 @@
 package.xml
+setup.cfg
 setup.py
 altair_web_server/__init__.py
 altair_web_server/web_server_node.py
