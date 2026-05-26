@@ -82,6 +82,9 @@ class WebServerROSNode(Node):
         # パブリッシャ辞書 (ブラウザからの操作指令をROS2トピックへ投げる用)
         self.publishers_dict = {}
 
+        # ゲームコントローラー状態のパブリッシャ
+        self.gamepad_pub = self.create_publisher(String, '/altair/gamepad/state', 10)
+
         # 1秒周期でモジュール設定ファイルを監視し、動的にMDDフィードバックサブスクライバを作成
         self.create_timer(2.0, self.sync_mdd_subscriptions, callback_group=self.callback_group)
 
@@ -454,6 +457,13 @@ async def websocket_endpoint(websocket: WebSocket):
                 ros_node.publish_servo_cmd(name, msg.get("angles", []))
             elif msg_type == "solenoid_cmd":
                 ros_node.publish_solenoid_cmd(name, msg.get("valves", []))
+            elif msg_type == "gamepad_state":
+                ros_msg = String()
+                ros_msg.data = json.dumps({
+                    "axes": msg.get("axes", []),
+                    "buttons": msg.get("buttons", [])
+                })
+                ros_node.gamepad_pub.publish(ros_msg)
 
     except WebSocketDisconnect:
         manager.disconnect(websocket)

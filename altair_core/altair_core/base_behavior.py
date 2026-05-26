@@ -7,6 +7,27 @@ import os
 
 # メッセージ定義
 from altair_interfaces.msg import MddFeedback, MddCommand, ServoCommand, SolenoidCommand
+from std_msgs.msg import String
+
+class GamepadState:
+    """
+    ゲームコントローラーの各スイッチやスティックの入力を変数として保持するクラス
+    """
+    def __init__(self):
+        self.axes = [0.0] * 8
+        self.buttons = [False] * 16
+
+    def get_button(self, index):
+        """指定インデックスのボタン状態 (True=ON, False=OFF) を取得します。"""
+        if 0 <= index < len(self.buttons):
+            return bool(self.buttons[index])
+        return False
+
+    def get_axis(self, index):
+        """指定インデックスのアナログスティック軸状態 (-1.0〜1.0) を取得します。"""
+        if 0 <= index < len(self.axes):
+            return float(self.axes[index])
+        return 0.0
 
 class MddClient:
     """
@@ -109,9 +130,24 @@ class AltairBehavior(Node):
         # 設定のロード
         self.config = self._load_config()
 
+        # ゲームコントローラー状態の自動購読
+        self.gamepad = GamepadState()
+        self.gamepad_sub = self.create_subscription(
+            String, '/altair/gamepad/state', self._gamepad_callback, 10,
+            callback_group=self.callback_group
+        )
+
         # 派生クラスの初期化
         self.on_init()
         self.get_logger().info(f"動作プログラム {node_name} が初期化されました。")
+
+    def _gamepad_callback(self, msg):
+        try:
+            data = json.loads(msg.data)
+            self.gamepad.axes = data.get("axes", [])
+            self.gamepad.buttons = data.get("buttons", [])
+        except Exception:
+            pass
 
     def _load_config(self):
         # 設定ファイルの探索

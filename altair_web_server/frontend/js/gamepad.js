@@ -1,21 +1,16 @@
 /* ==========================================================================
-   Altair Web Controller v2 - ゲームコントローラー連携 JavaScript
-   機能: Web Gamepad API 連携, 入力ポーリング(60Hz), 操作マッピングの管理
+   Altair Web Controller v2 - ゲームコントローラー変数化 ＆ モニター JavaScript
+   機能: Web Gamepad API 連携, 入力周期送信 (20Hz), リアルタイムインプットモニター
    ========================================================================== */
 
 document.addEventListener("DOMContentLoaded", () => {
   // コントローラ状態管理
   const state = {
     gamepadIdx: null,
-    animationFrameId: null,
-    mappings: [
-      // 初期サンプルマッピング
-      { input: "axis-1", module: "drive_mdd", action: "mdd_speed_y", scale: -5.0 }, // 左スティックY軸で前後走行
-      { input: "axis-0", module: "drive_mdd", action: "mdd_speed_x", scale: 5.0 },  // 左スティックX軸で左右旋回
-      { input: "btn-0", module: "valve_controller", action: "valve_toggle", channel: 1 } // ×ボタンでバルブ1トグル
-    ],
-    // ボタンの押し下げをトグル処理するための前状態キャッシュ
-    prevButtons: {}
+    intervalId: null,
+    prevButtons: [],
+    axesCount: 4,
+    buttonsCount: 16
   };
 
   const el = {
@@ -25,6 +20,11 @@ document.addEventListener("DOMContentLoaded", () => {
     terminal: document.getElementById("behavior-terminal")
   };
 
+  // 直接マッピング追加ボタンなどは非表示またはラベル変更
+  if (el.btnAddMapping) {
+    el.btnAddMapping.style.display = "none"; // マッピング不要になったため非表示
+  }
+
   // --- 1. Gamepad API イベントハンドリング ---
   window.addEventListener("gamepadconnected", (e) => {
     console.log("コントローラーが接続されました:", e.gamepad.id);
@@ -32,15 +32,15 @@ document.addEventListener("DOMContentLoaded", () => {
     
     // UI表示の更新
     const icon = el.indicator.querySelector(".gamepad-icon");
-    icon.className = "fa-solid fa-gamepad gamepad-icon connected";
+    if (icon) icon.className = "fa-solid fa-gamepad gamepad-icon connected";
     
     const text = el.indicator.querySelector(".ctrl-status-text");
-    text.textContent = `Connected: ${e.gamepad.id.substring(0, 24)}...`;
+    if (text) text.textContent = `Connected: ${e.gamepad.id.substring(0, 24)}...`;
 
     appendLog(`[SYSTEM] コントローラーが接続されました: ${e.gamepad.id}`, "system-msg");
 
-    // 入力監視ループの開始
-    startGamepadLoop();
+    // 周期（20Hz = 50ms）で WebSocket 送信＆モニター描画を行うタイマーを開始
+    startGamepadPolling();
   });
 
   window.addEventListener("gamepaddisconnected", (e) => {
@@ -50,260 +50,158 @@ document.addEventListener("DOMContentLoaded", () => {
       
       // UIの初期化
       const icon = el.indicator.querySelector(".gamepad-icon");
-      icon.className = "fa-solid fa-gamepad gamepad-icon disconnected";
+      if (icon) icon.className = "fa-solid fa-gamepad gamepad-icon disconnected";
       
       const text = el.indicator.querySelector(".ctrl-status-text");
-      text.textContent = "Not Connected (コントローラー未接続)";
+      if (text) text.textContent = "Not Connected (コントローラー未接続)";
       
       appendLog("[SYSTEM] コントローラーが切断されました。", "warning-msg");
 
-      // ループの停止
-      stopGamepadLoop();
+      // タイマー停止
+      stopGamepadPolling();
+      renderDisconnectedMonitor();
     }
   });
 
-  // --- 2. 割り当てマップ (Mappings) UI の描画 ---
-  function renderMappings() {
+  // --- 2. リアルタイムモニター表示の描画 ---
+  function initMonitorTable() {
+    if (!el.mappingsBody) return;
     el.mappingsBody.innerHTML = "";
+    
+    // アナログスティック軸モニター (4ch分)
+    for (let i = 0; i < state.axesCount; i++) {
+      let label = "";
+      if (i === 0) label = "L-Stick 左右 (X)";
+      else if (i === 1) label = "L-Stick 上下 (Y)";
+      else if (i === 2) label = "R-Stick 左右 (X)";
+      else if (i === 3) label = "R-Stick 上下 (Y)";
+      else label = `Axis ${i}`;
 
-    if (state.mappings.length === 0) {
-      el.mappingsBody.innerHTML = `
-        <tr>
-          <td colspan="5" style="text-align: center; color: var(--text-muted);">
-            割り当てがありません。右上の「新規割り当て」から追加してください。
-          </td>
-        </tr>`;
-      return;
-    }
-
-    state.mappings.forEach((map, idx) => {
       const tr = document.createElement("tr");
-
-      // 入力名のラベル化
-      let inputLabel = map.input;
-      if (map.input.startsWith("axis-")) {
-        const axisNum = map.input.split("-")[1];
-        inputLabel = `<i class="fa-solid fa-arrows-up-down-left-right"></i> Stick Axis ${axisNum}`;
-      } else if (map.input.startsWith("btn-")) {
-        const btnNum = map.input.split("-")[1];
-        inputLabel = `<i class="fa-solid fa-circle-dot"></i> Button ${btnNum}`;
-      }
-
-      // アクション名
-      let actionLabel = map.action;
-      if (map.action === "mdd_speed_y") actionLabel = "モータ前後 (RPS)";
-      else if (map.action === "mdd_speed_x") actionLabel = "モータ左右旋回 (RPS)";
-      else if (map.action === "valve_toggle") actionLabel = `電磁弁 ${map.channel}ch トグル`;
-      else if (map.action === "servo_angle") actionLabel = "サーボ角度指定";
-
       tr.innerHTML = `
-        <td>${inputLabel}</td>
-        <td><strong>${map.module}</strong></td>
-        <td>${actionLabel}</td>
-        <td>${map.scale || "-"}</td>
-        <td>
-          <button class="btn btn-danger btn-xs btn-icon" onclick="deleteMapping(${idx})" title="削除">
-            <i class="fa-solid fa-trash"></i>
-          </button>
+        <td><i class="fa-solid fa-arrows-up-down-left-right"></i> ${label}</td>
+        <td><code>self.gamepad.get_axis(${i})</code></td>
+        <td colspan="3">
+          <div class="progress-bar-container" style="background: #e8eaed; border-radius: 10px; height: 16px; width: 100%; position: relative; overflow: hidden;">
+            <div id="monitor-axis-${i}" class="progress-bar" style="background: var(--color-primary); height: 100%; width: 50%; margin-left: 0; transition: width 0.05s ease; border-radius: 10px;"></div>
+            <span id="monitor-axis-val-${i}" style="position: absolute; width: 100%; text-align: center; top: 0; font-size: 11px; font-weight: 700; color: #202124; line-height: 16px;">0.00</span>
+          </div>
         </td>
       `;
-
       el.mappingsBody.appendChild(tr);
-    });
-  }
-
-  // マッピング削除
-  window.deleteMapping = (idx) => {
-    state.mappings.splice(idx, 1);
-    renderMappings();
-  };
-
-  // 新規割り当て追加
-  el.btnAddMapping.addEventListener("click", () => {
-    // ユーザーに簡易プロンプトで追加（実際にはダイアログが望ましいが簡易化のためJSの対話を利用）
-    const inputType = confirm("スティック(軸)の割り当てですか？ (OK=スティック, キャンセル=ボタン)") ? "axis" : "btn";
-    
-    let inputNum = prompt(inputType === "axis" ? "スティックの軸番号を入力してください (例: 0=左X, 1=左Y, 2=右X, 3=右Y)" : "ボタンの番号を入力してください (例: 0=×, 1=○, 2=□, 3=△)");
-    if (inputNum === null || inputNum === "") return;
-    
-    const targetModule = prompt("ターゲットモジュール名を入力してください (例: drive_mdd, arm_servo)");
-    if (!targetModule) return;
-
-    let action = "";
-    let scale = 1.0;
-    let channel = 1;
-
-    if (inputType === "axis") {
-      action = prompt("操作アクションを選択 (mdd_speed_y / mdd_speed_x / servo_angle)");
-      if (!action) return;
-      scale = parseFloat(prompt("スケール（係数）を入力してください (例: 5.0 または -5.0)"));
-      if (isNaN(scale)) scale = 1.0;
-    } else {
-      action = "valve_toggle";
-      channel = parseInt(prompt("操作する電磁弁のチャネル(1〜12)を入力してください"));
-      if (isNaN(channel)) channel = 1;
     }
 
-    // 新規登録
-    state.mappings.push({
-      input: `${inputType}-${inputNum}`,
-      module: targetModule,
-      action: action,
-      scale: scale,
-      channel: channel
-    });
-
-    renderMappings();
-    appendLog(`[SYSTEM] コントローラー割り当てを追加しました: ${inputType}-${inputNum} ➔ ${targetModule}`, "system-msg");
-  });
-
-  // --- 3. ゲームパッド入力ポーリングループ (60Hz) ---
-  function startGamepadLoop() {
-    if (state.animationFrameId) {
-      cancelAnimationFrame(state.animationFrameId);
-    }
-    tick();
-  }
-
-  function stopGamepadLoop() {
-    if (state.animationFrameId) {
-      cancelAnimationFrame(state.animationFrameId);
-      state.animationFrameId = null;
+    // 主要ボタンモニター (10ch分)
+    const btnLabels = ["A / ×", "B / ○", "X / □", "Y / △", "L1", "R1", "L2", "R2", "Select / Share", "Start / Options"];
+    for (let i = 0; i < btnLabels.length; i++) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><i class="fa-solid fa-circle-dot"></i> ${btnLabels[i]}</td>
+        <td><code>self.gamepad.get_button(${i})</code></td>
+        <td colspan="3">
+          <span id="monitor-btn-${i}" class="badge badge-secondary">OFF</span>
+        </td>
+      `;
+      el.mappingsBody.appendChild(tr);
     }
   }
 
-  function tick() {
-    pollGamepad();
-    state.animationFrameId = requestAnimationFrame(tick);
+  function renderDisconnectedMonitor() {
+    if (!el.mappingsBody) return;
+    el.mappingsBody.innerHTML = `
+      <tr>
+        <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 30px 0;">
+          <i class="fa-solid fa-gamepad" style="font-size: 32px; margin-bottom: 10px; display: block; color: var(--text-muted);"></i>
+          コントローラーが接続されていません。ボタンやスティックの値を検出すると、ここにリアルタイムに値と変数名（Blocklyやコードで参照可能）が表示されます。
+        </td>
+      </tr>`;
   }
 
-  // メインサンプリング
-  function pollGamepad() {
+  // --- 3. コントローラー状態のサンプリング ＆ 送信タイマー ---
+  function startGamepadPolling() {
+    stopGamepadPolling();
+    initMonitorTable();
+    state.intervalId = setInterval(pollAndSendGamepad, 50); // 20Hz
+  }
+
+  function stopGamepadPolling() {
+    if (state.intervalId) {
+      clearInterval(state.intervalId);
+      state.intervalId = null;
+    }
+  }
+
+  function pollAndSendGamepad() {
     if (state.gamepadIdx === null) return;
 
     const gamepads = navigator.getGamepads();
     const gp = gamepads[state.gamepadIdx];
     if (!gp) return;
 
-    // 最新のモータ目標値 (MDD用の一時バッファ)
-    const mddTargets = {
-      // "drive_mdd": { speed_y: 0.0, speed_x: 0.0 } 等
-    };
-
-    // マッピングルールに沿って入力をスキャン
-    state.mappings.forEach(map => {
-      // A. スティック入力 (軸) の処理
-      if (map.input.startsWith("axis-")) {
-        const axisIdx = parseInt(map.input.split("-")[1]);
-        if (axisIdx >= gp.axes.length) return;
-
-        let val = gp.axes[axisIdx];
-        
-        // デッドバンド (遊び) の適用 (スティックの微小なチャタリングノイズを除去)
-        const DEADBAND = 0.08;
-        if (Math.abs(val) < DEADBAND) {
-          val = 0.0;
-        }
-
-        const scaledVal = val * (map.scale || 1.0);
-
-        if (map.action === "mdd_speed_y" || map.action === "mdd_speed_x") {
-          if (!mddTargets[map.module]) {
-            mddTargets[map.module] = { speed_y: 0.0, speed_x: 0.0 };
-          }
-          if (map.action === "mdd_speed_y") {
-            mddTargets[map.module].speed_y = scaledVal;
-          } else {
-            mddTargets[map.module].speed_x = scaledVal;
-          }
-        }
-      } 
-      
-      // B. ボタン入力の処理
-      else if (map.input.startsWith("btn-")) {
-        const btnIdx = parseInt(map.input.split("-")[1]);
-        if (btnIdx >= gp.buttons.length) return;
-
-        const btn = gp.buttons[btnIdx];
-        const isPressed = btn.pressed;
-        
-        // 前フレームとの比較 (エッジ検出: 押し下げられた瞬間だけトリガーする)
-        const prevPressed = state.prevButtons[btnIdx] || false;
-        
-        if (isPressed && !prevPressed) {
-          // 押し下げられた瞬間！
-          handleButtonPress(map);
-        }
-
-        // 状態の保存
-        state.prevButtons[btnIdx] = isPressed;
-      }
+    // デッドバンド (遊び) を適用したスティック値の取得
+    const DEADBAND = 0.05;
+    const axesData = gp.axes.map(v => {
+      let val = v;
+      if (Math.abs(val) < DEADBAND) val = 0.0;
+      return parseFloat(val.toFixed(3));
     });
 
-    // キャッシュされたMDD目標値を一括でWebSocket送信 (オムニや2輪差動などの混合演算)
-    for (const [modName, spd] of Object.entries(mddTargets)) {
-      // Y軸（前後）とX軸（左右旋回）を結合して、各車輪の目標速度を計算
-      // 簡易的な差動駆動または全車輪への均等割付
-      // M1=左前, M2=左後, M3=右前, M4=右後 と仮定
-      const leftSpd = spd.speed_y + spd.speed_x;
-      const rightSpd = spd.speed_y - spd.speed_x;
-      
-      const targets = [leftSpd, leftSpd, rightSpd, rightSpd];
+    // ボタンの押し下げ状態の取得
+    const buttonsData = gp.buttons.map(b => b.pressed);
 
-      // WebSocketで即座に送信
-      const appWs = window.parent.WebSocket ? window.parent : window; // 親ウインドウのWSを共有可能
-      // 実際にはメインの app.js 内の ws 接続を利用
-      sendMddCommandViaApp(modName, targets);
-    }
-  }
-
-  // ボタンが押された瞬間の処理 (トグル制御など)
-  function handleButtonPress(map) {
-    if (map.action === "valve_toggle") {
-      // 対象チャネルのボタン要素を取得してトグル
-      const btn = document.getElementById(`btn-${map.module}-v${map.channel}`);
-      if (btn) {
-        btn.click(); // GUIのクリックイベントをシミュレート
-        console.log(`[Gamepad] ${map.module} バルブ ${map.channel}ch をトグルしました。`);
-      }
-    }
-  }
-
-  // app.jsと繋ぐためのブリッジ関数
-  function sendMddCommandViaApp(modName, targets) {
-    // グローバル状態を通じて送信できるように window オブジェクトなどにフックするか、
-    // あるいは直接 window を介して WebSocket 送信を行う
-    // 本UIは単一ウィンドウHTMLのため、親 app.js の関数を呼び出し可能です。
-    // スライダーの値も同期させておくと親切
-    for (let i = 1; i <= 4; i++) {
-      const slider = document.getElementById(`range-${modName}-m${i}`);
-      const valText = document.getElementById(`val-${modName}-m${i}`);
-      if (slider) {
-        slider.value = targets[i-1];
-        if (valText) valText.textContent = `${targets[i-1].toFixed(1)} rps`;
-      }
-    }
-
-    // メインのWebSocketを取得して送信
-    const mainWs = getActiveWebSocket();
+    // WebSocket経由で操縦PC(ROS2ノード)へ送信
+    const mainWs = window.appWs || window.parent.appWs;
     if (mainWs && mainWs.readyState === WebSocket.OPEN) {
       mainWs.send(JSON.stringify({
-        type: "mdd_cmd",
-        name: modName,
-        targets: targets
+        type: "gamepad_state",
+        axes: axesData,
+        buttons: buttonsData
       }));
     }
+
+    // 画面モニターの更新
+    updateMonitorUI(axesData, buttonsData);
   }
 
-  function getActiveWebSocket() {
-    // 簡易的にウィンドウ上のオブジェクトから取得
-    // app.js内で window.appState = state などとフックしておけば容易に共有可能
-    // 本コードではグローバルな通信を行うために index.html レベルでグローバル共有されている想定です。
-    // window 経由で WebSocket 接続を特定
-    // （app.js 側で `window.appWs = state.ws` を設定するコードに後で app.js を変更するか、
-    //  またはローカルストレージやイベント連携する）
-    // 最も簡単なのは、app.js 側で `window.appWs` に参照を渡しておくことです。
-    return window.appWs || null;
+  // リアルタイムインプットモニターの描画更新
+  function updateMonitorUI(axes, buttons) {
+    // 1. スティック軸の描画更新
+    for (let i = 0; i < state.axesCount; i++) {
+      const bar = document.getElementById(`monitor-axis-${i}`);
+      const text = document.getElementById(`monitor-axis-val-${i}`);
+      if (bar && text && i < axes.length) {
+        const val = axes[i];
+        // -1.0〜1.0 の値を progress のパーセンテージ幅に変換
+        // -1.0 ➔ 0%、0 ➔ 50%、1.0 ➔ 100%
+        const percent = ((val + 1.0) / 2.0) * 100;
+        bar.style.width = `${percent}%`;
+        text.textContent = val.toFixed(2);
+        
+        // ニュートラル(0)からの離脱によって色を変える
+        if (Math.abs(val) > 0.1) {
+          bar.style.backgroundColor = "var(--color-primary)";
+        } else {
+          bar.style.backgroundColor = "#bdc1c6";
+        }
+      }
+    }
+
+    // 2. ボタンの描画更新
+    for (let i = 0; i < 10; i++) {
+      const btnBadge = document.getElementById(`monitor-btn-${i}`);
+      if (btnBadge && i < buttons.length) {
+        const isPressed = buttons[i];
+        if (isPressed) {
+          btnBadge.textContent = "ON";
+          btnBadge.className = "badge badge-success";
+          btnBadge.style.boxShadow = "0 2px 4px rgba(19, 115, 51, 0.3)";
+        } else {
+          btnBadge.textContent = "OFF";
+          btnBadge.className = "badge badge-secondary";
+          btnBadge.style.boxShadow = "none";
+        }
+      }
+    }
   }
 
   function appendLog(text, className = "") {
@@ -316,7 +214,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // app.js側で window.appWs = state.ws が設定されるため、それを利用
-  // 初期レンダリング
-  renderMappings();
+  // 初期化時の描画
+  renderDisconnectedMonitor();
 });

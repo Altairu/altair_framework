@@ -1083,6 +1083,54 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
+  // コントローラー用カスタムブロック
+  Blockly.Blocks['gamepad_button'] = {
+    init: function() {
+      this.appendDummyInput()
+          .appendField("コントローラー ボタン")
+          .appendField(new Blockly.FieldDropdown([
+            ["Button A / ×", "0"],
+            ["Button B / ○", "1"],
+            ["Button X / □", "2"],
+            ["Button Y / △", "3"],
+            ["L1", "4"],
+            ["R1", "5"],
+            ["L2 (デジタル)", "6"],
+            ["R2 (デジタル)", "7"],
+            ["Share / Select", "8"],
+            ["Options / Start", "9"],
+            ["L-Stick クリック", "10"],
+            ["R-Stick クリック", "11"],
+            ["D-Pad Up", "12"],
+            ["D-Pad Down", "13"],
+            ["D-Pad Left", "14"],
+            ["D-Pad Right", "15"]
+          ]), "BUTTON");
+      this.setOutput(true, "Boolean");
+      this.setColour(290);
+      this.setTooltip("ゲームコントローラーの特定のボタンが押されているか(True/False)を取得します。");
+      this.setHelpUrl("");
+    }
+  };
+
+  Blockly.Blocks['gamepad_axis'] = {
+    init: function() {
+      this.appendDummyInput()
+          .appendField("コントローラー ")
+          .appendField(new Blockly.FieldDropdown([
+            ["L-Stick 左右 (X)", "0"],
+            ["L-Stick 上下 (Y)", "1"],
+            ["R-Stick 左右 (X)", "2"],
+            ["R-Stick 上下 (Y)", "3"]
+          ]), "AXIS")
+          .appendField("傾き");
+      this.setOutput(true, "Number");
+      this.setColour(290);
+      this.setTooltip("ゲームコントローラーの指定されたスティックの傾き値(-1.0〜1.0)を取得します。");
+      this.setHelpUrl("");
+    }
+  };
+
   // Blockly.Python ジェネレーターの定義
   Blockly.Python['mdd_move'] = function(block) {
     const name = block.getFieldValue('NAME');
@@ -1119,6 +1167,18 @@ document.addEventListener("DOMContentLoaded", () => {
   Blockly.Python['print_log'] = function(block) {
     const text = block.getFieldValue('TEXT');
     return `            print("[BLOCKLY] ${text}")\n`;
+  };
+
+  Blockly.Python['gamepad_button'] = function(block) {
+    const buttonIdx = block.getFieldValue('BUTTON');
+    const code = `self.gamepad.get_button(${buttonIdx})`;
+    return [code, Blockly.Python.ORDER_ATOMIC];
+  };
+
+  Blockly.Python['gamepad_axis'] = function(block) {
+    const axisIdx = block.getFieldValue('AXIS');
+    const code = `self.gamepad.get_axis(${axisIdx})`;
+    return [code, Blockly.Python.ORDER_ATOMIC];
   };
 
   // フルPythonコードに組み立てるヘルパー
@@ -1167,12 +1227,27 @@ if __name__ == '__main__':
 `;
   }
 
-  // ツールボックスの定義 XML
+  // ツールボックスの定義 XML (Logic, Math, Gamepad, アクチュエータの統合)
   const toolboxXml = `
     <xml id="toolbox" style="display: none">
       <category name="基本動作" colour="120">
         <block type="delay_wait"></block>
         <block type="print_log"></block>
+      </category>
+      <category name="条件分岐 (Logic)" colour="210">
+        <block type="controls_if"></block>
+        <block type="logic_compare"></block>
+        <block type="logic_operation"></block>
+        <block type="logic_negate"></block>
+        <block type="logic_boolean"></block>
+      </category>
+      <category name="計算・数値 (Math)" colour="230">
+        <block type="math_number"></block>
+        <block type="math_arithmetic"></block>
+      </category>
+      <category name="コントローラー" colour="290">
+        <block type="gamepad_button"></block>
+        <block type="gamepad_axis"></block>
       </category>
       <category name="MDDモータ" colour="230">
         <block type="mdd_move">
@@ -1181,7 +1256,6 @@ if __name__ == '__main__':
           <value name="M3"><block type="math_number"><field name="NUM">0</field></block></value>
           <value name="M4"><block type="math_number"><field name="NUM">0</field></block></value>
         </block>
-        <block type="math_number"></block>
       </category>
       <category name="サーボ" colour="60">
         <block type="servo_move">
@@ -1192,7 +1266,6 @@ if __name__ == '__main__':
           <value name="S5"><block type="math_number"><field name="NUM">90</field></block></value>
           <value name="S6"><block type="math_number"><field name="NUM">90</field></block></value>
         </block>
-        <block type="math_number"></block>
       </category>
       <category name="電磁弁" colour="0">
         <block type="valve_control"></block>
@@ -1307,6 +1380,23 @@ if __name__ == '__main__':
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+    });
+  }
+
+  // コードプレビュードロワーの開閉制御
+  const btnToggleCode = document.getElementById("btn-toggle-code");
+  const btnCloseDrawer = document.getElementById("btn-close-drawer");
+  const codeDrawer = document.getElementById("blockly-code-drawer");
+
+  if (btnToggleCode && codeDrawer) {
+    btnToggleCode.addEventListener("click", () => {
+      codeDrawer.classList.toggle("open");
+    });
+  }
+
+  if (btnCloseDrawer && codeDrawer) {
+    btnCloseDrawer.addEventListener("click", () => {
+      codeDrawer.classList.remove("open");
     });
   }
 });

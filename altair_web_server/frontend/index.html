@@ -239,30 +239,41 @@
 
       <!-- ビュー 4: Automation -->
       <section id="view-automation" class="content-view">
-        <div class="automation-layout">
+        <div class="automation-container" style="position: relative; overflow: hidden; width: 100%;">
           <!-- Blockly エディタ領域 -->
-          <div class="glass-card blockly-card">
+          <div class="glass-card blockly-card" style="width: 100%; position: relative;">
             <div class="blockly-header">
               <h2><i class="fa-solid fa-puzzle-piece"></i> Blockly ビジュアルマクロ作成</h2>
               <div class="blockly-btn-group">
-                <button class="btn btn-success" id="btn-run-blockly"><i class="fa-solid fa-play"></i> マクロを実行</button>
-                <button class="btn btn-secondary" id="btn-stop-blockly"><i class="fa-solid fa-stop"></i> 停止</button>
+                <button class="btn btn-secondary" id="btn-toggle-code">
+                  <i class="fa-solid fa-code"></i> コードを表示
+                </button>
+                <button class="btn btn-success" id="btn-run-blockly">
+                  <i class="fa-solid fa-play"></i> マクロを実行
+                </button>
+                <button class="btn btn-secondary" id="btn-stop-blockly">
+                  <i class="fa-solid fa-stop"></i> 停止
+                </button>
               </div>
             </div>
             <p>Scratchライクなブロックを組み合わせて、センサーフィードバックに応じた自動制御を作成します。</p>
-
-            <div id="blocklyDiv" style="height: 550px; width: 100%; border-radius: 8px; margin-top: 15px;"></div>
+            <div id="blocklyDiv" style="height: 600px; width: 100%; border-radius: 8px; margin-top: 15px;"></div>
           </div>
 
-          <!-- 生成コード確認パネル [★スクラッチコード生成機能] -->
-          <div class="glass-card blockly-code-card">
-            <div class="console-header">
-              <h3><i class="fa-solid fa-file-code"></i> 生成された Python 制御コード</h3>
-              <button class="btn btn-secondary btn-xs" id="btn-export-blockly-code">コードを保存</button>
+          <!-- コードプレビュー スライドドロワー -->
+          <div class="code-drawer" id="blockly-code-drawer">
+            <div class="code-drawer-header">
+              <h3><i class="fa-solid fa-file-code"></i> 生成された Python コード</h3>
+              <button class="btn-close-drawer" id="btn-close-drawer">&times;</button>
             </div>
-            <p class="group-desc">ブロックの配置に応じて、ROS2の自律制御Pythonプログラムがリアルタイム自動生成されます。</p>
-            <div class="terminal-view code-preview-view" id="blockly-code-terminal" style="height: 530px;">
-              <pre><code id="blockly-code-area"># ブロックを配置するとここにコードが生成されます...</code></pre>
+            <div class="code-drawer-body">
+              <p class="group-desc" style="margin-bottom: 10px;">ブロックの配置に応じて、自律制御Pythonコードがリアルタイム生成されます。</p>
+              <div class="terminal-view code-preview-view" id="blockly-code-terminal" style="height: calc(100% - 100px); overflow-y: auto;">
+                <pre><code id="blockly-code-area"># ブロックを配置するとここにコードが生成されます...</code></pre>
+              </div>
+              <button class="btn btn-secondary btn-block" id="btn-export-blockly-code" style="margin-top: 12px; border-radius: 20px;">
+                <i class="fa-solid fa-file-arrow-down"></i> スクリプトをローカル保存
+              </button>
             </div>
           </div>
         </div>

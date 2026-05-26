@@ -1136,3 +1136,63 @@ body {
   0% { transform: rotate(-2deg); }
   100% { transform: rotate(2deg); }
 }
+
+/* --- 18. コードプレビュードロワー ＆ インプットモニター用 CSS --- */
+.code-drawer {
+  position: fixed;
+  top: 0;
+  right: -520px;
+  width: 520px;
+  height: 100vh;
+  background: #ffffff;
+  border-left: 1px solid var(--border-color);
+  box-shadow: -4px 0 24px rgba(60, 64, 67, 0.25);
+  z-index: 1000;
+  transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+.code-drawer.open {
+  right: 0;
+}
+
+.code-drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-light);
+  background-color: #f8f9fa;
+}
+
+.code-drawer-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-close-drawer {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 28px;
+  cursor: pointer;
+  line-height: 1;
+  transition: var(--transition-smooth);
+}
+.btn-close-drawer:hover {
+  color: var(--text-main);
+}
+
+.code-drawer-body {
+  padding: 24px;
+  flex-grow: 1;
+  height: calc(100vh - 70px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
