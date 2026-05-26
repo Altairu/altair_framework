@@ -1,0 +1,35 @@
+{
+  "package_name": "altair_interfaces",
+  "output_dir": "/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_interfaces/rosidl_typesupport_fastrtps_c/altair_interfaces",
+  "template_dir": "/opt/ros/humble/share/rosidl_typesupport_fastrtps_c/resource",
+  "idl_tuples": [
+    "/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_interfaces/rosidl_adapter/altair_interfaces:msg/CanStatus.idl",
+    "/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_interfaces/rosidl_adapter/altair_interfaces:msg/MddFeedback.idl",
+    "/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_interfaces/rosidl_adapter/altair_interfaces:msg/MddCommand.idl",
+    "/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_interfaces/rosidl_adapter/altair_interfaces:msg/ServoCommand.idl",
+    "/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_interfaces/rosidl_adapter/altair_interfaces:msg/SolenoidCommand.idl",
+    "/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_interfaces/rosidl_adapter/altair_interfaces:srv/TriggerControl.idl",
+    "/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_interfaces/rosidl_adapter/altair_interfaces:srv/GetAvailablePorts.idl",
+    "/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_interfaces/rosidl_adapter/altair_interfaces:srv/ConnectCan.idl",
+    "/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_interfaces/rosidl_adapter/altair_interfaces:srv/StartBehavior.idl"
+  ],
+  "target_dependencies": [
+    "/opt/ros/humble/lib/rosidl_typesupport_fastrtps_c/rosidl_typesupport_fastrtps_c",
+    "/opt/ros/humble/local/lib/python3.10/dist-packages/rosidl_typesupport_fastrtps_c/__init__.py",
+    "/opt/ros/humble/share/rosidl_typesupport_fastrtps_c/resource/idl__rosidl_typesupport_fastrtps_c.h.em",
+    "/opt/ros/humble/share/rosidl_typesupport_fastrtps_c/resource/idl__type_support_c.cpp.em",
+    "/opt/ros/humble/share/rosidl_typesupport_fastrtps_c/resource/msg__rosidl_typesupport_fastrtps_c.h.em",
+    "/opt/ros/humble/share/rosidl_typesupport_fastrtps_c/resource/msg__type_support_c.cpp.em",
+    "/opt/ros/humble/share/rosidl_typesupport_fastrtps_c/resource/srv__rosidl_typesupport_fastrtps_c.h.em",
+    "/opt/ros/humble/share/rosidl_typesupport_fastrtps_c/resource/srv__type_support_c.cpp.em",
+    "/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_interfaces/rosidl_adapter/altair_interfaces/msg/CanStatus.idl",
+    "/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_interfaces/rosidl_adapter/altair_interfaces/msg/MddFeedback.idl",
+    "/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_interfaces/rosidl_adapter/altair_interfaces/msg/MddCommand.idl",
+    "/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_interfaces/rosidl_adapter/altair_interfaces/msg/ServoCommand.idl",
+    "/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_interfaces/rosidl_adapter/altair_interfaces/msg/SolenoidCommand.idl",
+    "/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_interfaces/rosidl_adapter/altair_interfaces/srv/TriggerControl.idl",
+    "/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_interfaces/rosidl_adapter/altair_interfaces/srv/GetAvailablePorts.idl",
+    "/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_interfaces/rosidl_adapter/altair_interfaces/srv/ConnectCan.idl",
+    "/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_interfaces/rosidl_adapter/altair_interfaces/srv/StartBehavior.idl"
+  ]
+}

@@ -1,0 +1,71 @@
+[2.685s] Invoking command in '/mnt/c/Users/106no/Documents/GitHub/altair_framework/altair_core': AMENT_PREFIX_PATH=/mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_interfaces LD_LIBRARY_PATH=/mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_interfaces/lib:${LD_LIBRARY_PATH} PYTHONPATH=/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_core/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/lib/python3.10/site-packages:/mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_interfaces/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/altair_core build --build-base /mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_core/build install --record /mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_core/install.log --single-version-externally-managed install_data
+[3.675s] running egg_info
+[3.678s] creating ../build/altair_core/altair_core.egg-info
+[3.680s] writing ../build/altair_core/altair_core.egg-info/PKG-INFO
+[3.686s] writing dependency_links to ../build/altair_core/altair_core.egg-info/dependency_links.txt
+[3.693s] writing entry points to ../build/altair_core/altair_core.egg-info/entry_points.txt
+[3.701s] writing requirements to ../build/altair_core/altair_core.egg-info/requires.txt
+[3.706s] writing top-level names to ../build/altair_core/altair_core.egg-info/top_level.txt
+[3.712s] writing manifest file '../build/altair_core/altair_core.egg-info/SOURCES.txt'
+[3.764s] reading manifest file '../build/altair_core/altair_core.egg-info/SOURCES.txt'
+[3.831s] writing manifest file '../build/altair_core/altair_core.egg-info/SOURCES.txt'
+[3.834s] running build
+[3.835s] running build_py
+[3.840s] creating /mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_core/build
+[3.842s] creating /mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_core/build/lib
+[3.844s] creating /mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_core/build/lib/altair_core
+[3.853s] copying altair_core/base_behavior.py -> /mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_core/build/lib/altair_core
+[3.878s] copying altair_core/behavior_runner.py -> /mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_core/build/lib/altair_core
+[3.900s] copying altair_core/module_manager.py -> /mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_core/build/lib/altair_core
+[3.925s] copying altair_core/__init__.py -> /mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_core/build/lib/altair_core
+[3.942s] creating /mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_core/build/lib/user_behaviors
+[3.952s] copying user_behaviors/example_behavior.py -> /mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_core/build/lib/user_behaviors
+[3.974s] copying user_behaviors/template_behavior.py -> /mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_core/build/lib/user_behaviors
+[3.995s] copying user_behaviors/__init__.py -> /mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_core/build/lib/user_behaviors
+[4.012s] running install
+[4.013s] running install_lib
+[4.040s] creating /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/lib/python3.10/site-packages/altair_core
+[4.059s] copying /mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_core/build/lib/altair_core/base_behavior.py -> /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/lib/python3.10/site-packages/altair_core
+[4.094s] copying /mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_core/build/lib/altair_core/behavior_runner.py -> /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/lib/python3.10/site-packages/altair_core
+[4.130s] copying /mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_core/build/lib/altair_core/module_manager.py -> /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/lib/python3.10/site-packages/altair_core
+[4.162s] copying /mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_core/build/lib/altair_core/__init__.py -> /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/lib/python3.10/site-packages/altair_core
+[4.193s] creating /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/lib/python3.10/site-packages/user_behaviors
+[4.209s] copying /mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_core/build/lib/user_behaviors/example_behavior.py -> /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/lib/python3.10/site-packages/user_behaviors
+[4.238s] copying /mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_core/build/lib/user_behaviors/template_behavior.py -> /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/lib/python3.10/site-packages/user_behaviors
+[4.271s] copying /mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_core/build/lib/user_behaviors/__init__.py -> /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/lib/python3.10/site-packages/user_behaviors
+[4.304s] byte-compiling /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/lib/python3.10/site-packages/altair_core/base_behavior.py to base_behavior.cpython-310.pyc
+[4.340s] byte-compiling /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/lib/python3.10/site-packages/altair_core/behavior_runner.py to behavior_runner.cpython-310.pyc
+[4.355s]   File "/mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/lib/python3.10/site-packages/altair_core/behavior_runner.py", line 131
+[4.356s]     (void)request;
+[4.357s]           ^^^^^^^
+[4.357s] SyntaxError: invalid syntax
+[4.358s] 
+[4.362s] byte-compiling /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/lib/python3.10/site-packages/altair_core/module_manager.py to module_manager.cpython-310.pyc
+[4.379s]   File "/mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/lib/python3.10/site-packages/altair_core/module_manager.py", line 290
+[4.380s]     (void)request;
+[4.380s]           ^^^^^^^
+[4.381s] SyntaxError: invalid syntax
+[4.382s] 
+[4.385s] byte-compiling /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/lib/python3.10/site-packages/altair_core/__init__.py to __init__.cpython-310.pyc
+[4.424s] byte-compiling /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/lib/python3.10/site-packages/user_behaviors/example_behavior.py to example_behavior.cpython-310.pyc
+[4.459s] byte-compiling /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/lib/python3.10/site-packages/user_behaviors/template_behavior.py to template_behavior.cpython-310.pyc
+[4.501s] byte-compiling /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/lib/python3.10/site-packages/user_behaviors/__init__.py to __init__.cpython-310.pyc
+[4.544s] running install_data
+[4.550s] creating /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/share/ament_index
+[4.552s] creating /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/share/ament_index/resource_index
+[4.556s] creating /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/share/ament_index/resource_index/packages
+[4.569s] copying resource/altair_core -> /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/share/ament_index/resource_index/packages
+[4.596s] copying package.xml -> /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/share/altair_core
+[4.615s] creating /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/share/altair_core/config
+[4.624s] copying config/modules_config.json -> /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/share/altair_core/config
+[4.641s] creating /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/share/altair_core/profiles
+[4.650s] copying profiles/arm_test_profile.json -> /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/share/altair_core/profiles
+[4.673s] copying profiles/base_only_profile.json -> /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/share/altair_core/profiles
+[4.695s] copying profiles/default_profile.json -> /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/share/altair_core/profiles
+[4.722s] running install_egg_info
+[5.072s] Copying ../build/altair_core/altair_core.egg-info to /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/lib/python3.10/site-packages/altair_core-1.0.0-py3.10.egg-info
+[5.073s] running install_scripts
+[5.074s] Installing behavior_runner script to /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/bin
+[5.075s] Installing module_manager script to /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/bin
+[5.083s] writing list of installed files to '/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_core/install.log'
+[5.101s] Invoked command in '/mnt/c/Users/106no/Documents/GitHub/altair_framework/altair_core' returned '0': AMENT_PREFIX_PATH=/mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_interfaces LD_LIBRARY_PATH=/mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_interfaces/lib:${LD_LIBRARY_PATH} PYTHONPATH=/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_core/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/lib/python3.10/site-packages:/mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_interfaces/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/altair_core build --build-base /mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_core/build install --record /mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_core/install.log --single-version-externally-managed install_data

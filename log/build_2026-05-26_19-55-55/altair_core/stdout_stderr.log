@@ -1,0 +1,26 @@
+running egg_info
+writing ../build/altair_core/altair_core.egg-info/PKG-INFO
+writing dependency_links to ../build/altair_core/altair_core.egg-info/dependency_links.txt
+writing entry points to ../build/altair_core/altair_core.egg-info/entry_points.txt
+writing requirements to ../build/altair_core/altair_core.egg-info/requires.txt
+writing top-level names to ../build/altair_core/altair_core.egg-info/top_level.txt
+reading manifest file '../build/altair_core/altair_core.egg-info/SOURCES.txt'
+writing manifest file '../build/altair_core/altair_core.egg-info/SOURCES.txt'
+running build
+running build_py
+copying altair_core/behavior_runner.py -> /mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_core/build/lib/altair_core
+copying altair_core/module_manager.py -> /mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_core/build/lib/altair_core
+running install
+running install_lib
+copying /mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_core/build/lib/altair_core/behavior_runner.py -> /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/lib/python3.10/site-packages/altair_core
+copying /mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_core/build/lib/altair_core/module_manager.py -> /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/lib/python3.10/site-packages/altair_core
+byte-compiling /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/lib/python3.10/site-packages/altair_core/behavior_runner.py to behavior_runner.cpython-310.pyc
+byte-compiling /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/lib/python3.10/site-packages/altair_core/module_manager.py to module_manager.cpython-310.pyc
+running install_data
+running install_egg_info
+removing '/mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/lib/python3.10/site-packages/altair_core-1.0.0-py3.10.egg-info' (and everything under it)
+Copying ../build/altair_core/altair_core.egg-info to /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/lib/python3.10/site-packages/altair_core-1.0.0-py3.10.egg-info
+running install_scripts
+Installing behavior_runner script to /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/bin
+Installing module_manager script to /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/bin
+writing list of installed files to '/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_core/install.log'

@@ -1,0 +1,258 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"childIndexes" : 
+					[
+						1,
+						2
+					],
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-.-22fed6538a77344795e5.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.12"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						3,
+						4,
+						5,
+						6,
+						7,
+						8,
+						9,
+						10,
+						11,
+						12,
+						13,
+						15,
+						16,
+						17,
+						18
+					]
+				},
+				{
+					"build" : "altair_interfaces__py",
+					"jsonFile" : "directory-altair_interfaces__py-131db118800bf0ce30c6.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.12"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 0,
+					"source" : "/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_interfaces/altair_interfaces__py",
+					"targetIndexes" : 
+					[
+						2
+					]
+				},
+				{
+					"build" : "altair_interfaces__rs",
+					"jsonFile" : "directory-altair_interfaces__rs-fb8a6173298aa529cc95.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.12"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 0,
+					"source" : "/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_interfaces/altair_interfaces__rs",
+					"targetIndexes" : 
+					[
+						14
+					]
+				}
+			],
+			"name" : "",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0,
+						1,
+						2
+					],
+					"name" : "altair_interfaces",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5,
+						6,
+						7,
+						8,
+						9,
+						10,
+						11,
+						12,
+						13,
+						14,
+						15,
+						16,
+						17,
+						18
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "altair_interfaces::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-altair_interfaces-3169d3862af1fa5cfc8e.json",
+					"name" : "altair_interfaces",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "altair_interfaces__cpp::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-altair_interfaces__cpp-f24fe1ad0170957e3d0d.json",
+					"name" : "altair_interfaces__cpp",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "altair_interfaces__py::@0541b2579cc76668f7b4",
+					"jsonFile" : "target-altair_interfaces__py-2d4738161fdacb708309.json",
+					"name" : "altair_interfaces__py",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "altair_interfaces__rosidl_generator_c::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-altair_interfaces__rosidl_generator_c-5c1a745a88b72d271995.json",
+					"name" : "altair_interfaces__rosidl_generator_c",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "altair_interfaces__rosidl_generator_py::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-altair_interfaces__rosidl_generator_py-ae3866225650c36714a4.json",
+					"name" : "altair_interfaces__rosidl_generator_py",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "altair_interfaces__rosidl_typesupport_c::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-altair_interfaces__rosidl_typesupport_c-3dc906df323aea643107.json",
+					"name" : "altair_interfaces__rosidl_typesupport_c",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "altair_interfaces__rosidl_typesupport_c__pyext::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-altair_interfaces__rosidl_typesupport_c__pyext-55c36ce1f92a6f293752.json",
+					"name" : "altair_interfaces__rosidl_typesupport_c__pyext",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "altair_interfaces__rosidl_typesupport_cpp::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-altair_interfaces__rosidl_typesupport_cpp-65d0e89a8ba47094c0e8.json",
+					"name" : "altair_interfaces__rosidl_typesupport_cpp",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "altair_interfaces__rosidl_typesupport_fastrtps_c::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-altair_interfaces__rosidl_typesupport_fastrtps_c-c94ba5f8fa2f5168b6b9.json",
+					"name" : "altair_interfaces__rosidl_typesupport_fastrtps_c",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "altair_interfaces__rosidl_typesupport_fastrtps_c__pyext::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-altair_interfaces__rosidl_typesupport_fastrtps_c__pyext-d550e9412f74a9cea433.json",
+					"name" : "altair_interfaces__rosidl_typesupport_fastrtps_c__pyext",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "altair_interfaces__rosidl_typesupport_fastrtps_cpp::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-altair_interfaces__rosidl_typesupport_fastrtps_cpp-89da3e8dacccea3ede16.json",
+					"name" : "altair_interfaces__rosidl_typesupport_fastrtps_cpp",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "altair_interfaces__rosidl_typesupport_introspection_c::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-altair_interfaces__rosidl_typesupport_introspection_c-c1ea7b38d6baf1467caa.json",
+					"name" : "altair_interfaces__rosidl_typesupport_introspection_c",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "altair_interfaces__rosidl_typesupport_introspection_c__pyext::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-altair_interfaces__rosidl_typesupport_introspection_c__pyext-b986086dbb07850bb226.json",
+					"name" : "altair_interfaces__rosidl_typesupport_introspection_c__pyext",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "altair_interfaces__rosidl_typesupport_introspection_cpp::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-altair_interfaces__rosidl_typesupport_introspection_cpp-1d2b8151ecd37fcefa21.json",
+					"name" : "altair_interfaces__rosidl_typesupport_introspection_cpp",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 2,
+					"id" : "altair_interfaces__rs::@bf88e0e1c4316d89ba53",
+					"jsonFile" : "target-altair_interfaces__rs-b2a345b2f234cd455c8e.json",
+					"name" : "altair_interfaces__rs",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "altair_interfaces_uninstall::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-altair_interfaces_uninstall-3f903d649a0690a51a9e.json",
+					"name" : "altair_interfaces_uninstall",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "ament_cmake_python_build_altair_interfaces_egg::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ament_cmake_python_build_altair_interfaces_egg-d2e22382735442da3d3b.json",
+					"name" : "ament_cmake_python_build_altair_interfaces_egg",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "ament_cmake_python_copy_altair_interfaces::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ament_cmake_python_copy_altair_interfaces-18432ef05eb3bfaf2d9f.json",
+					"name" : "ament_cmake_python_copy_altair_interfaces",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "uninstall::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-uninstall-792b07b6168e0c2f2343.json",
+					"name" : "uninstall",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_interfaces",
+		"source" : "/mnt/c/Users/106no/Documents/GitHub/altair_framework/altair_interfaces"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 3
+	}
+}

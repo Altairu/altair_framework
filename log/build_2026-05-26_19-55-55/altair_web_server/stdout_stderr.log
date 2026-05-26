@@ -1,0 +1,19 @@
+running egg_info
+writing ../build/altair_web_server/altair_web_server.egg-info/PKG-INFO
+writing dependency_links to ../build/altair_web_server/altair_web_server.egg-info/dependency_links.txt
+writing entry points to ../build/altair_web_server/altair_web_server.egg-info/entry_points.txt
+writing requirements to ../build/altair_web_server/altair_web_server.egg-info/requires.txt
+writing top-level names to ../build/altair_web_server/altair_web_server.egg-info/top_level.txt
+reading manifest file '../build/altair_web_server/altair_web_server.egg-info/SOURCES.txt'
+writing manifest file '../build/altair_web_server/altair_web_server.egg-info/SOURCES.txt'
+running build
+running build_py
+running install
+running install_lib
+running install_data
+running install_egg_info
+removing '/mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_web_server/lib/python3.10/site-packages/altair_web_server-1.0.0-py3.10.egg-info' (and everything under it)
+Copying ../build/altair_web_server/altair_web_server.egg-info to /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_web_server/lib/python3.10/site-packages/altair_web_server-1.0.0-py3.10.egg-info
+running install_scripts
+Installing web_server_node script to /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_web_server/bin
+writing list of installed files to '/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_web_server/install.log'

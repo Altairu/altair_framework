@@ -1,0 +1,9 @@
+/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_interfaces/rosidl_adapter/altair_interfaces:msg/CanStatus.idl
+/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_interfaces/rosidl_adapter/altair_interfaces:msg/MddFeedback.idl
+/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_interfaces/rosidl_adapter/altair_interfaces:msg/MddCommand.idl
+/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_interfaces/rosidl_adapter/altair_interfaces:msg/ServoCommand.idl
+/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_interfaces/rosidl_adapter/altair_interfaces:msg/SolenoidCommand.idl
+/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_interfaces/rosidl_adapter/altair_interfaces:srv/TriggerControl.idl
+/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_interfaces/rosidl_adapter/altair_interfaces:srv/GetAvailablePorts.idl
+/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_interfaces/rosidl_adapter/altair_interfaces:srv/ConnectCan.idl
+/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_interfaces/rosidl_adapter/altair_interfaces:srv/StartBehavior.idl

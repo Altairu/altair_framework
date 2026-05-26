@@ -1,0 +1,21 @@
+[2.921s] Invoking command in '/mnt/c/Users/106no/Documents/GitHub/altair_framework/altair_web_server': AMENT_PREFIX_PATH=/mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_interfaces LD_LIBRARY_PATH=/mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_interfaces/lib:${LD_LIBRARY_PATH} PYTHONPATH=/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_web_server/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_web_server/lib/python3.10/site-packages:/mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_interfaces/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/altair_web_server build --build-base /mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_web_server/build install --record /mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_web_server/install.log --single-version-externally-managed install_data
+[3.901s] running egg_info
+[3.906s] writing ../build/altair_web_server/altair_web_server.egg-info/PKG-INFO
+[3.911s] writing dependency_links to ../build/altair_web_server/altair_web_server.egg-info/dependency_links.txt
+[3.914s] writing entry points to ../build/altair_web_server/altair_web_server.egg-info/entry_points.txt
+[3.919s] writing requirements to ../build/altair_web_server/altair_web_server.egg-info/requires.txt
+[3.923s] writing top-level names to ../build/altair_web_server/altair_web_server.egg-info/top_level.txt
+[3.959s] reading manifest file '../build/altair_web_server/altair_web_server.egg-info/SOURCES.txt'
+[4.056s] writing manifest file '../build/altair_web_server/altair_web_server.egg-info/SOURCES.txt'
+[4.061s] running build
+[4.062s] running build_py
+[4.096s] running install
+[4.097s] running install_lib
+[4.215s] running install_data
+[4.325s] running install_egg_info
+[4.338s] removing '/mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_web_server/lib/python3.10/site-packages/altair_web_server-1.0.0-py3.10.egg-info' (and everything under it)
+[4.392s] Copying ../build/altair_web_server/altair_web_server.egg-info to /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_web_server/lib/python3.10/site-packages/altair_web_server-1.0.0-py3.10.egg-info
+[4.606s] running install_scripts
+[4.725s] Installing web_server_node script to /mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_web_server/bin
+[4.734s] writing list of installed files to '/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_web_server/install.log'
+[4.754s] Invoked command in '/mnt/c/Users/106no/Documents/GitHub/altair_framework/altair_web_server' returned '0': AMENT_PREFIX_PATH=/mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_interfaces LD_LIBRARY_PATH=/mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_interfaces/lib:${LD_LIBRARY_PATH} PYTHONPATH=/mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_web_server/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_web_server/lib/python3.10/site-packages:/mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_interfaces/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/altair_web_server build --build-base /mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_web_server/build install --record /mnt/c/Users/106no/Documents/GitHub/altair_framework/build/altair_web_server/install.log --single-version-externally-managed install_data

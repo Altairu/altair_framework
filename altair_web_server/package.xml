@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_xml_model.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>altair_web_server</name>
+  <version>1.0.0</version>
+  <description>操縦者PC/NUC側：FastAPI Webサーバーおよびモダンなブラウザ制御ダッシュボードUI</description>
+  <maintainer email="106no@users.noreply.github.com">USER</maintainer>
+  <license>MIT</license>
+
+  <depend>rclpy</depend>
+  <depend>altair_interfaces</depend>
+  <depend>can_msgs</depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

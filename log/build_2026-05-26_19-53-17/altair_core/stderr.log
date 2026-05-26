@@ -1,0 +1,10 @@
+  File "/mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/lib/python3.10/site-packages/altair_core/behavior_runner.py", line 131
+    (void)request;
+          ^^^^^^^
+SyntaxError: invalid syntax
+
+  File "/mnt/c/Users/106no/Documents/GitHub/altair_framework/install/altair_core/lib/python3.10/site-packages/altair_core/module_manager.py", line 290
+    (void)request;
+          ^^^^^^^
+SyntaxError: invalid syntax
+

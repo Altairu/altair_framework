@@ -1,0 +1,12 @@
+source;share/altair_web_server/hook/path.ps1
+source;share/altair_web_server/hook/path.dsv
+source;share/altair_web_server/hook/path.sh
+source;share/altair_web_server/hook/pythonpath.ps1
+source;share/altair_web_server/hook/pythonpath.dsv
+source;share/altair_web_server/hook/pythonpath.sh
+source;share/altair_web_server/hook/pythonscriptspath.ps1
+source;share/altair_web_server/hook/pythonscriptspath.dsv
+source;share/altair_web_server/hook/pythonscriptspath.sh
+source;share/altair_web_server/hook/ament_prefix_path.ps1
+source;share/altair_web_server/hook/ament_prefix_path.dsv
+source;share/altair_web_server/hook/ament_prefix_path.sh

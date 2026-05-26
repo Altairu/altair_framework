@@ -1,0 +1,1072 @@
+/* ==========================================================================
+   Altair Web Controller v2 - Premium CSS Design System
+   Aesthetics: Glassmorphism, Neon Glows, Dark Theme, Micro-interactions
+   ========================================================================== */
+
+/* --- 1. 設計用カスタム変数・トークン --- */
+:root {
+  --font-main: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-logo: 'Outfit', sans-serif;
+  
+  /* HSLベースの調和のとれたカラーパレット */
+  --bg-dark: hsl(220, 25%, 6%);
+  --bg-sidebar: hsla(220, 30%, 8%, 0.8);
+  --glass-card: hsla(220, 20%, 12%, 0.6);
+  --glass-card-hover: hsla(220, 20%, 16%, 0.75);
+  --border-light: rgba(255, 255, 255, 0.08);
+  --border-light-focus: rgba(255, 255, 255, 0.2);
+  
+  --text-main: hsl(210, 20%, 92%);
+  --text-muted: hsl(210, 10%, 65%);
+  --text-dark: hsl(220, 25%, 10%);
+
+  /* ネオン発光カラー */
+  --color-primary: hsl(210, 100%, 55%);
+  --color-primary-glow: hsla(210, 100%, 55%, 0.35);
+  
+  --color-purple: hsl(270, 85%, 65%);
+  --color-purple-glow: hsla(270, 85%, 65%, 0.35);
+
+  --color-success: hsl(145, 80%, 50%);
+  --color-success-glow: hsla(145, 80%, 50%, 0.25);
+
+  --color-warning: hsl(40, 95%, 55%);
+  --color-danger: hsl(355, 85%, 55%);
+  --color-danger-glow: hsla(355, 85%, 55%, 0.35);
+  
+  /* グラデーション */
+  --grad-primary: linear-gradient(135deg, hsl(210, 100%, 50%), hsl(260, 90%, 55%));
+  --grad-card: linear-gradient(135deg, hsla(220, 20%, 12%, 0.8), hsla(220, 20%, 8%, 0.8));
+  
+  /* イージング・アニメーション */
+  --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-bounce: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* --- 2. リセット ＆ グローバルスタイル --- */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-main);
+  background-color: var(--bg-dark);
+  color: var(--text-main);
+  min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* 背景のネオングロー (立体感を出す) */
+.bg-glow {
+  position: absolute;
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  filter: blur(150px);
+  z-index: -1;
+  opacity: 0.3;
+  pointer-events: none;
+}
+.bg-glow-1 {
+  background-color: var(--color-primary);
+  top: 10%;
+  left: 20%;
+}
+.bg-glow-2 {
+  background-color: var(--color-purple);
+  bottom: 10%;
+  right: 15%;
+}
+
+/* --- 3. アプリ全体のレイアウトグリッド --- */
+.app-container {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: 100vh;
+}
+
+/* モバイル表示時のレスポンシブブレークポイント */
+@media (max-width: 992px) {
+  .app-container {
+    grid-template-columns: 1fr; /* サイドバーを隠すかトグル化する */
+  }
+  .sidebar {
+    display: none !important; /* タブレット以下では簡易バー化するか別トグルへ */
+  }
+}
+
+/* --- 4. サイドバー / ナビゲーション --- */
+.sidebar {
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-light);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.sidebar-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 30px;
+  border-bottom: 1px solid var(--border-light);
+  margin-bottom: 24px;
+}
+
+.logo-icon {
+  font-size: 24px;
+  background: var(--grad-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: logo-drift 6s ease-in-out infinite alternate;
+}
+
+.sidebar-logo span {
+  font-family: var(--font-logo);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  background: linear-gradient(to right, #fff, var(--text-muted));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.sidebar-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-grow: 1;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 15px;
+  font-weight: 500;
+  border-radius: 10px;
+  transition: var(--transition-smooth);
+}
+
+.menu-item i {
+  font-size: 18px;
+  width: 20px;
+  text-align: center;
+  transition: var(--transition-smooth);
+}
+
+.menu-item:hover {
+  color: var(--text-main);
+  background-color: rgba(255, 255, 255, 0.04);
+  transform: translateX(4px);
+}
+
+.menu-item.active {
+  color: #fff;
+  background: var(--grad-primary);
+  box-shadow: 0 4px 15px var(--color-primary-glow);
+}
+
+.menu-item.active i {
+  transform: scale(1.1);
+}
+
+.sidebar-footer {
+  padding-top: 15px;
+  border-top: 1px solid var(--border-light);
+  text-align: center;
+}
+
+.version-tag {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* --- 5. メインコンテンツエリア --- */
+.main-content {
+  padding: 32px 40px;
+  overflow-y: auto;
+  height: 100vh;
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    padding: 20px;
+  }
+}
+
+/* ヘッダー */
+.main-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.header-title h1 {
+  font-family: var(--font-logo);
+  font-size: 32px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.5px;
+}
+
+.header-title .subtitle {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.header-status-panel {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.connection-pill {
+  background: var(--glass-card);
+  border: 1px solid var(--border-light);
+  border-radius: 30px;
+  padding: 8px 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.status-dot.connected {
+  background-color: var(--color-success);
+  box-shadow: 0 0 10px var(--color-success);
+}
+.status-dot.disconnected {
+  background-color: var(--color-danger);
+  box-shadow: 0 0 10px var(--color-danger);
+}
+.status-dot.warning {
+  background-color: var(--color-warning);
+  box-shadow: 0 0 10px var(--color-warning);
+}
+
+/* --- 6. コンポーネント: Glassmorphism カード --- */
+.glass-card {
+  background: var(--glass-card);
+  border: 1px solid var(--border-light);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: var(--transition-smooth);
+}
+
+.glass-card:hover {
+  background: var(--glass-card-hover);
+  border-color: var(--border-light-focus);
+}
+
+/* ページ専用カード */
+.page-card {
+  padding: 28px;
+  margin-bottom: 24px;
+}
+
+.page-card h2 {
+  font-family: var(--font-logo);
+  font-size: 24px;
+  margin-bottom: 12px;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.page-card p {
+  color: var(--text-muted);
+  line-height: 1.6;
+  font-size: 15px;
+  margin-bottom: 20px;
+}
+
+/* --- 7. コントロールボード (Dashboard上部) --- */
+.control-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+  padding: 24px;
+  margin-bottom: 32px;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-right: 15px;
+}
+
+.control-group:not(:last-child) {
+  border-right: 1px solid var(--border-light);
+}
+
+@media (max-width: 992px) {
+  .control-group:not(:last-child) {
+    border-right: none;
+    border-bottom: 1px solid var(--border-light);
+    padding-bottom: 20px;
+  }
+}
+
+.control-group h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.group-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.port-select-row {
+  display: flex;
+  gap: 8px;
+}
+
+.control-status {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
+/* --- 8. ボタン ＆ インプット要素 --- */
+.btn {
+  font-family: var(--font-main);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: var(--transition-smooth);
+}
+
+.btn-primary {
+  background: var(--grad-primary);
+  color: #fff;
+  box-shadow: 0 4px 15px var(--color-primary-glow);
+}
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px var(--color-primary-glow);
+  filter: brightness(1.1);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-main);
+  border: 1px solid var(--border-light);
+}
+.btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+}
+
+.btn-success {
+  background: var(--color-success);
+  color: var(--text-dark);
+  box-shadow: 0 4px 15px var(--color-success-glow);
+}
+.btn-success:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px var(--color-success-glow);
+  filter: brightness(1.1);
+}
+
+.btn-danger {
+  background: var(--color-danger);
+  color: #fff;
+  box-shadow: 0 4px 15px var(--color-danger-glow);
+}
+.btn-danger:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px var(--color-danger-glow);
+  filter: brightness(1.1);
+}
+
+.btn-emergency {
+  padding: 12px 24px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  animation: pulse-border 2s infinite;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.btn-block {
+  display: flex;
+  width: 100%;
+}
+
+.btn-icon {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+/* インプット */
+.form-input {
+  font-family: var(--font-main);
+  font-size: 14px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  color: #fff;
+  padding: 10px 14px;
+  outline: none;
+  width: 100%;
+  transition: var(--transition-smooth);
+}
+
+.form-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 10px var(--color-primary-glow);
+}
+
+.form-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* トグルスイッチ */
+.toggle-checkbox {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  gap: 12px;
+}
+
+.toggle-checkbox input {
+  display: none;
+}
+
+.toggle-switch {
+  width: 44px;
+  height: 24px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  position: relative;
+  transition: var(--transition-smooth);
+  border: 1px solid var(--border-light);
+}
+
+.toggle-switch::after {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  background-color: #fff;
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  transition: var(--transition-smooth);
+}
+
+.toggle-checkbox input:checked + .toggle-switch {
+  background-color: var(--color-primary);
+  box-shadow: 0 0 10px var(--color-primary-glow);
+}
+
+.toggle-checkbox input:checked + .toggle-switch::after {
+  left: 22px;
+}
+
+.toggle-label {
+  font-size: 14px;
+  font-weight: 500;
+  user-select: none;
+}
+
+/* --- 9. バッジ / タグ --- */
+.badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 20px;
+  display: inline-block;
+}
+
+.badge-warning {
+  background-color: rgba(243, 156, 18, 0.15);
+  color: var(--color-warning);
+  border: 1px solid rgba(243, 156, 18, 0.3);
+}
+
+.badge-success {
+  background-color: rgba(46, 204, 113, 0.15);
+  color: var(--color-success);
+  border: 1px solid rgba(46, 204, 113, 0.3);
+}
+
+.badge-secondary {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  border: 1px solid var(--border-light);
+}
+
+/* --- 10. モジュールカードグリッド (Dashboard) --- */
+.modules-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 28px;
+}
+
+.module-card {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* カード左端のカラーストライプ */
+.module-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 5px;
+  height: 100%;
+}
+.module-card-mdd::before { background-color: var(--color-purple); }
+.module-card-servo::before { background-color: var(--color-primary); }
+.module-card-solenoid::before { background-color: var(--color-success); }
+
+.card-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px solid var(--border-light);
+  padding-bottom: 12px;
+}
+
+.module-title h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.module-meta-info {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  display: flex;
+  gap: 12px;
+}
+
+.card-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* スライダー & コントロール */
+.control-slider-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.slider-label-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.slider-name {
+  color: var(--text-main);
+  font-weight: 500;
+}
+.slider-val {
+  color: var(--color-primary);
+  font-family: monospace;
+  font-weight: 600;
+}
+
+.custom-range {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  outline: none;
+}
+
+.custom-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  cursor: pointer;
+  box-shadow: 0 0 10px var(--color-primary-glow);
+  transition: var(--transition-smooth);
+}
+.custom-range::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+/* MDD 特有パラメータ表示 */
+.mdd-params-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  background: rgba(0, 0, 0, 0.15);
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-light);
+}
+
+.mdd-param-item {
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  justify-content: space-between;
+}
+.mdd-param-item span {
+  font-family: monospace;
+  color: var(--text-main);
+  font-weight: 500;
+}
+
+/* リミットスイッチUI */
+.switches-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sw-indicator {
+  flex-grow: 1;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-light);
+  padding: 8px;
+  border-radius: 6px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  transition: var(--transition-smooth);
+}
+.sw-indicator.active {
+  background: var(--color-danger-glow);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+  box-shadow: 0 0 8px var(--color-danger-glow);
+}
+
+/* 電磁弁グリッド */
+.valves-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.valve-btn {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 10px 4px;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+.valve-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+.valve-btn.active {
+  background: var(--color-success-glow);
+  border-color: var(--color-success);
+  color: var(--color-success);
+  box-shadow: 0 0 10px var(--color-success-glow);
+}
+
+/* --- 11. ターミナル風コンソール (Logs ＆ Programs) --- */
+.terminal-view {
+  background: #06090e;
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  padding: 16px;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 13px;
+  color: #c9d1d9;
+  overflow-y: auto;
+  line-height: 1.5;
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8);
+}
+
+.terminal-line {
+  margin-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.01);
+  padding-bottom: 2px;
+}
+
+.terminal-line.system-msg { color: #58a6ff; }
+.terminal-line.error-msg { color: #f85149; }
+.terminal-line.rx-msg { color: #3fb950; }
+.terminal-line.tx-msg { color: #bc8cff; }
+
+.console-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.console-header h3 {
+  font-size: 16px;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* --- 12. 動作プログラム(Behavior)用のレイアウト --- */
+.behavior-layout {
+  display: grid;
+  grid-template-columns: 350px 1fr;
+  gap: 28px;
+}
+
+@media (max-width: 992px) {
+  .behavior-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.behavior-selector {
+  margin: 15px 0 25px 0;
+}
+
+.behavior-controls-row {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.terminal-view {
+  height: 100%;
+  min-height: 400px;
+}
+
+/* --- 13. モーダルオーバーレイ & モーダルカード --- */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  transition: var(--transition-smooth);
+}
+
+.modal-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.modal-card {
+  width: 480px;
+  max-width: 90%;
+  padding: 24px;
+  transform: translateY(-50px);
+  transition: var(--transition-bounce);
+}
+
+.modal-overlay.active .modal-card {
+  transform: translateY(0);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-light);
+  padding-bottom: 12px;
+  margin-bottom: 20px;
+}
+
+.modal-header h2 {
+  font-family: var(--font-logo);
+  font-size: 20px;
+  color: #fff;
+}
+
+.modal-close-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 24px;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+.modal-close-btn:hover {
+  color: #fff;
+}
+
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  border-top: 1px solid var(--border-light);
+  padding-top: 16px;
+}
+
+/* --- 14. プロファイル管理特有レイアウト --- */
+.profile-manager-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+}
+
+@media (max-width: 768px) {
+  .profile-manager-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.profile-list-panel h3, .profile-ops-panel h3 {
+  font-size: 16px;
+  color: #fff;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.profile-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 350px;
+  overflow-y: auto;
+}
+
+.profile-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  padding: 12px 16px;
+  transition: var(--transition-smooth);
+}
+.profile-item:hover {
+  border-color: var(--color-primary);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.profile-name-sec {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.profile-name-sec i {
+  color: var(--color-primary);
+}
+
+.profile-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.ops-card {
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.ops-card h4 {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.input-row {
+  display: flex;
+  gap: 8px;
+}
+
+/* --- 15. ゲームコントローラー割り当て特有レイアウト --- */
+.controller-status-card {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.ctrl-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.gamepad-icon {
+  font-size: 48px;
+  transition: var(--transition-smooth);
+}
+.gamepad-icon.disconnected {
+  color: var(--text-muted);
+}
+.gamepad-icon.connected {
+  color: var(--color-success);
+  filter: drop-shadow(0 0 10px var(--color-success));
+  animation: shake 0.5s ease-in-out infinite alternate;
+}
+
+.ctrl-status-text {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.help-text {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 10px;
+}
+
+.mapping-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.mapping-table-wrapper {
+  overflow-x: auto;
+}
+
+.mapping-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  text-align: left;
+}
+
+.mapping-table th {
+  padding: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+  border-bottom: 2px solid var(--border-light);
+}
+
+.mapping-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.mapping-table tr:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* --- 16. ビューの表示切り替えロジック --- */
+.content-view {
+  display: none;
+  animation: fade-in 0.4s ease-in-out forwards;
+}
+
+.content-view.active {
+  display: block;
+}
+
+/* --- 17. キーフレーム・アニメーションの定義 --- */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-border {
+  0% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7); }
+  70% { box-shadow: 0 0 0 15px rgba(231, 76, 60, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
+}
+
+@keyframes shake {
+  0% { transform: rotate(-3deg); }
+  100% { transform: rotate(3deg); }
+}
+
+@keyframes logo-drift {
+  0% { transform: translateY(0) rotate(0deg); }
+  100% { transform: translateY(-4px) rotate(8deg); }
+}

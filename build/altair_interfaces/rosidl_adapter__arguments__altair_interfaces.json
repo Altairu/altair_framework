@@ -1,0 +1,14 @@
+{
+  "package_name": "altair_interfaces",
+  "non_idl_tuples": [
+    "/mnt/c/Users/106no/Documents/GitHub/altair_framework/altair_interfaces:msg/CanStatus.msg",
+    "/mnt/c/Users/106no/Documents/GitHub/altair_framework/altair_interfaces:msg/MddFeedback.msg",
+    "/mnt/c/Users/106no/Documents/GitHub/altair_framework/altair_interfaces:msg/MddCommand.msg",
+    "/mnt/c/Users/106no/Documents/GitHub/altair_framework/altair_interfaces:msg/ServoCommand.msg",
+    "/mnt/c/Users/106no/Documents/GitHub/altair_framework/altair_interfaces:msg/SolenoidCommand.msg",
+    "/mnt/c/Users/106no/Documents/GitHub/altair_framework/altair_interfaces:srv/TriggerControl.srv",
+    "/mnt/c/Users/106no/Documents/GitHub/altair_framework/altair_interfaces:srv/GetAvailablePorts.srv",
+    "/mnt/c/Users/106no/Documents/GitHub/altair_framework/altair_interfaces:srv/ConnectCan.srv",
+    "/mnt/c/Users/106no/Documents/GitHub/altair_framework/altair_interfaces:srv/StartBehavior.srv"
+  ]
+}
