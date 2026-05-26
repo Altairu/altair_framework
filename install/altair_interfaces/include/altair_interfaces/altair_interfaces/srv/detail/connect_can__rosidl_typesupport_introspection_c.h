@@ -1,1 +1,0 @@
-/home/altair/altair_framework/build/altair_interfaces/rosidl_typesupport_introspection_c/altair_interfaces/srv/detail/connect_can__rosidl_typesupport_introspection_c.h

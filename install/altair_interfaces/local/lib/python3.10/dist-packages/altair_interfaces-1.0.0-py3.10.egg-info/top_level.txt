@@ -1,1 +1,0 @@
-/home/altair/altair_framework/build/altair_interfaces/ament_cmake_python/altair_interfaces/altair_interfaces.egg-info/top_level.txt

@@ -1,2 +1,0 @@
-altair_core
-user_behaviors

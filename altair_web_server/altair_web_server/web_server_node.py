@@ -224,6 +224,9 @@ class SolenoidCmdRequest(BaseModel):
     name: str
     valves: list[bool]
 
+class SaveBlocklyRequest(BaseModel):
+    code: str
+
 # --- REST API ルーティング ---
 
 @app.get("/api/ports")
@@ -302,6 +305,32 @@ async def stop_behavior():
         
     res = future.result()
     return {"success": res.success, "message": res.message}
+
+@app.post("/api/behavior/save_blockly")
+async def save_blockly(req_data: SaveBlocklyRequest):
+    """Blocklyで生成されたPythonコードをファイルとして保存"""
+    paths = [
+        "c:/Users/106no/Documents/GitHub/altair_framework/altair_core/user_behaviors",
+        os.path.join(os.path.expanduser('~'), "ros2_ws/src/altair_framework/altair_core/user_behaviors"),
+        "./src/altair_framework/altair_core/user_behaviors",
+        "user_behaviors"
+    ]
+    dest_dir = None
+    for p in paths:
+        if os.path.exists(p):
+            dest_dir = p
+            break
+    if not dest_dir:
+        dest_dir = "user_behaviors"
+        os.makedirs(dest_dir, exist_ok=True)
+        
+    dest_file = os.path.join(dest_dir, "blockly_behavior.py")
+    try:
+        with open(dest_file, "w", encoding="utf-8") as f:
+            f.write(req_data.code)
+        return {"success": True, "message": "Blocklyコードを blockly_behavior.py として保存しました。"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"保存に失敗しました: {str(e)}")
 
 # --- 📁 プロファイル管理 (REST API) ---
 

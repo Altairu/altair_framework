@@ -1,1 +1,0 @@
-/home/altair/altair_framework/build/altair_interfaces/rosidl_generator_cpp/altair_interfaces/srv/detail/trigger_control__type_support.hpp

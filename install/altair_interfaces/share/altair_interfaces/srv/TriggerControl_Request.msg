@@ -1,1 +1,0 @@
-/home/altair/altair_framework/build/altair_interfaces/rosidl_cmake/srv/TriggerControl_Request.msg

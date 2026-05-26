@@ -1,0 +1,19 @@
+# ROS2 build artifacts
+build/
+install/
+log/
+
+# Python artifacts
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+
+# Custom user behaviors (Blockly generated)
+altair_core/user_behaviors/blockly_behavior.py
+
+# OS generated files
+.DS_Store
+Thumbs.db

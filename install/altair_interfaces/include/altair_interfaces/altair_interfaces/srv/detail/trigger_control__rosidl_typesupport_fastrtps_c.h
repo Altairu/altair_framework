@@ -1,1 +1,0 @@
-/home/altair/altair_framework/build/altair_interfaces/rosidl_typesupport_fastrtps_c/altair_interfaces/srv/detail/trigger_control__rosidl_typesupport_fastrtps_c.h

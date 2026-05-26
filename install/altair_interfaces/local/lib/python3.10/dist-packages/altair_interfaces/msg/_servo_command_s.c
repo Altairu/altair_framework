@@ -1,1 +1,0 @@
-/home/altair/altair_framework/build/altair_interfaces/rosidl_generator_py/altair_interfaces/msg/_servo_command_s.c

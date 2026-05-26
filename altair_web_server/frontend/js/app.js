@@ -292,23 +292,63 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>`;
     }
 
+    // M1〜M4のパラメータ（モード, P, I, D）編集テーブル
+    let paramsRowsHtml = "";
+    for (let i = 1; i <= 4; i++) {
+      const motorParam = mod.parameters?.[`m${i}`] ?? { mode: 0, p: 10.0, i: 0.0, d: 0.0 };
+      paramsRowsHtml += `
+        <tr style="border-bottom: 1px solid var(--border-light);">
+          <td style="padding: 4px 0; font-weight: 500;">M${i}</td>
+          <td style="padding: 4px 0;">
+            <select class="form-input form-input-sm select-mdd-mode" data-module="${mod.name}" data-motor="${i}" style="padding: 2px 4px; font-size: 11px; height: 22px; width: 68px;">
+              <option value="0" ${motorParam.mode === 0 ? "selected" : ""}>Speed</option>
+              <option value="1" ${motorParam.mode === 1 ? "selected" : ""}>Angle</option>
+              <option value="2" ${motorParam.mode === 2 ? "selected" : ""}>Pos</option>
+            </select>
+          </td>
+          <td style="padding: 4px 0; text-align: center;">
+            <input type="number" class="form-input form-input-sm input-mdd-p" data-module="${mod.name}" data-motor="${i}" step="0.1" value="${motorParam.p}" style="padding: 2px 4px; font-size: 11px; height: 22px; width: 42px; text-align: center; display: inline-block;">
+          </td>
+          <td style="padding: 4px 0; text-align: center;">
+            <input type="number" class="form-input form-input-sm input-mdd-i" data-module="${mod.name}" data-motor="${i}" step="0.01" value="${motorParam.i}" style="padding: 2px 4px; font-size: 11px; height: 22px; width: 42px; text-align: center; display: inline-block;">
+          </td>
+          <td style="padding: 4px 0; text-align: center;">
+            <input type="number" class="form-input form-input-sm input-mdd-d" data-module="${mod.name}" data-motor="${i}" step="0.01" value="${motorParam.d}" style="padding: 2px 4px; font-size: 11px; height: 22px; width: 42px; text-align: center; display: inline-block;">
+          </td>
+        </tr>`;
+    }
+
+    const paramTableHtml = `
+      <div class="mdd-params-table-wrapper mt-3">
+        <h4 style="font-size: 12px; margin-bottom: 6px; font-weight: 600;"><i class="fa-solid fa-gears"></i> PID & Mode Settings</h4>
+        <table class="mdd-params-table" style="width: 100%; border-collapse: collapse; font-size: 11px;">
+          <thead>
+            <tr style="border-bottom: 1px solid var(--border-light); text-align: left; color: var(--text-muted);">
+              <th style="padding-bottom: 4px; width: 10%;">Ch</th>
+              <th style="padding-bottom: 4px; width: 30%;">Mode</th>
+              <th style="padding-bottom: 4px; text-align: center; width: 20%;">P</th>
+              <th style="padding-bottom: 4px; text-align: center; width: 20%;">I</th>
+              <th style="padding-bottom: 4px; text-align: center; width: 20%;">D</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${paramsRowsHtml}
+          </tbody>
+        </table>
+      </div>`;
+
     return `
       <!-- モータ目標値スライダー -->
       <div class="mdd-sliders">
         ${slidersHtml}
       </div>
       
-      <!-- PID等の内部パラメータ表示 -->
-      <div class="mdd-params-grid mt-3">
-        <div class="mdd-param-item">M1 mode: <span id="lbl-${mod.name}-m1-mode">-</span></div>
-        <div class="mdd-param-item">M2 mode: <span id="lbl-${mod.name}-m2-mode">-</span></div>
-        <div class="mdd-param-item">M1 PID: <span id="lbl-${mod.name}-m1-pid">-</span></div>
-        <div class="mdd-param-item">M2 PID: <span id="lbl-${mod.name}-m2-pid">-</span></div>
-      </div>
+      <!-- PIDおよびモードの編集テーブル -->
+      ${paramTableHtml}
 
       <!-- Limitスイッチインジケータ -->
       <div class="switches-section mt-3">
-        <h4 style="font-size: 13px; margin-bottom: 8px;">Limit Switches</h4>
+        <h4 style="font-size: 12px; margin-bottom: 6px; font-weight: 600;">Limit Switches</h4>
         <div class="switches-row">
           <div class="sw-indicator" id="sw-${mod.name}-1">SW 1</div>
           <div class="sw-indicator" id="sw-${mod.name}-2">SW 2</div>
@@ -319,10 +359,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
       <!-- エンコーダ実測データ表示 -->
       <div class="mdd-params-grid mt-3">
-        <div class="mdd-param-item">M1 Ang/Spd: <span id="lbl-${mod.name}-m1-fb">0.0° / 0.0</span></div>
-        <div class="mdd-param-item">M2 Ang/Spd: <span id="lbl-${mod.name}-m2-fb">0.0° / 0.0</span></div>
-        <div class="mdd-param-item">M3 Ang/Spd: <span id="lbl-${mod.name}-m3-fb">0.0° / 0.0</span></div>
-        <div class="mdd-param-item">M4 Ang/Spd: <span id="lbl-${mod.name}-m4-fb">0.0° / 0.0</span></div>
+        <div class="mdd-param-item">M1 FB: <span id="lbl-${mod.name}-m1-fb">0.0° / 0.0</span></div>
+        <div class="mdd-param-item">M2 FB: <span id="lbl-${mod.name}-m2-fb">0.0° / 0.0</span></div>
+        <div class="mdd-param-item">M3 FB: <span id="lbl-${mod.name}-m3-fb">0.0° / 0.0</span></div>
+        <div class="mdd-param-item">M4 FB: <span id="lbl-${mod.name}-m4-fb">0.0° / 0.0</span></div>
       </div>
     `;
   }
@@ -377,19 +417,59 @@ document.addEventListener("DOMContentLoaded", () => {
         });
       });
 
-      // 設定パラメータのカードへの初期描画
-      for (let i = 1; i <= 4; i++) {
-        const motorParam = mod.parameters?.[`m${i}`] ?? { mode: 0, p: 1.0, i: 0.0, d: 0.0 };
-        const modeText = motorParam.mode === 0 ? "Speed" : motorParam.mode === 1 ? "Angle" : "Pos";
-        
-        // M1, M2のみ簡易表示
-        if (i <= 2) {
-          const modeEl = document.getElementById(`lbl-${mod.name}-m${i}-mode`);
-          const pidEl = document.getElementById(`lbl-${mod.name}-m${i}-pid`);
-          if (modeEl) modeEl.textContent = modeText;
-          if (pidEl) pidEl.textContent = `P:${motorParam.p} I:${motorParam.i}`;
-        }
-      }
+      // モード変更イベントリスナーの追加
+      const modeSelects = document.querySelectorAll(`.select-mdd-mode[data-module="${mod.name}"]`);
+      modeSelects.forEach(sel => {
+        sel.addEventListener("change", async (e) => {
+          const motorIdx = e.target.getAttribute("data-motor");
+          const modeVal = parseInt(e.target.value);
+          
+          const moduleObj = state.config.modules.find(m => m.name === mod.name);
+          if (moduleObj) {
+            if (!moduleObj.parameters) moduleObj.parameters = {};
+            if (!moduleObj.parameters[`m${motorIdx}`]) {
+              moduleObj.parameters[`m${motorIdx}`] = { p: 10.0, i: 0.0, d: 0.0, diameter: 100.0, direction: 1, mode: 0 };
+            }
+            moduleObj.parameters[`m${motorIdx}`].mode = modeVal;
+            
+            // スライダー単位の更新
+            const valEl = document.getElementById(`val-${mod.name}-m${motorIdx}`);
+            const slider = document.getElementById(`range-${mod.name}-m${motorIdx}`);
+            const unit = modeVal === 0 ? "rps" : modeVal === 1 ? "deg" : "mm";
+            if (valEl) valEl.textContent = `${parseFloat(slider.value).toFixed(1)} ${unit}`;
+            
+            // 設定ファイルを自動保存
+            await saveConfigToServer();
+          }
+        });
+      });
+
+      // PID値変更イベントリスナーの追加
+      const pidInputs = document.querySelectorAll(`.input-mdd-p[data-module="${mod.name}"], .input-mdd-i[data-module="${mod.name}"], .input-mdd-d[data-module="${mod.name}"]`);
+      pidInputs.forEach(input => {
+        input.addEventListener("change", async (e) => {
+          const motorIdx = e.target.getAttribute("data-motor");
+          const moduleObj = state.config.modules.find(m => m.name === mod.name);
+          if (moduleObj) {
+            if (!moduleObj.parameters) moduleObj.parameters = {};
+            if (!moduleObj.parameters[`m${motorIdx}`]) {
+              moduleObj.parameters[`m${motorIdx}`] = { p: 10.0, i: 0.0, d: 0.0, diameter: 100.0, direction: 1, mode: 0 };
+            }
+            
+            const val = parseFloat(e.target.value) || 0.0;
+            if (e.target.classList.contains("input-mdd-p")) {
+              moduleObj.parameters[`m${motorIdx}`].p = val;
+            } else if (e.target.classList.contains("input-mdd-i")) {
+              moduleObj.parameters[`m${motorIdx}`].i = val;
+            } else if (e.target.classList.contains("input-mdd-d")) {
+              moduleObj.parameters[`m${motorIdx}`].d = val;
+            }
+            
+            // 設定ファイルを自動保存
+            await saveConfigToServer();
+          }
+        });
+      });
 
     } else if (mod.type === "servo") {
       // サーボスライダーのドラッグイベント
@@ -818,10 +898,10 @@ document.addEventListener("DOMContentLoaded", () => {
     // MDD特有の初期パラメータ構造を追加
     if (type === "mdd") {
       newMod.parameters = {
-        m1: { p: 1.5, i: 0.1, d: 0.05, diameter: 100.0, direction: 1, mode: 0 },
-        m2: { p: 1.5, i: 0.1, d: 0.05, diameter: 100.0, direction: 1, mode: 0 },
-        m3: { p: 1.5, i: 0.1, d: 0.05, diameter: 100.0, direction: 1, mode: 0 },
-        m4: { p: 1.5, i: 0.1, d: 0.05, diameter: 100.0, direction: 1, mode: 0 }
+        m1: { p: 10.0, i: 0.0, d: 0.0, diameter: 100.0, direction: 1, mode: 0 },
+        m2: { p: 10.0, i: 0.0, d: 0.0, diameter: 100.0, direction: 1, mode: 0 },
+        m3: { p: 10.0, i: 0.0, d: 0.0, diameter: 100.0, direction: 1, mode: 0 },
+        m4: { p: 10.0, i: 0.0, d: 0.0, diameter: 100.0, direction: 1, mode: 0 }
       };
     }
 
@@ -863,9 +943,370 @@ document.addEventListener("DOMContentLoaded", () => {
     await fetch("/api/behavior/stop", { method: "POST" });
   });
 
+  // 設定保存用APIの呼び出し
+  async function saveConfigToServer() {
+    try {
+      await fetch("/api/config/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(state.config)
+      });
+    } catch (err) {
+      console.error("設定の自動保存に失敗しました:", err);
+    }
+  }
+
   // --- 13. 初期化処理の実行 ---
   connectWebSocket();
   loadConfigAndRender();
   refreshPorts();
   refreshProfiles();
+
+  // 全画面表示の切り替え
+  const btnFullscreen = document.getElementById("btn-fullscreen-toggle");
+  if (btnFullscreen) {
+    btnFullscreen.addEventListener("click", () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+          console.error(`全画面表示への切り替えに失敗しました: ${err.message}`);
+        });
+        btnFullscreen.innerHTML = '<i class="fa-solid fa-compress"></i> 画面縮小';
+      } else {
+        document.exitFullscreen();
+        btnFullscreen.innerHTML = '<i class="fa-solid fa-expand"></i> 全画面表示';
+      }
+    });
+  }
+
+  // ==========================================================================
+  // --- 14. Blockly ビジュアルマクロ統合 ＆ Pythonコードリアルタイム生成 ---
+  // ==========================================================================
+  
+  // Blockly カスタムブロック定義
+  Blockly.Blocks['mdd_move'] = {
+    init: function() {
+      this.appendDummyInput()
+          .appendField("MDD モータ制御")
+          .appendField(new Blockly.FieldTextInput("drive_mdd"), "NAME");
+      this.appendValueInput("M1")
+          .setCheck("Number")
+          .appendField("M1");
+      this.appendValueInput("M2")
+          .setCheck("Number")
+          .appendField("M2");
+      this.appendValueInput("M3")
+          .setCheck("Number")
+          .appendField("M3");
+      this.appendValueInput("M4")
+          .setCheck("Number")
+          .appendField("M4");
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setColour(230);
+      this.setTooltip("MDDモータの目標速度/目標角度/目標位置を一括指示します。");
+      this.setHelpUrl("");
+    }
+  };
+
+  Blockly.Blocks['servo_move'] = {
+    init: function() {
+      this.appendDummyInput()
+          .appendField("Servo 角度制御")
+          .appendField(new Blockly.FieldTextInput("arm_servo"), "NAME");
+      this.appendValueInput("S1")
+          .setCheck("Number")
+          .appendField("S1 (0-180°)");
+      this.appendValueInput("S2")
+          .setCheck("Number")
+          .appendField("S2 (0-180°)");
+      this.appendValueInput("S3")
+          .setCheck("Number")
+          .appendField("S3 (0-180°)");
+      this.appendValueInput("S4")
+          .setCheck("Number")
+          .appendField("S4 (0-180°)");
+      this.appendValueInput("S5")
+          .setCheck("Number")
+          .appendField("S5 (0-180°)");
+      this.appendValueInput("S6")
+          .setCheck("Number")
+          .appendField("S6 (0-180°)");
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setColour(60);
+      this.setTooltip("サーボの目標角度を6ch一括指示します。");
+      this.setHelpUrl("");
+    }
+  };
+
+  Blockly.Blocks['valve_control'] = {
+    init: function() {
+      this.appendDummyInput()
+          .appendField("Solenoid 電磁弁制御")
+          .appendField(new Blockly.FieldTextInput("valve_controller"), "NAME")
+          .appendField("Ch")
+          .appendField(new Blockly.FieldNumber(1, 1, 12, 1), "CHANNEL")
+          .appendField("状態")
+          .appendField(new Blockly.FieldDropdown([["ON", "True"], ["OFF", "False"]]), "STATE");
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setColour(0);
+      this.setTooltip("特定の電磁弁をON/OFF制御します。");
+      this.setHelpUrl("");
+    }
+  };
+
+  Blockly.Blocks['delay_wait'] = {
+    init: function() {
+      this.appendDummyInput()
+          .appendField("遅延ウェイト")
+          .appendField(new Blockly.FieldNumber(1.0, 0.0, 100.0, 0.1), "SEC")
+          .appendField("秒");
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setColour(120);
+      this.setTooltip("指定された秒数処理を一時停止します。");
+      this.setHelpUrl("");
+    }
+  };
+
+  Blockly.Blocks['print_log'] = {
+    init: function() {
+      this.appendDummyInput()
+          .appendField("ログ出力")
+          .appendField(new Blockly.FieldTextInput("マクロを実行中..."), "TEXT");
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setColour(180);
+      this.setTooltip("プログラム出力ログにメッセージを出力します。");
+      this.setHelpUrl("");
+    }
+  };
+
+  // Blockly.Python ジェネレーターの定義
+  Blockly.Python['mdd_move'] = function(block) {
+    const name = block.getFieldValue('NAME');
+    const m1 = Blockly.Python.valueToCode(block, 'M1', Blockly.Python.ORDER_ATOMIC) || '0.0';
+    const m2 = Blockly.Python.valueToCode(block, 'M2', Blockly.Python.ORDER_ATOMIC) || '0.0';
+    const m3 = Blockly.Python.valueToCode(block, 'M3', Blockly.Python.ORDER_ATOMIC) || '0.0';
+    const m4 = Blockly.Python.valueToCode(block, 'M4', Blockly.Python.ORDER_ATOMIC) || '0.0';
+    return `            self.get_module("${name}").set_targets([${m1}, ${m2}, ${m3}, ${m4}])\n`;
+  };
+
+  Blockly.Python['servo_move'] = function(block) {
+    const name = block.getFieldValue('NAME');
+    const s1 = Blockly.Python.valueToCode(block, 'S1', Blockly.Python.ORDER_ATOMIC) || '90';
+    const s2 = Blockly.Python.valueToCode(block, 'S2', Blockly.Python.ORDER_ATOMIC) || '90';
+    const s3 = Blockly.Python.valueToCode(block, 'S3', Blockly.Python.ORDER_ATOMIC) || '90';
+    const s4 = Blockly.Python.valueToCode(block, 'S4', Blockly.Python.ORDER_ATOMIC) || '90';
+    const s5 = Blockly.Python.valueToCode(block, 'S5', Blockly.Python.ORDER_ATOMIC) || '90';
+    const s6 = Blockly.Python.valueToCode(block, 'S6', Blockly.Python.ORDER_ATOMIC) || '90';
+    return `            self.get_module("${name}").set_angles([${s1}, ${s2}, ${s3}, ${s4}, ${s5}, ${s6}])\n`;
+  };
+
+  Blockly.Python['valve_control'] = function(block) {
+    const name = block.getFieldValue('NAME');
+    const channel = block.getFieldValue('CHANNEL');
+    const state = block.getFieldValue('STATE');
+    return `            self.get_module("${name}").set_valve(${channel}, ${state})\n`;
+  };
+
+  Blockly.Python['delay_wait'] = function(block) {
+    const sec = block.getFieldValue('SEC');
+    return `            time.sleep(${sec})\n`;
+  };
+
+  Blockly.Python['print_log'] = function(block) {
+    const text = block.getFieldValue('TEXT');
+    return `            print("[BLOCKLY] ${text}")\n`;
+  };
+
+  // フルPythonコードに組み立てるヘルパー
+  function generatePythonCode(blocklyCode) {
+    return `#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+Altair Module System - Blockly 自動生成プログラム
+"""
+
+import sys
+import rclpy
+import os
+import time
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from altair_core.base_behavior import AltairBehavior
+
+class BlocklyBehavior(AltairBehavior):
+    def on_init(self):
+        self.get_logger().info("BlocklyマクロBehaviorが初期化されました。")
+        self.executed = False
+
+    def loop(self):
+        if self.executed:
+            return
+        self.executed = True
+        
+        try:
+            print("--- Blocklyマクロの実行を開始します ---")
+${blocklyCode}
+            print("--- Blocklyマクロの実行が完了しました ---")
+        except Exception as e:
+            self.get_logger().error(f"マクロ実行中にエラーが発生しました: {str(e)}")
+        finally:
+            sys.exit(0)
+
+def main(args=None):
+    rclpy.init(args=args)
+    behavior = BlocklyBehavior("blockly_behavior_node")
+    behavior.run(rate_hz=10.0)
+
+if __name__ == '__main__':
+    main()
+`;
+  }
+
+  // ツールボックスの定義 XML
+  const toolboxXml = `
+    <xml id="toolbox" style="display: none">
+      <category name="基本動作" colour="120">
+        <block type="delay_wait"></block>
+        <block type="print_log"></block>
+      </category>
+      <category name="MDDモータ" colour="230">
+        <block type="mdd_move">
+          <value name="M1"><block type="math_number"><field name="NUM">0</field></block></value>
+          <value name="M2"><block type="math_number"><field name="NUM">0</field></block></value>
+          <value name="M3"><block type="math_number"><field name="NUM">0</field></block></value>
+          <value name="M4"><block type="math_number"><field name="NUM">0</field></block></value>
+        </block>
+        <block type="math_number"></block>
+      </category>
+      <category name="サーボ" colour="60">
+        <block type="servo_move">
+          <value name="S1"><block type="math_number"><field name="NUM">90</field></block></value>
+          <value name="S2"><block type="math_number"><field name="NUM">90</field></block></value>
+          <value name="S3"><block type="math_number"><field name="NUM">90</field></block></value>
+          <value name="S4"><block type="math_number"><field name="NUM">90</field></block></value>
+          <value name="S5"><block type="math_number"><field name="NUM">90</field></block></value>
+          <value name="S6"><block type="math_number"><field name="NUM">90</field></block></value>
+        </block>
+        <block type="math_number"></block>
+      </category>
+      <category name="電磁弁" colour="0">
+        <block type="valve_control"></block>
+      </category>
+    </xml>
+  `;
+
+  // XML を body に一時注入して injection する
+  const tDiv = document.createElement("div");
+  tDiv.innerHTML = toolboxXml;
+  document.body.appendChild(tDiv.firstElementChild);
+
+  const workspace = Blockly.inject('blocklyDiv', {
+    toolbox: document.getElementById('toolbox'),
+    scrollbars: true,
+    trashcan: true
+  });
+
+  // リアルタイムにコードを生成＆プレビュー
+  workspace.addChangeListener(() => {
+    try {
+      const rawCode = Blockly.Python.workspaceToCode(workspace);
+      const fullPython = generatePythonCode(rawCode);
+      const codeArea = document.getElementById("blockly-code-area");
+      if (codeArea) {
+        codeArea.textContent = fullPython;
+      }
+    } catch (err) {
+      const codeArea = document.getElementById("blockly-code-area");
+      if (codeArea) {
+        codeArea.textContent = "# コード自動生成エラー: " + err.message;
+      }
+    }
+  });
+
+  // マクロ実行ボタンのイベント
+  const btnRunBlockly = document.getElementById("btn-run-blockly");
+  if (btnRunBlockly) {
+    btnRunBlockly.addEventListener("click", async () => {
+      const rawCode = Blockly.Python.workspaceToCode(workspace);
+      const fullPython = generatePythonCode(rawCode);
+      
+      appendTerminalLog(el.behaviorTerminal, "Blocklyコードを blockly_behavior.py として保存中...");
+      
+      try {
+        const saveRes = await fetch("/api/behavior/save_blockly", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: fullPython })
+        });
+        const saveData = await saveRes.json();
+        
+        if (!saveData.success) {
+          appendTerminalLog(el.behaviorTerminal, `[ERROR] コード保存失敗: ${saveData.message}`, "error-msg");
+          return;
+        }
+        
+        appendTerminalLog(el.behaviorTerminal, "Blocklyビジュアルマクロを起動中...");
+        
+        const runRes = await fetch("/api/behavior/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ behavior_name: "blockly_behavior.py" })
+        });
+        const runData = await runRes.json();
+        
+        if (runData.success) {
+          appendTerminalLog(el.behaviorTerminal, "[SYSTEM] Blocklyマクロが正常に起動しました。", "system-msg");
+          // 実行画面（Behaviorビュー）へ自動的に切り替える
+          const targetItem = document.querySelector('.menu-item[data-target="view-behavior"]');
+          if (targetItem) targetItem.click();
+        } else {
+          appendTerminalLog(el.behaviorTerminal, `[ERROR] 起動失敗: ${runData.message}`, "error-msg");
+        }
+      } catch (err) {
+        appendTerminalLog(el.behaviorTerminal, `[ERROR] 通信エラー: ${err}`, "error-msg");
+      }
+    });
+  }
+
+  // マクロ停止ボタンのイベント
+  const btnStopBlockly = document.getElementById("btn-stop-blockly");
+  if (btnStopBlockly) {
+    btnStopBlockly.addEventListener("click", async () => {
+      appendTerminalLog(el.behaviorTerminal, "マクロ停止要求を送信...");
+      try {
+        const res = await fetch("/api/behavior/stop", { method: "POST" });
+        const data = await res.json();
+        if (data.success) {
+          appendTerminalLog(el.behaviorTerminal, "[SYSTEM] マクロを停止しました。", "system-msg");
+        } else {
+          appendTerminalLog(el.behaviorTerminal, `[ERROR] 停止失敗: ${data.message}`, "error-msg");
+        }
+      } catch (err) {
+        appendTerminalLog(el.behaviorTerminal, `[ERROR] 通信エラー: ${err}`, "error-msg");
+      }
+    });
+  }
+
+  // 保存ボタンのイベント
+  const btnExportBlocklyCode = document.getElementById("btn-export-blockly-code");
+  if (btnExportBlocklyCode) {
+    btnExportBlocklyCode.addEventListener("click", () => {
+      const rawCode = Blockly.Python.workspaceToCode(workspace);
+      const fullPython = generatePythonCode(rawCode);
+      const blob = new Blob([fullPython], { type: "text/x-python" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "blockly_behavior.py";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+  }
 });

@@ -15,10 +15,11 @@
   
   <!-- Google Blockly CDN -->
   <script src="https://unpkg.com/blockly/blockly.min.js"></script>
+  <script src="https://unpkg.com/blockly/python_compressed.js"></script>
 </head>
 <body>
 
-  <!-- 背景デコレーション -->
+  <!-- Googleスタイルのクリーン背景デコレーション（柔らかい薄色の変化） -->
   <div class="bg-glow bg-glow-1"></div>
   <div class="bg-glow bg-glow-2"></div>
 
@@ -27,7 +28,7 @@
     <!-- 1. サイドバー / ナビゲーション -->
     <aside class="sidebar">
       <div class="sidebar-logo">
-        <i class="fa-solid fa-space-shuttle logo-icon"></i>
+        <i class="fa-solid fa-compass logo-icon"></i>
         <span>ALTAIR</span>
       </div>
       
@@ -42,10 +43,10 @@
           <i class="fa-solid fa-gamepad"></i> Controller
         </a>
         <a href="#" class="menu-item" data-target="view-automation">
-          <i class="fa-solid fa-puzzle-piece"></i> Automation
+          <i class="fa-solid fa-puzzle-piece"></i> Automation (Block)
         </a>
         <a href="#" class="menu-item" data-target="view-behavior">
-          <i class="fa-solid fa-terminal"></i> Programs
+          <i class="fa-solid fa-code"></i> Python Program
         </a>
         <a href="#" class="menu-item" data-target="view-logs">
           <i class="fa-solid fa-receipt"></i> System Logs
@@ -69,13 +70,18 @@
 
         <!-- 接続情報・非常停止ステータス -->
         <div class="header-status-panel">
+          <!-- 全画面トグルボタン [★追加] -->
+          <button class="btn btn-secondary btn-fullscreen" id="btn-fullscreen-toggle" title="全画面表示の切り替え">
+            <i class="fa-solid fa-expand"></i> 全画面表示
+          </button>
+
           <div class="connection-pill shadow-sm" id="can-status-indicator">
             <span class="status-dot disconnected"></span>
             <span class="status-text">CAN: Disconnected</span>
           </div>
           
           <button class="btn btn-danger btn-emergency" id="btn-emergency-stop">
-            <i class="fa-solid fa-radiation"></i> EMERGENCY STOP
+            <i class="fa-solid fa-circle-stop"></i> EMERGENCY STOP
           </button>
         </div>
       </header>
@@ -86,7 +92,7 @@
         <div class="control-board glass-card">
           <!-- 接続ポート設定 -->
           <div class="control-group">
-            <h3><i class="fa-solid fa-link"></i> Connection (slcan)</h3>
+            <h3><i class="fa-solid fa-network-wired"></i> Connection (slcan)</h3>
             <div class="connection-controls">
               <label class="toggle-checkbox">
                 <input type="checkbox" id="chk-auto-connect" checked>
@@ -112,11 +118,11 @@
 
           <!-- 動作モードパラメータ送信 -->
           <div class="control-group">
-            <h3><i class="fa-solid fa-gears"></i> Parameter Settings</h3>
+            <h3><i class="fa-solid fa-sliders"></i> Parameter Settings</h3>
             <p class="group-desc">MDDモータの制御を開始するにはパラメータを一括送信してください。</p>
             <div class="btn-row-centered">
               <button class="btn btn-success btn-lg" id="btn-send-params">
-                <i class="fa-solid fa-paper-plane"></i> Send Params & Start
+                <i class="fa-solid fa-play"></i> Send Params & Start
               </button>
             </div>
             <div class="control-status" id="control-mode-status">
@@ -126,7 +132,7 @@
 
           <!-- モジュール追加 -->
           <div class="control-group">
-            <h3><i class="fa-solid fa-plus-circle"></i> Manage Modules</h3>
+            <h3><i class="fa-solid fa-circle-plus"></i> Manage Modules</h3>
             <p class="group-desc">制御対象のモジュールを動的に追加・編集します。</p>
             <div class="btn-row">
               <button class="btn btn-primary" id="btn-add-module-modal">
@@ -233,18 +239,32 @@
 
       <!-- ビュー 4: Automation -->
       <section id="view-automation" class="content-view">
-        <div class="glass-card page-card blockly-card">
-          <div class="blockly-header">
-            <h2><i class="fa-solid fa-puzzle-piece"></i> Blockly ビジュアルマクロ作成</h2>
-            <div class="blockly-btn-group">
-              <button class="btn btn-success" id="btn-run-blockly"><i class="fa-solid fa-play"></i> マクロを実行</button>
-              <button class="btn btn-secondary" id="btn-stop-blockly"><i class="fa-solid fa-stop"></i> 停止</button>
+        <div class="automation-layout">
+          <!-- Blockly エディタ領域 -->
+          <div class="glass-card blockly-card">
+            <div class="blockly-header">
+              <h2><i class="fa-solid fa-puzzle-piece"></i> Blockly ビジュアルマクロ作成</h2>
+              <div class="blockly-btn-group">
+                <button class="btn btn-success" id="btn-run-blockly"><i class="fa-solid fa-play"></i> マクロを実行</button>
+                <button class="btn btn-secondary" id="btn-stop-blockly"><i class="fa-solid fa-stop"></i> 停止</button>
+              </div>
+            </div>
+            <p>Scratchライクなブロックを組み合わせて、センサーフィードバックに応じた自動制御を作成します。</p>
+
+            <div id="blocklyDiv" style="height: 550px; width: 100%; border-radius: 8px; margin-top: 15px;"></div>
+          </div>
+
+          <!-- 生成コード確認パネル [★スクラッチコード生成機能] -->
+          <div class="glass-card blockly-code-card">
+            <div class="console-header">
+              <h3><i class="fa-solid fa-file-code"></i> 生成された Python 制御コード</h3>
+              <button class="btn btn-secondary btn-xs" id="btn-export-blockly-code">コードを保存</button>
+            </div>
+            <p class="group-desc">ブロックの配置に応じて、ROS2の自律制御Pythonプログラムがリアルタイム自動生成されます。</p>
+            <div class="terminal-view code-preview-view" id="blockly-code-terminal" style="height: 530px;">
+              <pre><code id="blockly-code-area"># ブロックを配置するとここにコードが生成されます...</code></pre>
             </div>
           </div>
-          <p>Scratchライクなブロックを組み合わせて、センサーフィードバックに応じた自動制御（マクロ）を作成します。</p>
-
-          <!-- Blockly エディタ領域 -->
-          <div id="blocklyDiv" style="height: 600px; width: 100%; border-radius: 12px; margin-top: 15px;"></div>
         </div>
       </section>
 
@@ -261,6 +281,7 @@
               <select id="sel-behavior-script" class="form-input">
                 <option value="example_behavior.py">example_behavior.py (ピック＆プレース)</option>
                 <option value="template_behavior.py">template_behavior.py (動作雛形ファイル)</option>
+                <option value="blockly_behavior.py">blockly_behavior.py (Blockly生成マクロ)</option>
               </select>
             </div>
 
@@ -269,7 +290,7 @@
                 <i class="fa-solid fa-play"></i> 起動 (Start Program)
               </button>
               <button class="btn btn-danger btn-lg btn-block" id="btn-stop-behavior" disabled>
-                <i class="fa-solid fa-square-term"></i> 停止 (Stop Program)
+                <i class="fa-solid fa-circle-stop"></i> 停止 (Stop Program)
               </button>
             </div>
 

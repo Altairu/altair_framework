@@ -43,7 +43,7 @@ fi
 
 # can_msgs 依存関係のチェックと自動インストール
 ros2 pkg prefix can_msgs &>/dev/null
-if [ $? -ne 0 ]; then
+if [ $? -ne 0 ] && [ ! -d "can_msgs" ] && [ ! -d "src/can_msgs" ]; then
     echo "[WARNING] can_msgs パッケージがROS2環境内に見つかりません。"
     echo "altair_can_bridge のビルドに必須のため、ros-$ROS_DISTRO-can-msgs のインストールを試みます..."
     sudo apt-get update && sudo apt-get install -y ros-$ROS_DISTRO-can-msgs
@@ -56,6 +56,8 @@ if [ $? -ne 0 ]; then
         exit 1
     fi
     echo "[SUCCESS] can_msgs が正常にインストールされました！"
+elif [ -d "can_msgs" ] || [ -d "src/can_msgs" ]; then
+    echo "[INFO] ワークスペース内にローカルの can_msgs パッケージを検出しました。これを使用してビルドします。"
 fi
 
 if [ "$DO_CLEAN" -eq 1 ]; then

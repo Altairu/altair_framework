@@ -1,1 +1,0 @@
-/home/altair/altair_framework/build/altair_interfaces/rosidl_generator_c/altair_interfaces/srv/detail/connect_can__struct.h

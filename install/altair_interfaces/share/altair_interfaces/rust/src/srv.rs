@@ -1,1 +1,0 @@
-/home/altair/altair_framework/build/altair_interfaces/rosidl_generator_rs/altair_interfaces/rust/src/srv.rs
