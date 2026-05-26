@@ -22,7 +22,7 @@ document.addEventListener("DOMContentLoaded", () => {
     menuItems: document.querySelectorAll(".menu-item"),
     views: document.querySelectorAll(".content-view"),
     pageTitle: document.getElementById("page-title"),
-    
+
     // 接続関連
     canStatusIndicator: document.getElementById("can-status-indicator"),
     chkAutoConnect: document.getElementById("chk-auto-connect"),
@@ -37,7 +37,7 @@ document.addEventListener("DOMContentLoaded", () => {
     lblControlModeStatus: document.getElementById("control-mode-status"),
     modulesContainer: document.getElementById("modules-container"),
     btnAddModuleModal: document.getElementById("btn-add-module-modal"),
-    
+
     // プロファイル管理
     profileListUl: document.getElementById("profile-list-ul"),
     txtNewProfileName: document.getElementById("txt-new-profile-name"),
@@ -68,6 +68,9 @@ document.addEventListener("DOMContentLoaded", () => {
     modalModuleDesc: document.getElementById("modal-module-desc"),
   };
 
+  // Blocklyワークスペース参照（タブ表示時の再レイアウトに使用）
+  let blocklyWorkspace = null;
+
   // --- 2. ビュー（画面）切り替えロジック ---
   el.menuItems.forEach(item => {
     item.addEventListener("click", (e) => {
@@ -87,6 +90,15 @@ document.addEventListener("DOMContentLoaded", () => {
           view.classList.remove("active");
         }
       });
+
+      // 非表示タブで初期化されたBlocklyを表示時に再レイアウトする
+      if (targetId === "view-automation" && blocklyWorkspace && typeof Blockly !== "undefined") {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            Blockly.svgResize(blocklyWorkspace);
+          });
+        });
+      }
     });
   });
 
@@ -140,7 +152,7 @@ document.addEventListener("DOMContentLoaded", () => {
       case "mdd_feedback":
         updateMddCardFeedback(msg.name, data);
         break;
-      
+
       case "raw_can_frame": // システム全体のCANログ用
         appendCanLog(data);
         break;
@@ -163,7 +175,7 @@ document.addEventListener("DOMContentLoaded", () => {
       text.textContent = "CAN: Disconnected";
       el.btnConnectCan.disabled = false;
       el.btnDisconnectCan.disabled = true;
-      
+
       if (data.error_message) {
         appendTerminalLog(el.behaviorTerminal, `[CAN ERROR] ${data.error_message}`, "error-msg");
       }
@@ -174,7 +186,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function updateBehaviorStatusUI(status) {
     state.behaviorStatus = status;
     el.lblBehaviorStatus.textContent = status;
-    
+
     // バッジ色の変更
     if (status.includes("RUNNING")) {
       el.lblBehaviorStatus.className = "badge badge-success";
@@ -197,12 +209,12 @@ document.addEventListener("DOMContentLoaded", () => {
     line.className = `terminal-line ${className}`;
     line.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
     terminal.appendChild(line);
-    
+
     // 最大300行に制限
     while (terminal.childElementCount > 300) {
       terminal.removeChild(terminal.firstChild);
     }
-    
+
     // スクロール追従
     terminal.scrollTop = terminal.scrollHeight;
   }
@@ -212,7 +224,7 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const res = await fetch("/api/config");
       state.config = await res.json();
-      
+
       renderModuleCards();
     } catch (err) {
       console.error("モジュール設定のロードに失敗しました:", err);
@@ -271,7 +283,7 @@ document.addEventListener("DOMContentLoaded", () => {
       `;
 
       el.modulesContainer.appendChild(card);
-      
+
       // イベントリスナーの動的設定
       bindCardEvents(mod);
     });
@@ -406,7 +418,7 @@ document.addEventListener("DOMContentLoaded", () => {
         slider.addEventListener("input", (e) => {
           const motorIdx = e.target.getAttribute("data-motor");
           const valEl = document.getElementById(`val-${mod.name}-m${motorIdx}`);
-          
+
           // モード表示の読み込み
           const mode = mod.parameters?.[`m${motorIdx}`]?.mode ?? 0;
           const unit = mode === 0 ? "rps" : mode === 1 ? "deg" : "mm";
@@ -423,7 +435,7 @@ document.addEventListener("DOMContentLoaded", () => {
         sel.addEventListener("change", async (e) => {
           const motorIdx = e.target.getAttribute("data-motor");
           const modeVal = parseInt(e.target.value);
-          
+
           const moduleObj = state.config.modules.find(m => m.name === mod.name);
           if (moduleObj) {
             if (!moduleObj.parameters) moduleObj.parameters = {};
@@ -431,13 +443,13 @@ document.addEventListener("DOMContentLoaded", () => {
               moduleObj.parameters[`m${motorIdx}`] = { p: 10.0, i: 0.0, d: 0.0, diameter: 100.0, direction: 1, mode: 0 };
             }
             moduleObj.parameters[`m${motorIdx}`].mode = modeVal;
-            
+
             // スライダー単位の更新
             const valEl = document.getElementById(`val-${mod.name}-m${motorIdx}`);
             const slider = document.getElementById(`range-${mod.name}-m${motorIdx}`);
             const unit = modeVal === 0 ? "rps" : modeVal === 1 ? "deg" : "mm";
             if (valEl) valEl.textContent = `${parseFloat(slider.value).toFixed(1)} ${unit}`;
-            
+
             // 設定ファイルを自動保存
             await saveConfigToServer();
           }
@@ -455,7 +467,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!moduleObj.parameters[`m${motorIdx}`]) {
               moduleObj.parameters[`m${motorIdx}`] = { p: 10.0, i: 0.0, d: 0.0, diameter: 100.0, direction: 1, mode: 0 };
             }
-            
+
             const val = parseFloat(e.target.value) || 0.0;
             if (e.target.classList.contains("input-mdd-p")) {
               moduleObj.parameters[`m${motorIdx}`].p = val;
@@ -464,7 +476,7 @@ document.addEventListener("DOMContentLoaded", () => {
             } else if (e.target.classList.contains("input-mdd-d")) {
               moduleObj.parameters[`m${motorIdx}`].d = val;
             }
-            
+
             // 設定ファイルを自動保存
             await saveConfigToServer();
           }
@@ -491,7 +503,7 @@ document.addEventListener("DOMContentLoaded", () => {
       btns.forEach(btn => {
         btn.addEventListener("click", (e) => {
           btn.classList.toggle("active");
-          
+
           // 即時送信
           sendSolenoidCommand(mod.name);
         });
@@ -556,7 +568,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function updateMddCardFeedback(name, data) {
     // Limitスイッチ
     for (let i = 0; i < 4; i++) {
-      const swEl = document.getElementById(`sw-${name}-${i+1}`);
+      const swEl = document.getElementById(`sw-${name}-${i + 1}`);
       if (swEl) {
         if (data.limit_switches[i]) {
           swEl.classList.add("active");
@@ -568,7 +580,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // エンコーダフィードバック (角度 ＆ 速度)
     for (let i = 0; i < 4; i++) {
-      const fbEl = document.getElementById(`lbl-${name}-m${i+1}-fb`);
+      const fbEl = document.getElementById(`lbl-${name}-m${i + 1}-fb`);
       if (fbEl) {
         const ang = data.angles[i].toFixed(1);
         const spd = data.speeds[i].toFixed(2);
@@ -625,7 +637,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const port = el.selCanPort.value;
 
     appendTerminalLog(el.behaviorTerminal, "USB-to-CAN 接続要求を送信中...");
-    
+
     try {
       const res = await fetch("/api/connect", {
         method: "POST",
@@ -633,7 +645,7 @@ document.addEventListener("DOMContentLoaded", () => {
         body: JSON.stringify({ port: port, auto_connect: auto })
       });
       const data = await res.json();
-      
+
       if (data.success) {
         appendTerminalLog(el.behaviorTerminal, `[SYSTEM] ${data.message}`, "system-msg");
       } else {
@@ -666,7 +678,7 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const res = await fetch("/api/start_control", { method: "POST" });
       const data = await res.json();
-      
+
       if (data.success) {
         appendTerminalLog(el.behaviorTerminal, "[SYSTEM] パラメータ送信成功。制御実行状態になりました！", "system-msg");
         el.lblControlModeStatus.innerHTML = 'ステータス: <span class="badge badge-success">制御実行中 (Control Mode)</span>';
@@ -719,7 +731,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const res = await fetch(`/api/profiles/load?name=${name}`, { method: "POST" });
       const data = await res.json();
       appendTerminalLog(el.behaviorTerminal, `[SYSTEM] ${data.message}`, "system-msg");
-      
+
       // 設定ファイルを再読み込みしてDashboardを更新
       await loadConfigAndRender();
     } catch (err) {
@@ -737,7 +749,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const res = await fetch(`/api/profiles/save?name=${name}`, { method: "POST" });
       const data = await res.json();
       appendTerminalLog(el.behaviorTerminal, `[SYSTEM] ${data.message}`, "system-msg");
-      
+
       el.txtNewProfileName.value = "";
       refreshProfiles();
     } catch (err) {
@@ -750,10 +762,10 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const res = await fetch("/api/config");
       const configData = await res.json();
-      
+
       const blob = new Blob([JSON.stringify(configData, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
-      
+
       const a = document.createElement("a");
       a.href = url;
       a.download = "modules_config.json";
@@ -775,7 +787,7 @@ document.addEventListener("DOMContentLoaded", () => {
     reader.onload = async (event) => {
       try {
         const configData = JSON.parse(event.target.result);
-        
+
         // サーバーの設定を上書き更新
         const res = await fetch("/api/config/update", {
           method: "POST",
@@ -783,7 +795,7 @@ document.addEventListener("DOMContentLoaded", () => {
           body: JSON.stringify(configData)
         });
         const data = await res.json();
-        
+
         appendTerminalLog(el.behaviorTerminal, `[SYSTEM] 設定ファイルをインポートしました: ${data.message}`, "system-msg");
         await loadConfigAndRender();
       } catch (err) {
@@ -839,7 +851,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // 設定ファイルから除外して更新
     state.config.modules = state.config.modules.filter(m => m.name !== name);
-    
+
     try {
       const res = await fetch("/api/config/update", {
         method: "POST",
@@ -915,7 +927,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
       const data = await res.json();
       appendTerminalLog(el.behaviorTerminal, `モジュールを追加しました: ${data.message}`);
-      
+
       closeModal();
       await loadConfigAndRender();
     } catch (err) {
@@ -934,7 +946,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       } else if (mod.type === "solenoid") {
         if (state.ws && state.ws.readyState === WebSocket.OPEN) {
-          state.ws.send(JSON.stringify({ type: "solenoid_cmd", name: mod.name, valves: [false]*12 }));
+          state.ws.send(JSON.stringify({ type: "solenoid_cmd", name: mod.name, valves: [false] * 12 }));
         }
       }
     });
@@ -981,25 +993,25 @@ document.addEventListener("DOMContentLoaded", () => {
   // ==========================================================================
   // --- 14. Blockly ビジュアルマクロ統合 ＆ Pythonコードリアルタイム生成 ---
   // ==========================================================================
-  
+
   // Blockly カスタムブロック定義
   Blockly.Blocks['mdd_move'] = {
-    init: function() {
+    init: function () {
       this.appendDummyInput()
-          .appendField("MDD モータ制御")
-          .appendField(new Blockly.FieldTextInput("drive_mdd"), "NAME");
+        .appendField("MDD モータ制御")
+        .appendField(new Blockly.FieldTextInput("drive_mdd"), "NAME");
       this.appendValueInput("M1")
-          .setCheck("Number")
-          .appendField("M1");
+        .setCheck("Number")
+        .appendField("M1");
       this.appendValueInput("M2")
-          .setCheck("Number")
-          .appendField("M2");
+        .setCheck("Number")
+        .appendField("M2");
       this.appendValueInput("M3")
-          .setCheck("Number")
-          .appendField("M3");
+        .setCheck("Number")
+        .appendField("M3");
       this.appendValueInput("M4")
-          .setCheck("Number")
-          .appendField("M4");
+        .setCheck("Number")
+        .appendField("M4");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
       this.setColour(230);
@@ -1009,28 +1021,28 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   Blockly.Blocks['servo_move'] = {
-    init: function() {
+    init: function () {
       this.appendDummyInput()
-          .appendField("Servo 角度制御")
-          .appendField(new Blockly.FieldTextInput("arm_servo"), "NAME");
+        .appendField("Servo 角度制御")
+        .appendField(new Blockly.FieldTextInput("arm_servo"), "NAME");
       this.appendValueInput("S1")
-          .setCheck("Number")
-          .appendField("S1 (0-180°)");
+        .setCheck("Number")
+        .appendField("S1 (0-180°)");
       this.appendValueInput("S2")
-          .setCheck("Number")
-          .appendField("S2 (0-180°)");
+        .setCheck("Number")
+        .appendField("S2 (0-180°)");
       this.appendValueInput("S3")
-          .setCheck("Number")
-          .appendField("S3 (0-180°)");
+        .setCheck("Number")
+        .appendField("S3 (0-180°)");
       this.appendValueInput("S4")
-          .setCheck("Number")
-          .appendField("S4 (0-180°)");
+        .setCheck("Number")
+        .appendField("S4 (0-180°)");
       this.appendValueInput("S5")
-          .setCheck("Number")
-          .appendField("S5 (0-180°)");
+        .setCheck("Number")
+        .appendField("S5 (0-180°)");
       this.appendValueInput("S6")
-          .setCheck("Number")
-          .appendField("S6 (0-180°)");
+        .setCheck("Number")
+        .appendField("S6 (0-180°)");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
       this.setColour(60);
@@ -1040,14 +1052,14 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   Blockly.Blocks['valve_control'] = {
-    init: function() {
+    init: function () {
       this.appendDummyInput()
-          .appendField("Solenoid 電磁弁制御")
-          .appendField(new Blockly.FieldTextInput("valve_controller"), "NAME")
-          .appendField("Ch")
-          .appendField(new Blockly.FieldNumber(1, 1, 12, 1), "CHANNEL")
-          .appendField("状態")
-          .appendField(new Blockly.FieldDropdown([["ON", "True"], ["OFF", "False"]]), "STATE");
+        .appendField("Solenoid 電磁弁制御")
+        .appendField(new Blockly.FieldTextInput("valve_controller"), "NAME")
+        .appendField("Ch")
+        .appendField(new Blockly.FieldNumber(1, 1, 12, 1), "CHANNEL")
+        .appendField("状態")
+        .appendField(new Blockly.FieldDropdown([["ON", "True"], ["OFF", "False"]]), "STATE");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
       this.setColour(0);
@@ -1057,11 +1069,11 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   Blockly.Blocks['delay_wait'] = {
-    init: function() {
+    init: function () {
       this.appendDummyInput()
-          .appendField("遅延ウェイト")
-          .appendField(new Blockly.FieldNumber(1.0, 0.0, 100.0, 0.1), "SEC")
-          .appendField("秒");
+        .appendField("遅延ウェイト")
+        .appendField(new Blockly.FieldNumber(1.0, 0.0, 100.0, 0.1), "SEC")
+        .appendField("秒");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
       this.setColour(120);
@@ -1071,10 +1083,10 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   Blockly.Blocks['print_log'] = {
-    init: function() {
+    init: function () {
       this.appendDummyInput()
-          .appendField("ログ出力")
-          .appendField(new Blockly.FieldTextInput("マクロを実行中..."), "TEXT");
+        .appendField("ログ出力")
+        .appendField(new Blockly.FieldTextInput("マクロを実行中..."), "TEXT");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
       this.setColour(180);
@@ -1085,27 +1097,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // コントローラー用カスタムブロック
   Blockly.Blocks['gamepad_button'] = {
-    init: function() {
+    init: function () {
       this.appendDummyInput()
-          .appendField("コントローラー ボタン")
-          .appendField(new Blockly.FieldDropdown([
-            ["Button A / ×", "0"],
-            ["Button B / ○", "1"],
-            ["Button X / □", "2"],
-            ["Button Y / △", "3"],
-            ["L1", "4"],
-            ["R1", "5"],
-            ["L2 (デジタル)", "6"],
-            ["R2 (デジタル)", "7"],
-            ["Share / Select", "8"],
-            ["Options / Start", "9"],
-            ["L-Stick クリック", "10"],
-            ["R-Stick クリック", "11"],
-            ["D-Pad Up", "12"],
-            ["D-Pad Down", "13"],
-            ["D-Pad Left", "14"],
-            ["D-Pad Right", "15"]
-          ]), "BUTTON");
+        .appendField("コントローラー ボタン")
+        .appendField(new Blockly.FieldDropdown([
+          ["Button A / ×", "0"],
+          ["Button B / ○", "1"],
+          ["Button X / □", "2"],
+          ["Button Y / △", "3"],
+          ["L1", "4"],
+          ["R1", "5"],
+          ["L2 (デジタル)", "6"],
+          ["R2 (デジタル)", "7"],
+          ["Share / Select", "8"],
+          ["Options / Start", "9"],
+          ["L-Stick クリック", "10"],
+          ["R-Stick クリック", "11"],
+          ["D-Pad Up", "12"],
+          ["D-Pad Down", "13"],
+          ["D-Pad Left", "14"],
+          ["D-Pad Right", "15"]
+        ]), "BUTTON");
       this.setOutput(true, "Boolean");
       this.setColour(290);
       this.setTooltip("ゲームコントローラーの特定のボタンが押されているか(True/False)を取得します。");
@@ -1114,16 +1126,16 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   Blockly.Blocks['gamepad_axis'] = {
-    init: function() {
+    init: function () {
       this.appendDummyInput()
-          .appendField("コントローラー ")
-          .appendField(new Blockly.FieldDropdown([
-            ["L-Stick 左右 (X)", "0"],
-            ["L-Stick 上下 (Y)", "1"],
-            ["R-Stick 左右 (X)", "2"],
-            ["R-Stick 上下 (Y)", "3"]
-          ]), "AXIS")
-          .appendField("傾き");
+        .appendField("コントローラー ")
+        .appendField(new Blockly.FieldDropdown([
+          ["L-Stick 左右 (X)", "0"],
+          ["L-Stick 上下 (Y)", "1"],
+          ["R-Stick 左右 (X)", "2"],
+          ["R-Stick 上下 (Y)", "3"]
+        ]), "AXIS")
+        .appendField("傾き");
       this.setOutput(true, "Number");
       this.setColour(290);
       this.setTooltip("ゲームコントローラーの指定されたスティックの傾き値(-1.0〜1.0)を取得します。");
@@ -1132,7 +1144,7 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   // Blockly.Python ジェネレーターの定義
-  Blockly.Python['mdd_move'] = function(block) {
+  Blockly.Python['mdd_move'] = function (block) {
     const name = block.getFieldValue('NAME');
     const m1 = Blockly.Python.valueToCode(block, 'M1', Blockly.Python.ORDER_ATOMIC) || '0.0';
     const m2 = Blockly.Python.valueToCode(block, 'M2', Blockly.Python.ORDER_ATOMIC) || '0.0';
@@ -1141,7 +1153,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return `            self.get_module("${name}").set_targets([${m1}, ${m2}, ${m3}, ${m4}])\n`;
   };
 
-  Blockly.Python['servo_move'] = function(block) {
+  Blockly.Python['servo_move'] = function (block) {
     const name = block.getFieldValue('NAME');
     const s1 = Blockly.Python.valueToCode(block, 'S1', Blockly.Python.ORDER_ATOMIC) || '90';
     const s2 = Blockly.Python.valueToCode(block, 'S2', Blockly.Python.ORDER_ATOMIC) || '90';
@@ -1152,30 +1164,30 @@ document.addEventListener("DOMContentLoaded", () => {
     return `            self.get_module("${name}").set_angles([${s1}, ${s2}, ${s3}, ${s4}, ${s5}, ${s6}])\n`;
   };
 
-  Blockly.Python['valve_control'] = function(block) {
+  Blockly.Python['valve_control'] = function (block) {
     const name = block.getFieldValue('NAME');
     const channel = block.getFieldValue('CHANNEL');
     const state = block.getFieldValue('STATE');
     return `            self.get_module("${name}").set_valve(${channel}, ${state})\n`;
   };
 
-  Blockly.Python['delay_wait'] = function(block) {
+  Blockly.Python['delay_wait'] = function (block) {
     const sec = block.getFieldValue('SEC');
     return `            time.sleep(${sec})\n`;
   };
 
-  Blockly.Python['print_log'] = function(block) {
+  Blockly.Python['print_log'] = function (block) {
     const text = block.getFieldValue('TEXT');
     return `            print("[BLOCKLY] ${text}")\n`;
   };
 
-  Blockly.Python['gamepad_button'] = function(block) {
+  Blockly.Python['gamepad_button'] = function (block) {
     const buttonIdx = block.getFieldValue('BUTTON');
     const code = `self.gamepad.get_button(${buttonIdx})`;
     return [code, Blockly.Python.ORDER_ATOMIC];
   };
 
-  Blockly.Python['gamepad_axis'] = function(block) {
+  Blockly.Python['gamepad_axis'] = function (block) {
     const axisIdx = block.getFieldValue('AXIS');
     const code = `self.gamepad.get_axis(${axisIdx})`;
     return [code, Blockly.Python.ORDER_ATOMIC];
@@ -1278,38 +1290,51 @@ if __name__ == '__main__':
   tDiv.innerHTML = toolboxXml;
   document.body.appendChild(tDiv.firstElementChild);
 
-  const workspace = Blockly.inject('blocklyDiv', {
-    toolbox: document.getElementById('toolbox'),
-    scrollbars: true,
-    trashcan: true
-  });
+  const blocklyDiv = document.getElementById('blocklyDiv');
+  const toolboxEl = document.getElementById('toolbox');
+  if (blocklyDiv && toolboxEl && typeof Blockly !== 'undefined') {
+    blocklyWorkspace = Blockly.inject('blocklyDiv', {
+      toolbox: toolboxEl,
+      scrollbars: true,
+      trashcan: true
+    });
+  }
+
+  // 既存コード互換のため参照名を維持
+  const workspace = blocklyWorkspace;
 
   // リアルタイムにコードを生成＆プレビュー
-  workspace.addChangeListener(() => {
-    try {
-      const rawCode = Blockly.Python.workspaceToCode(workspace);
-      const fullPython = generatePythonCode(rawCode);
-      const codeArea = document.getElementById("blockly-code-area");
-      if (codeArea) {
-        codeArea.textContent = fullPython;
+  if (workspace) {
+    workspace.addChangeListener(() => {
+      try {
+        const rawCode = Blockly.Python.workspaceToCode(workspace);
+        const fullPython = generatePythonCode(rawCode);
+        const codeArea = document.getElementById("blockly-code-area");
+        if (codeArea) {
+          codeArea.textContent = fullPython;
+        }
+      } catch (err) {
+        const codeArea = document.getElementById("blockly-code-area");
+        if (codeArea) {
+          codeArea.textContent = "# コード自動生成エラー: " + err.message;
+        }
       }
-    } catch (err) {
-      const codeArea = document.getElementById("blockly-code-area");
-      if (codeArea) {
-        codeArea.textContent = "# コード自動生成エラー: " + err.message;
-      }
-    }
-  });
+    });
+  }
 
   // マクロ実行ボタンのイベント
   const btnRunBlockly = document.getElementById("btn-run-blockly");
   if (btnRunBlockly) {
     btnRunBlockly.addEventListener("click", async () => {
+      if (!workspace) {
+        appendTerminalLog(el.behaviorTerminal, "[ERROR] Blocklyワークスペースの初期化に失敗しています。ページを再読み込みしてください。", "error-msg");
+        return;
+      }
       const rawCode = Blockly.Python.workspaceToCode(workspace);
       const fullPython = generatePythonCode(rawCode);
-      
+
       appendTerminalLog(el.behaviorTerminal, "Blocklyコードを blockly_behavior.py として保存中...");
-      
+
       try {
         const saveRes = await fetch("/api/behavior/save_blockly", {
           method: "POST",
@@ -1317,21 +1342,21 @@ if __name__ == '__main__':
           body: JSON.stringify({ code: fullPython })
         });
         const saveData = await saveRes.json();
-        
+
         if (!saveData.success) {
           appendTerminalLog(el.behaviorTerminal, `[ERROR] コード保存失敗: ${saveData.message}`, "error-msg");
           return;
         }
-        
+
         appendTerminalLog(el.behaviorTerminal, "Blocklyビジュアルマクロを起動中...");
-        
+
         const runRes = await fetch("/api/behavior/start", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ behavior_name: "blockly_behavior.py" })
         });
         const runData = await runRes.json();
-        
+
         if (runData.success) {
           appendTerminalLog(el.behaviorTerminal, "[SYSTEM] Blocklyマクロが正常に起動しました。", "system-msg");
           // 実行画面（Behaviorビュー）へ自動的に切り替える
@@ -1369,6 +1394,10 @@ if __name__ == '__main__':
   const btnExportBlocklyCode = document.getElementById("btn-export-blockly-code");
   if (btnExportBlocklyCode) {
     btnExportBlocklyCode.addEventListener("click", () => {
+      if (!workspace) {
+        appendTerminalLog(el.behaviorTerminal, "[ERROR] Blocklyワークスペースが未初期化のため保存できません。", "error-msg");
+        return;
+      }
       const rawCode = Blockly.Python.workspaceToCode(workspace);
       const fullPython = generatePythonCode(rawCode);
       const blob = new Blob([fullPython], { type: "text/x-python" });
