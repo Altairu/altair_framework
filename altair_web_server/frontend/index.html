@@ -13,9 +13,9 @@
   <!-- CSS -->
   <link rel="stylesheet" href="/css/styles.css">
   
-  <!-- Google Blockly CDN -->
-  <script src="https://unpkg.com/blockly/blockly.min.js"></script>
-  <script src="https://unpkg.com/blockly/python_compressed.js"></script>
+  <!-- Google Blockly CDN (v6.20.0 固定 - Blockly.Python APIが安定動作するバージョン) -->
+  <script src="https://unpkg.com/blockly@6.20.0/blockly.min.js"></script>
+  <script src="https://unpkg.com/blockly@6.20.0/python_compressed.js"></script>
 </head>
 <body>
 
@@ -184,6 +184,22 @@
                 <span id="btn-dash-5" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;">R1</span>
                 <span id="btn-dash-6" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;">L2</span>
                 <span id="btn-dash-7" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;">R2</span>
+                <span id="btn-dash-8" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;">Share</span>
+                <span id="btn-dash-9" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;">Start</span>
+                <span id="btn-dash-10" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;">L3</span>
+                <span id="btn-dash-11" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;">R3</span>
+              </div>
+              <!-- 十字キーインジケータ -->
+              <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; margin-top: 6px;">
+                <span>D-Pad</span>
+              </div>
+              <div style="display: flex; gap: 4px; align-items: center;">
+                <span id="btn-dash-14" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;"><i class="fa-solid fa-arrow-left"></i></span>
+                <div style="display: flex; flex-direction: column; gap: 2px;">
+                  <span id="btn-dash-12" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;"><i class="fa-solid fa-arrow-up"></i></span>
+                  <span id="btn-dash-13" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;"><i class="fa-solid fa-arrow-down"></i></span>
+                </div>
+                <span id="btn-dash-15" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;"><i class="fa-solid fa-arrow-right"></i></span>
               </div>
             </div>
           </div>

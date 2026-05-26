@@ -103,12 +103,20 @@ document.addEventListener("DOMContentLoaded", () => {
       el.mappingsBody.appendChild(tr);
     }
 
-    // 主要ボタンモニター (10ch分)
-    const btnLabels = ["A / ×", "B / ○", "X / □", "Y / △", "L1", "R1", "L2", "R2", "Select / Share", "Start / Options"];
+    // 主要ボタンモニター (全16ch分 - 十字キー含む)
+    const btnLabels = [
+      "A / ×", "B / ○", "X / □", "Y / △",
+      "L1", "R1", "L2", "R2",
+      "Select / Share", "Start / Options",
+      "L-Stick クリック", "R-Stick クリック",
+      "D-Pad ↑", "D-Pad ↓", "D-Pad ←", "D-Pad →"
+    ];
     for (let i = 0; i < btnLabels.length; i++) {
+      const isDpad = i >= 12;
+      const icon = isDpad ? "fa-solid fa-circle-arrow-" + ["up","down","left","right"][i-12] : "fa-solid fa-circle-dot";
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td><i class="fa-solid fa-circle-dot"></i> ${btnLabels[i]}</td>
+        <td><i class="${icon}"></i> ${btnLabels[i]}</td>
         <td><code>self.gamepad.get_button(${i})</code></td>
         <td colspan="3">
           <span id="monitor-btn-${i}" class="badge badge-secondary">OFF</span>
@@ -205,8 +213,8 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    // 2. ボタンの描画更新
-    for (let i = 0; i < 10; i++) {
+    // 2. ボタンの描画更新（全16ボタン: A/B/X/Y/L1/R1/L2/R2/Share/Start/L3/R3/D-Pad4方向）
+    for (let i = 0; i < 16; i++) {
       const btnBadge = document.getElementById(`monitor-btn-${i}`);
       if (btnBadge && i < buttons.length) {
         const isPressed = buttons[i];
@@ -266,8 +274,8 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    // Dashboard用ボタンの描画更新
-    for (let i = 0; i < 8; i++) {
+    // Dashboard用ボタンの描画更新（A/B/X/Y/L1/R1/L2/R2 + 十字キー4方向）
+    for (let i = 0; i < 12; i++) {
       const btnDash = document.getElementById(`btn-dash-${i}`);
       if (btnDash && i < buttons.length) {
         const isPressed = buttons[i];
