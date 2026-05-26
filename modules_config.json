@@ -1,0 +1,44 @@
+{
+  "modules": [
+    {
+      "name": "MDD1",
+      "type": "mdd",
+      "base_id": "0x200",
+      "description": "",
+      "parameters": {
+        "m1": {
+          "p": 1.5,
+          "i": 0.1,
+          "d": 0.05,
+          "diameter": 100,
+          "direction": 1,
+          "mode": 0
+        },
+        "m2": {
+          "p": 1.5,
+          "i": 0.1,
+          "d": 0.05,
+          "diameter": 100,
+          "direction": 1,
+          "mode": 0
+        },
+        "m3": {
+          "p": 1.5,
+          "i": 0.1,
+          "d": 0.05,
+          "diameter": 100,
+          "direction": 1,
+          "mode": 0
+        },
+        "m4": {
+          "p": 1.5,
+          "i": 0.1,
+          "d": 0.05,
+          "diameter": 100,
+          "direction": 1,
+          "mode": 0
+        }
+      }
+    }
+  ]
+}

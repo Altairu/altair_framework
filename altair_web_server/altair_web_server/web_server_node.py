@@ -3,16 +3,17 @@ import json
 import shutil
 import threading
 import asyncio
+from pathlib import Path
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel
 
 # ROS2 ヘッダー
 import rclpy
 from rclpy.node import Node
 from rclpy.callback_groups import ReentrantCallbackGroup
+from ament_index_python.packages import PackageNotFoundError, get_package_share_directory
 
 # ROS2 メッセージ・サービス
 from std_msgs.msg import String
@@ -434,25 +435,35 @@ async def websocket_endpoint(websocket: WebSocket):
 # --- 静的フロントエンドファイルの配備 ---
 
 def get_frontend_dir():
-    paths = [
-        "c:/Users/106no/Documents/GitHub/altair_framework/altair_web_server/frontend",
-        os.path.join(os.path.expanduser('~'), 'ros2_ws/src/altair_framework/altair_web_server/frontend'),
-        "./src/altair_framework/altair_web_server/frontend",
-        "frontend"
-    ]
-    for p in paths:
-        if os.path.exists(p):
-            return p
-    return "frontend"
+    candidates = []
+
+    # ROS2インストール先のshareディレクトリを最優先
+    try:
+        share_dir = Path(get_package_share_directory('altair_web_server'))
+        candidates.append(share_dir / 'frontend')
+    except PackageNotFoundError:
+        pass
+
+    cwd = Path.cwd()
+    candidates.append(cwd / 'altair_web_server' / 'frontend')
+    candidates.append(cwd / 'frontend')
+
+    this_file = Path(__file__).resolve()
+    candidates.append(this_file.parents[1] / 'frontend')
+
+    if len(this_file.parents) >= 5:
+        candidates.append(this_file.parents[4] / 'altair_web_server' / 'frontend')
+
+    for path in candidates:
+        if path.exists():
+            return str(path)
+
+    return str(candidates[0]) if candidates else 'frontend'
 
 frontend_dir = get_frontend_dir()
 if os.path.exists(frontend_dir):
-    app.mount("/css", StaticFiles(directory=os.path.join(frontend_dir, "css")), name="css")
-    app.mount("/js", StaticFiles(directory=os.path.join(frontend_dir, "js")), name="js")
-    
-    @app.get("/")
-    async def get_index():
-        return FileResponse(os.path.join(frontend_dir, "index.html"))
+    # html=True で / -> index.html と配下静的ファイルを一括配信
+    app.mount("/", StaticFiles(directory=frontend_dir, html=True, follow_symlink=True), name="frontend")
 
 
 # --- ROS2 ノードスピン実行スレッドの管理 ---

@@ -1,0 +1,4 @@
+Invoking command in '/home/altair/altair_framework/build/altair_interfaces': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --build /home/altair/altair_framework/build/altair_interfaces -- -j8 -l8
+Invoked command in '/home/altair/altair_framework/build/altair_interfaces' returned '0': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --build /home/altair/altair_framework/build/altair_interfaces -- -j8 -l8
+Invoking command in '/home/altair/altair_framework/build/altair_interfaces': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --install /home/altair/altair_framework/build/altair_interfaces
+Invoked command in '/home/altair/altair_framework/build/altair_interfaces' returned '0': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --install /home/altair/altair_framework/build/altair_interfaces
