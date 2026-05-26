@@ -39,6 +39,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     appendLog(`[SYSTEM] コントローラーが接続されました: ${e.gamepad.id}`, "system-msg");
 
+    // ダッシュボード表示の更新
+    const dashDisconnected = document.getElementById("dashboard-gamepad-disconnected");
+    const dashConnected = document.getElementById("dashboard-gamepad-connected");
+    if (dashDisconnected) dashDisconnected.style.display = "none";
+    if (dashConnected) dashConnected.style.display = "flex";
+
     // 周期（20Hz = 50ms）で WebSocket 送信＆モニター描画を行うタイマーを開始
     startGamepadPolling();
   });
@@ -56,6 +62,12 @@ document.addEventListener("DOMContentLoaded", () => {
       if (text) text.textContent = "Not Connected (コントローラー未接続)";
       
       appendLog("[SYSTEM] コントローラーが切断されました。", "warning-msg");
+
+      // ダッシュボード表示の更新
+      const dashDisconnected = document.getElementById("dashboard-gamepad-disconnected");
+      const dashConnected = document.getElementById("dashboard-gamepad-connected");
+      if (dashDisconnected) dashDisconnected.style.display = "block";
+      if (dashConnected) dashConnected.style.display = "none";
 
       // タイマー停止
       stopGamepadPolling();
@@ -121,6 +133,13 @@ document.addEventListener("DOMContentLoaded", () => {
   function startGamepadPolling() {
     stopGamepadPolling();
     initMonitorTable();
+
+    // ダッシュボード表示を接続状態に更新（念のため）
+    const dashDisconnected = document.getElementById("dashboard-gamepad-disconnected");
+    const dashConnected = document.getElementById("dashboard-gamepad-connected");
+    if (dashDisconnected) dashDisconnected.style.display = "none";
+    if (dashConnected) dashConnected.style.display = "flex";
+
     state.intervalId = setInterval(pollAndSendGamepad, 50); // 20Hz
   }
 
@@ -199,6 +218,65 @@ document.addEventListener("DOMContentLoaded", () => {
           btnBadge.textContent = "OFF";
           btnBadge.className = "badge badge-secondary";
           btnBadge.style.boxShadow = "none";
+        }
+      }
+    }
+
+    // 3. Dashboard用 Gamepad Monitor の描画更新
+    if (axes.length >= 4) {
+      const lx = axes[0];
+      const ly = axes[1];
+      const rx = axes[2];
+      const ry = axes[3];
+
+      // L-Stickテキストとバー
+      const lblLStick = document.getElementById("lbl-dash-lstick");
+      if (lblLStick) lblLStick.textContent = `X: ${lx.toFixed(2)} | Y: ${ly.toFixed(2)}`;
+
+      const barLx = document.getElementById("bar-dash-lx");
+      if (barLx) {
+        const percentLx = ((lx + 1.0) / 2.0) * 100;
+        barLx.style.width = `${percentLx}%`;
+        barLx.style.backgroundColor = Math.abs(lx) > 0.1 ? "var(--color-primary)" : "#bdc1c6";
+      }
+
+      const barLy = document.getElementById("bar-dash-ly");
+      if (barLy) {
+        const percentLy = ((ly + 1.0) / 2.0) * 100;
+        barLy.style.width = `${percentLy}%`;
+        barLy.style.backgroundColor = Math.abs(ly) > 0.1 ? "var(--color-primary)" : "#bdc1c6";
+      }
+
+      // R-Stickテキストとバー
+      const lblRStick = document.getElementById("lbl-dash-rstick");
+      if (lblRStick) lblRStick.textContent = `X: ${rx.toFixed(2)} | Y: ${ry.toFixed(2)}`;
+
+      const barRx = document.getElementById("bar-dash-rx");
+      if (barRx) {
+        const percentRx = ((rx + 1.0) / 2.0) * 100;
+        barRx.style.width = `${percentRx}%`;
+        barRx.style.backgroundColor = Math.abs(rx) > 0.1 ? "var(--color-primary)" : "#bdc1c6";
+      }
+
+      const barRy = document.getElementById("bar-dash-ry");
+      if (barRy) {
+        const percentRy = ((ry + 1.0) / 2.0) * 100;
+        barRy.style.width = `${percentRy}%`;
+        barRy.style.backgroundColor = Math.abs(ry) > 0.1 ? "var(--color-primary)" : "#bdc1c6";
+      }
+    }
+
+    // Dashboard用ボタンの描画更新
+    for (let i = 0; i < 8; i++) {
+      const btnDash = document.getElementById(`btn-dash-${i}`);
+      if (btnDash && i < buttons.length) {
+        const isPressed = buttons[i];
+        if (isPressed) {
+          btnDash.className = "badge badge-success";
+          btnDash.style.boxShadow = "0 2px 4px rgba(19, 115, 51, 0.3)";
+        } else {
+          btnDash.className = "badge badge-secondary";
+          btnDash.style.boxShadow = "none";
         }
       }
     }

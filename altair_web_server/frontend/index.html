@@ -140,6 +140,53 @@
               </button>
             </div>
           </div>
+
+          <!-- ゲームパッド常時モニター -->
+          <div class="control-group" id="dashboard-gamepad-group">
+            <h3><i class="fa-solid fa-gamepad"></i> Gamepad Monitor</h3>
+            <div id="dashboard-gamepad-disconnected" class="group-desc" style="text-align: center; padding: 10px 0;">
+              <i class="fa-solid fa-gamepad" style="font-size: 24px; color: var(--text-muted); margin-bottom: 6px; display: block;"></i>
+              コントローラー未接続
+            </div>
+            <div id="dashboard-gamepad-connected" style="display: none; flex-direction: column; gap: 8px;">
+              <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; margin-top: 4px;">
+                <span>L-Stick</span>
+                <span id="lbl-dash-lstick">X: 0.00 | Y: 0.00</span>
+              </div>
+              <div class="progress-bar-container" style="background: #e8eaed; border-radius: 4px; height: 8px; width: 100%; overflow: hidden; position: relative;">
+                <div id="bar-dash-lx" style="background: var(--color-primary); height: 100%; width: 50%; transition: width 0.05s ease;"></div>
+              </div>
+              <div class="progress-bar-container" style="background: #e8eaed; border-radius: 4px; height: 8px; width: 100%; overflow: hidden; position: relative; margin-top: 2px;">
+                <div id="bar-dash-ly" style="background: var(--color-primary); height: 100%; width: 50%; transition: width 0.05s ease;"></div>
+              </div>
+
+              <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; margin-top: 6px;">
+                <span>R-Stick</span>
+                <span id="lbl-dash-rstick">X: 0.00 | Y: 0.00</span>
+              </div>
+              <div class="progress-bar-container" style="background: #e8eaed; border-radius: 4px; height: 8px; width: 100%; overflow: hidden; position: relative;">
+                <div id="bar-dash-rx" style="background: var(--color-primary); height: 100%; width: 50%; transition: width 0.05s ease;"></div>
+              </div>
+              <div class="progress-bar-container" style="background: #e8eaed; border-radius: 4px; height: 8px; width: 100%; overflow: hidden; position: relative; margin-top: 2px;">
+                <div id="bar-dash-ry" style="background: var(--color-primary); height: 100%; width: 50%; transition: width 0.05s ease;"></div>
+              </div>
+
+              <!-- 主要ボタンインジケータ -->
+              <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; margin-top: 8px;">
+                <span>Buttons</span>
+              </div>
+              <div style="display: flex; flex-wrap: wrap; gap: 4px;" id="dashboard-buttons-container">
+                <span id="btn-dash-0" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;">A</span>
+                <span id="btn-dash-1" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;">B</span>
+                <span id="btn-dash-2" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;">X</span>
+                <span id="btn-dash-3" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;">Y</span>
+                <span id="btn-dash-4" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;">L1</span>
+                <span id="btn-dash-5" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;">R1</span>
+                <span id="btn-dash-6" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;">L2</span>
+                <span id="btn-dash-7" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;">R2</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- 動的に追加されるモジュールカードのグリッド -->
