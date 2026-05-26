@@ -10,6 +10,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(can_msgs REQUIRED)
 find_package(altair_interfaces REQUIRED)
+find_package(ament_index_cpp REQUIRED)
 
 # Executable
 add_executable(can_bridge_node src/can_bridge_node.cpp)
@@ -22,6 +23,7 @@ ament_target_dependencies(can_bridge_node
   rclcpp
   can_msgs
   altair_interfaces
+  ament_index_cpp
 )
 
 # Install

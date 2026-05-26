@@ -35,6 +35,29 @@ done
 
 echo "====== Altair Framework: Bilduing ROS2 Workspace ======"
 
+# ROS2環境変数がソースされているか確認
+if [ -z "$ROS_DISTRO" ]; then
+    echo "ERROR: ROS2環境変数がロードされていません。'source /opt/ros/<distro>/setup.bash' を実行してから再度お試しください。"
+    exit 1
+fi
+
+# can_msgs 依存関係のチェックと自動インストール
+ros2 pkg prefix can_msgs &>/dev/null
+if [ $? -ne 0 ]; then
+    echo "[WARNING] can_msgs パッケージがROS2環境内に見つかりません。"
+    echo "altair_can_bridge のビルドに必須のため、ros-$ROS_DISTRO-can-msgs のインストールを試みます..."
+    sudo apt-get update && sudo apt-get install -y ros-$ROS_DISTRO-can-msgs
+    
+    # 再チェック
+    ros2 pkg prefix can_msgs &>/dev/null
+    if [ $? -ne 0 ]; then
+        echo "[ERROR] can_msgs のインストールに失敗しました。"
+        echo "手動で 'sudo apt install ros-$ROS_DISTRO-can-msgs' を実行した後に再度ビルドしてください。"
+        exit 1
+    fi
+    echo "[SUCCESS] can_msgs が正常にインストールされました！"
+fi
+
 if [ "$DO_CLEAN" -eq 1 ]; then
     echo "INFO: build/install/log をクリーンしています..."
     rm -rf build install log

@@ -27,6 +27,7 @@
 #include "altair_interfaces/msg/can_status.hpp"
 #include "altair_interfaces/srv/get_available_ports.hpp"
 #include "altair_interfaces/srv/connect_can.hpp"
+#include <ament_index_cpp/get_package_share_directory.hpp>
 
 using namespace std::chrono_literals;
 namespace fs = std::filesystem;
@@ -191,25 +192,24 @@ private:
     close_can_socket_nolock();
     is_connected_ = false;
 
-    // パッケージシェアディレクトリ内のsetup_slcan.shのパスを取得
+    // パッケージシェアディレクトリ内のsetup_slcan.shのパスをROS2標準APIで取得
     std::string pkg_share_dir = "";
     try {
-      // 簡易的な探索、または標準的なROS2インストールパス
-      // WSL上での動作確認などを考慮してローカルパスもフォールバック
-      pkg_share_dir = "/home/wsl/ros2_ws/src/altair_framework/altair_can_bridge/scripts"; // もしくは標準パス
-      
-      // ament経由で取得できない場合に備えてローカルチェック
-      if (!fs::exists(pkg_share_dir + "/setup_slcan.sh")) {
-        // ワークスペース相対パス
-        pkg_share_dir = "./src/altair_can_bridge/scripts";
-      }
-      if (!fs::exists(pkg_share_dir + "/setup_slcan.sh")) {
-        // さらに絶対パス
-        pkg_share_dir = "c:/Users/106no/Documents/GitHub/altair_framework/altair_can_bridge/scripts";
-      }
-    } catch (...) {}
+      pkg_share_dir = ament_index_cpp::get_package_share_directory("altair_can_bridge");
+    } catch (const std::exception& e) {
+      RCLCPP_ERROR(this->get_logger(), "パッケージシェアディレクトリの検出に失敗しました: %s", e.what());
+      last_error_ = "パッケージ検出失敗";
+      return false;
+    }
 
-    std::string script_path = pkg_share_dir + "/setup_slcan.sh";
+    std::string script_path = pkg_share_dir + "/scripts/setup_slcan.sh";
+    // もしインストールディレクトリに無ければ、カレントワークスペースのローカルパスも探す (デバッグ用)
+    if (!fs::exists(script_path)) {
+      script_path = "./src/altair_can_bridge/scripts/setup_slcan.sh";
+    }
+    if (!fs::exists(script_path)) {
+      script_path = "./src/altair_framework/altair_can_bridge/scripts/setup_slcan.sh";
+    }
     
     // WSL環境か否かに応じてコマンド構築
     std::string cmd;

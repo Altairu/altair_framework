@@ -8,18 +8,25 @@ cd "$SCRIPT_DIR"
 
 echo "====== Altair Framework: Starting Operator Nodes ======"
 
-# 1. ROS2環境変数のソース
-if [ -f "install/setup.bash" ]; then
-    source install/setup.bash
-else
-    echo "[WARNING] ワークスペースがビルドされていません。ビルドを実行します..."
+# 1. ROS2環境変数のソース ＆ 実行ファイル存在チェック
+SHOULD_BUILD=0
+if [ ! -f "install/setup.bash" ]; then
+    SHOULD_BUILD=1
+elif [ ! -f "install/altair_core/lib/altair_core/module_manager" ] || [ ! -f "install/altair_web_server/lib/altair_web_server/web_server_node" ]; then
+    echo "[INFO] 実行ファイルが見つかりません。ビルドが必要です。"
+    SHOULD_BUILD=1
+fi
+
+if [ "$SHOULD_BUILD" -eq 1 ]; then
+    echo "[WARNING] ワークスペースをビルドまたは再ビルドします..."
     ./build.sh
     if [ $? -ne 0 ]; then
         echo "[ERROR] ビルド失敗のため起動を中止します。"
         exit 1
     fi
-    source install/setup.bash
 fi
+
+source install/setup.bash
 
 # 2. シグナルトラップの設定 (Ctrl+C時にバックグラウンドプロセスを安全にキル)
 cleanup() {
