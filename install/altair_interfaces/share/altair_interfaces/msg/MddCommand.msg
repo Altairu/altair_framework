@@ -1,8 +1,1 @@
-# MDD (モータドライバ) の目標値指令メッセージ定義
-
-float32[4] targets      # モータ1〜4の目標値
-                        # 【単位スケール】
-                        # 速度モード: rps
-                        # 角度モード: degree (度)
-                        # 位置モード: mm (ミリメートル)
-                        # (※ NUCブリッジ側で、マイコン用のスケール(各10倍のint16)に自動変換して送信されます)
+/home/altair/altair_framework/altair_interfaces/msg/MddCommand.msg

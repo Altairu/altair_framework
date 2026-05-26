@@ -1,3 +1,1 @@
-# NUC側の認識している利用可能なシリアルポート（/dev/ttyACM* など）一覧を取得するサービス
-
-# Request (空)
+/home/altair/altair_framework/build/altair_interfaces/rosidl_cmake/srv/GetAvailablePorts_Request.msg

@@ -3,7 +3,42 @@
 # Altair Framework - ROS2ワークスペースビルドスクリプト
 # ==========================================
 
+show_help() {
+    cat << 'EOF'
+Usage: ./build.sh [--clean] [--help]
+
+Options:
+  -c, --clean   Build前に build/install/log を自動クリーンしてからビルド
+  -h, --help    ヘルプを表示
+EOF
+}
+
+DO_CLEAN=0
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -c|--clean)
+            DO_CLEAN=1
+            shift
+            ;;
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        *)
+            echo "ERROR: 不明なオプションです: $1"
+            show_help
+            exit 1
+            ;;
+    esac
+done
+
 echo "====== Altair Framework: Bilduing ROS2 Workspace ======"
+
+if [ "$DO_CLEAN" -eq 1 ]; then
+    echo "INFO: build/install/log をクリーンしています..."
+    rm -rf build install log
+fi
 
 # 1. ワークスペースのビルドを実行 (シンボリックリンクインストールを有効化)
 colcon build --symlink-install

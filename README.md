@@ -57,7 +57,35 @@ chmod +x altair_can_bridge/scripts/setup_slcan.sh
 
 # ビルドの実行
 ./build.sh
+
+# キャッシュをクリーンして再ビルド（環境移動時に推奨）
+./build.sh --clean
 ```
+
+> 💡 別PCやWSL/Ubuntu間でワークスペースを移動した直後は、古いCMakeキャッシュとの不整合を避けるため `./build.sh --clean` を推奨します。
+
+---
+
+## 🧯 トラブルシュート
+
+### CMakeCache.txt のパス不一致エラーが出る
+
+以下のようなエラーが出る場合:
+
+- `CMake Error: The current CMakeCache.txt directory ... is different than the directory ... where CMakeCache.txt was created`
+- `CMake Error: The source "..." does not match the source "..." used to generate cache`
+
+原因:
+
+- 以前の別パス（例: Windows側 `/mnt/c/...`）で生成された `build/` キャッシュが残っている。
+
+対処:
+
+```bash
+./build.sh --clean
+```
+
+上記は `build/install/log` を削除してから再ビルドするため、パス不一致を解消できます。
 
 ---
 

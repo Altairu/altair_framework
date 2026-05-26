@@ -1,0 +1,1 @@
+/home/altair/altair_framework/build/altair_can_bridge/ament_cmake_core/altair_can_bridgeConfig-version.cmake

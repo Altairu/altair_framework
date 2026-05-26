@@ -1,4 +1,1 @@
-# Servo (6ch サーボモジュール) の角度指令メッセージ定義
-
-uint8[6] angles         # サーボ1〜6の目標角度 [0..180 度]
-                        # (※ 180を超える場合はマイコン側で180に自動的にクリップされます)
+/home/altair/altair_framework/altair_interfaces/msg/ServoCommand.msg

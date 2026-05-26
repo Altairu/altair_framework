@@ -1,3 +1,1 @@
-# 特定の動作プログラムを動的に起動するためのサービス
-
-string behavior_name    # 起動するスクリプトファイル名 (例: "example_behavior.py")
+/home/altair/altair_framework/build/altair_interfaces/rosidl_cmake/srv/StartBehavior_Request.msg

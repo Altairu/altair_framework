@@ -1,3 +1,1 @@
-# MDDのパラメータ送信 ＆ 制御実行モード開始を指示するサービス定義
-
-# Request (空)
+/home/altair/altair_framework/build/altair_interfaces/rosidl_cmake/srv/TriggerControl_Request.msg

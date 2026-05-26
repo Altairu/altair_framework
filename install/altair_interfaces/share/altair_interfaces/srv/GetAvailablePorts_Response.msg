@@ -1,3 +1,1 @@
-
-# Response
-string[] ports          # 検出されたポート名（パス）の配列
+/home/altair/altair_framework/build/altair_interfaces/rosidl_cmake/srv/GetAvailablePorts_Response.msg

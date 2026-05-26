@@ -1,4 +1,1 @@
-
-# Response
-bool success            # 制御開始指示が成功したか
-string message          # 結果のステータスメッセージやエラー情報
+/home/altair/altair_framework/build/altair_interfaces/rosidl_cmake/srv/TriggerControl_Response.msg

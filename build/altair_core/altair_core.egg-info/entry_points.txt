@@ -1,4 +1,3 @@
 [console_scripts]
 behavior_runner = altair_core.behavior_runner:main
 module_manager = altair_core.module_manager:main
-

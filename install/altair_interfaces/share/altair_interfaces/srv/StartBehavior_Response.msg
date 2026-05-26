@@ -1,3 +1,1 @@
-
-bool success            # プロセスの起動が成功したか
-string message          # 結果のステータスメッセージやエラー内容
+/home/altair/altair_framework/build/altair_interfaces/rosidl_cmake/srv/StartBehavior_Response.msg

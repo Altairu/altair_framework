@@ -1,0 +1,1 @@
+/home/altair/altair_framework/build/altair_can_bridge/ament_cmake_environment_hooks/local_setup.zsh

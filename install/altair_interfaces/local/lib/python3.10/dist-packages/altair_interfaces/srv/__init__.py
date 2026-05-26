@@ -1,4 +1,1 @@
-from altair_interfaces.srv._connect_can import ConnectCan  # noqa: F401
-from altair_interfaces.srv._get_available_ports import GetAvailablePorts  # noqa: F401
-from altair_interfaces.srv._start_behavior import StartBehavior  # noqa: F401
-from altair_interfaces.srv._trigger_control import TriggerControl  # noqa: F401
+/home/altair/altair_framework/build/altair_interfaces/rosidl_generator_py/altair_interfaces/srv/__init__.py

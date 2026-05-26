@@ -1,0 +1,340 @@
+[0.213s] DEBUG:colcon:Command line arguments: ['/usr/bin/colcon', 'build', '--symlink-install']
+[0.213s] DEBUG:colcon:Parsed command line arguments: Namespace(log_base=None, log_level=None, verb_name='build', build_base='build', install_base='install', merge_install=False, symlink_install=True, test_result_base=None, continue_on_error=False, executor='parallel', parallel_workers=8, event_handlers=None, ignore_user_meta=False, metas=['./colcon.meta'], base_paths=['.'], packages_ignore=None, packages_ignore_regex=None, paths=None, packages_up_to=None, packages_up_to_regex=None, packages_above=None, packages_above_and_dependencies=None, packages_above_depth=None, packages_select_by_dep=None, packages_skip_by_dep=None, packages_skip_up_to=None, packages_select_build_failed=False, packages_skip_build_finished=False, packages_select_test_failures=False, packages_skip_test_passed=False, packages_select=None, packages_skip=None, packages_select_regex=None, packages_skip_regex=None, packages_start=None, packages_end=None, allow_overriding=[], cmake_args=None, cmake_target=None, cmake_target_skip_unavailable=False, cmake_clean_cache=False, cmake_clean_first=False, cmake_force_configure=False, ament_cmake_args=None, catkin_cmake_args=None, catkin_skip_building_tests=False, mixin_files=None, mixin=None, verb_parser=<colcon_mixin.mixin.mixin_argument.MixinArgumentDecorator object at 0x7a4310a33910>, verb_extension=<colcon_core.verb.build.BuildVerb object at 0x7a4310a333d0>, main=<bound method BuildVerb.main of <colcon_core.verb.build.BuildVerb object at 0x7a4310a333d0>>, mixin_verb=('build',))
+[0.290s] Level 1:colcon.colcon_core.package_discovery:discover_packages(colcon_meta) check parameters
+[0.290s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) check parameters
+[0.290s] Level 1:colcon.colcon_core.package_discovery:discover_packages(ignore) check parameters
+[0.290s] Level 1:colcon.colcon_core.package_discovery:discover_packages(path) check parameters
+[0.290s] Level 1:colcon.colcon_core.package_discovery:discover_packages(colcon_meta) discover
+[0.290s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) discover
+[0.290s] INFO:colcon.colcon_core.package_discovery:Crawling recursively for packages in '/home/altair/altair_framework'
+[0.290s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['ignore', 'ignore_ament_install']
+[0.291s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'ignore'
+[0.291s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'ignore_ament_install'
+[0.291s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['colcon_pkg']
+[0.291s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'colcon_pkg'
+[0.291s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['colcon_meta']
+[0.291s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'colcon_meta'
+[0.291s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['ros']
+[0.291s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'ros'
+[0.319s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['cmake', 'python']
+[0.319s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'cmake'
+[0.319s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'python'
+[0.319s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extensions ['python_setup_py']
+[0.319s] Level 1:colcon.colcon_core.package_identification:_identify(.) by extension 'python_setup_py'
+[0.319s] Level 1:colcon.colcon_core.package_identification:_identify(altair_can_bridge) by extensions ['ignore', 'ignore_ament_install']
+[0.320s] Level 1:colcon.colcon_core.package_identification:_identify(altair_can_bridge) by extension 'ignore'
+[0.320s] Level 1:colcon.colcon_core.package_identification:_identify(altair_can_bridge) by extension 'ignore_ament_install'
+[0.320s] Level 1:colcon.colcon_core.package_identification:_identify(altair_can_bridge) by extensions ['colcon_pkg']
+[0.320s] Level 1:colcon.colcon_core.package_identification:_identify(altair_can_bridge) by extension 'colcon_pkg'
+[0.320s] Level 1:colcon.colcon_core.package_identification:_identify(altair_can_bridge) by extensions ['colcon_meta']
+[0.320s] Level 1:colcon.colcon_core.package_identification:_identify(altair_can_bridge) by extension 'colcon_meta'
+[0.320s] Level 1:colcon.colcon_core.package_identification:_identify(altair_can_bridge) by extensions ['ros']
+[0.320s] Level 1:colcon.colcon_core.package_identification:_identify(altair_can_bridge) by extension 'ros'
+[0.325s] DEBUG:colcon.colcon_core.package_identification:Package 'altair_can_bridge' with type 'ros.ament_cmake' and name 'altair_can_bridge'
+[0.325s] Level 1:colcon.colcon_core.package_identification:_identify(altair_core) by extensions ['ignore', 'ignore_ament_install']
+[0.326s] Level 1:colcon.colcon_core.package_identification:_identify(altair_core) by extension 'ignore'
+[0.326s] Level 1:colcon.colcon_core.package_identification:_identify(altair_core) by extension 'ignore_ament_install'
+[0.326s] Level 1:colcon.colcon_core.package_identification:_identify(altair_core) by extensions ['colcon_pkg']
+[0.326s] Level 1:colcon.colcon_core.package_identification:_identify(altair_core) by extension 'colcon_pkg'
+[0.326s] Level 1:colcon.colcon_core.package_identification:_identify(altair_core) by extensions ['colcon_meta']
+[0.326s] Level 1:colcon.colcon_core.package_identification:_identify(altair_core) by extension 'colcon_meta'
+[0.326s] Level 1:colcon.colcon_core.package_identification:_identify(altair_core) by extensions ['ros']
+[0.326s] Level 1:colcon.colcon_core.package_identification:_identify(altair_core) by extension 'ros'
+[0.327s] DEBUG:colcon.colcon_core.package_identification:Package 'altair_core' with type 'ros.ament_python' and name 'altair_core'
+[0.327s] Level 1:colcon.colcon_core.package_identification:_identify(altair_interfaces) by extensions ['ignore', 'ignore_ament_install']
+[0.327s] Level 1:colcon.colcon_core.package_identification:_identify(altair_interfaces) by extension 'ignore'
+[0.327s] Level 1:colcon.colcon_core.package_identification:_identify(altair_interfaces) by extension 'ignore_ament_install'
+[0.328s] Level 1:colcon.colcon_core.package_identification:_identify(altair_interfaces) by extensions ['colcon_pkg']
+[0.328s] Level 1:colcon.colcon_core.package_identification:_identify(altair_interfaces) by extension 'colcon_pkg'
+[0.328s] Level 1:colcon.colcon_core.package_identification:_identify(altair_interfaces) by extensions ['colcon_meta']
+[0.328s] Level 1:colcon.colcon_core.package_identification:_identify(altair_interfaces) by extension 'colcon_meta'
+[0.328s] Level 1:colcon.colcon_core.package_identification:_identify(altair_interfaces) by extensions ['ros']
+[0.328s] Level 1:colcon.colcon_core.package_identification:_identify(altair_interfaces) by extension 'ros'
+[0.328s] DEBUG:colcon.colcon_core.package_identification:Package 'altair_interfaces' with type 'ros.ament_cmake' and name 'altair_interfaces'
+[0.329s] Level 1:colcon.colcon_core.package_identification:_identify(altair_web_server) by extensions ['ignore', 'ignore_ament_install']
+[0.329s] Level 1:colcon.colcon_core.package_identification:_identify(altair_web_server) by extension 'ignore'
+[0.329s] Level 1:colcon.colcon_core.package_identification:_identify(altair_web_server) by extension 'ignore_ament_install'
+[0.329s] Level 1:colcon.colcon_core.package_identification:_identify(altair_web_server) by extensions ['colcon_pkg']
+[0.329s] Level 1:colcon.colcon_core.package_identification:_identify(altair_web_server) by extension 'colcon_pkg'
+[0.329s] Level 1:colcon.colcon_core.package_identification:_identify(altair_web_server) by extensions ['colcon_meta']
+[0.329s] Level 1:colcon.colcon_core.package_identification:_identify(altair_web_server) by extension 'colcon_meta'
+[0.329s] Level 1:colcon.colcon_core.package_identification:_identify(altair_web_server) by extensions ['ros']
+[0.329s] Level 1:colcon.colcon_core.package_identification:_identify(altair_web_server) by extension 'ros'
+[0.331s] DEBUG:colcon.colcon_core.package_identification:Package 'altair_web_server' with type 'ros.ament_python' and name 'altair_web_server'
+[0.331s] Level 1:colcon.colcon_core.package_identification:_identify(build) by extensions ['ignore', 'ignore_ament_install']
+[0.331s] Level 1:colcon.colcon_core.package_identification:_identify(build) by extension 'ignore'
+[0.332s] Level 1:colcon.colcon_core.package_identification:_identify(build) ignored
+[0.332s] Level 1:colcon.colcon_core.package_identification:_identify(docs) by extensions ['ignore', 'ignore_ament_install']
+[0.332s] Level 1:colcon.colcon_core.package_identification:_identify(docs) by extension 'ignore'
+[0.333s] Level 1:colcon.colcon_core.package_identification:_identify(docs) by extension 'ignore_ament_install'
+[0.333s] Level 1:colcon.colcon_core.package_identification:_identify(docs) by extensions ['colcon_pkg']
+[0.333s] Level 1:colcon.colcon_core.package_identification:_identify(docs) by extension 'colcon_pkg'
+[0.333s] Level 1:colcon.colcon_core.package_identification:_identify(docs) by extensions ['colcon_meta']
+[0.333s] Level 1:colcon.colcon_core.package_identification:_identify(docs) by extension 'colcon_meta'
+[0.333s] Level 1:colcon.colcon_core.package_identification:_identify(docs) by extensions ['ros']
+[0.333s] Level 1:colcon.colcon_core.package_identification:_identify(docs) by extension 'ros'
+[0.333s] Level 1:colcon.colcon_core.package_identification:_identify(docs) by extensions ['cmake', 'python']
+[0.333s] Level 1:colcon.colcon_core.package_identification:_identify(docs) by extension 'cmake'
+[0.333s] Level 1:colcon.colcon_core.package_identification:_identify(docs) by extension 'python'
+[0.333s] Level 1:colcon.colcon_core.package_identification:_identify(docs) by extensions ['python_setup_py']
+[0.333s] Level 1:colcon.colcon_core.package_identification:_identify(docs) by extension 'python_setup_py'
+[0.333s] Level 1:colcon.colcon_core.package_identification:_identify(install) by extensions ['ignore', 'ignore_ament_install']
+[0.334s] Level 1:colcon.colcon_core.package_identification:_identify(install) by extension 'ignore'
+[0.334s] Level 1:colcon.colcon_core.package_identification:_identify(install) ignored
+[0.334s] Level 1:colcon.colcon_core.package_identification:_identify(log) by extensions ['ignore', 'ignore_ament_install']
+[0.334s] Level 1:colcon.colcon_core.package_identification:_identify(log) by extension 'ignore'
+[0.334s] Level 1:colcon.colcon_core.package_identification:_identify(log) ignored
+[0.334s] Level 1:colcon.colcon_core.package_discovery:discover_packages(recursive) using defaults
+[0.334s] Level 1:colcon.colcon_core.package_discovery:discover_packages(ignore) discover
+[0.334s] Level 1:colcon.colcon_core.package_discovery:discover_packages(ignore) using defaults
+[0.334s] Level 1:colcon.colcon_core.package_discovery:discover_packages(path) discover
+[0.334s] Level 1:colcon.colcon_core.package_discovery:discover_packages(path) using defaults
+[0.377s] Level 1:colcon.colcon_core.package_discovery:discover_packages(prefix_path) check parameters
+[0.377s] Level 1:colcon.colcon_core.package_discovery:discover_packages(prefix_path) discover
+[0.385s] DEBUG:colcon.colcon_installed_package_information.package_discovery:Found 338 installed packages in /opt/ros/humble
+[0.387s] Level 1:colcon.colcon_core.package_discovery:discover_packages(prefix_path) using defaults
+[0.466s] Level 5:colcon.colcon_core.verb:set package 'altair_interfaces' build argument 'cmake_args' from command line to 'None'
+[0.466s] Level 5:colcon.colcon_core.verb:set package 'altair_interfaces' build argument 'cmake_target' from command line to 'None'
+[0.466s] Level 5:colcon.colcon_core.verb:set package 'altair_interfaces' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[0.466s] Level 5:colcon.colcon_core.verb:set package 'altair_interfaces' build argument 'cmake_clean_cache' from command line to 'False'
+[0.466s] Level 5:colcon.colcon_core.verb:set package 'altair_interfaces' build argument 'cmake_clean_first' from command line to 'False'
+[0.466s] Level 5:colcon.colcon_core.verb:set package 'altair_interfaces' build argument 'cmake_force_configure' from command line to 'False'
+[0.466s] Level 5:colcon.colcon_core.verb:set package 'altair_interfaces' build argument 'ament_cmake_args' from command line to 'None'
+[0.466s] Level 5:colcon.colcon_core.verb:set package 'altair_interfaces' build argument 'catkin_cmake_args' from command line to 'None'
+[0.466s] Level 5:colcon.colcon_core.verb:set package 'altair_interfaces' build argument 'catkin_skip_building_tests' from command line to 'False'
+[0.466s] DEBUG:colcon.colcon_core.verb:Building package 'altair_interfaces' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/altair/altair_framework/build/altair_interfaces', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/altair/altair_framework/install/altair_interfaces', 'merge_install': False, 'path': '/home/altair/altair_framework/altair_interfaces', 'symlink_install': True, 'test_result_base': None}
+[0.467s] Level 5:colcon.colcon_core.verb:set package 'altair_can_bridge' build argument 'cmake_args' from command line to 'None'
+[0.468s] Level 5:colcon.colcon_core.verb:set package 'altair_can_bridge' build argument 'cmake_target' from command line to 'None'
+[0.468s] Level 5:colcon.colcon_core.verb:set package 'altair_can_bridge' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[0.468s] Level 5:colcon.colcon_core.verb:set package 'altair_can_bridge' build argument 'cmake_clean_cache' from command line to 'False'
+[0.468s] Level 5:colcon.colcon_core.verb:set package 'altair_can_bridge' build argument 'cmake_clean_first' from command line to 'False'
+[0.468s] Level 5:colcon.colcon_core.verb:set package 'altair_can_bridge' build argument 'cmake_force_configure' from command line to 'False'
+[0.468s] Level 5:colcon.colcon_core.verb:set package 'altair_can_bridge' build argument 'ament_cmake_args' from command line to 'None'
+[0.468s] Level 5:colcon.colcon_core.verb:set package 'altair_can_bridge' build argument 'catkin_cmake_args' from command line to 'None'
+[0.468s] Level 5:colcon.colcon_core.verb:set package 'altair_can_bridge' build argument 'catkin_skip_building_tests' from command line to 'False'
+[0.468s] DEBUG:colcon.colcon_core.verb:Building package 'altair_can_bridge' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/altair/altair_framework/build/altair_can_bridge', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/altair/altair_framework/install/altair_can_bridge', 'merge_install': False, 'path': '/home/altair/altair_framework/altair_can_bridge', 'symlink_install': True, 'test_result_base': None}
+[0.469s] Level 5:colcon.colcon_core.verb:set package 'altair_core' build argument 'cmake_args' from command line to 'None'
+[0.469s] Level 5:colcon.colcon_core.verb:set package 'altair_core' build argument 'cmake_target' from command line to 'None'
+[0.469s] Level 5:colcon.colcon_core.verb:set package 'altair_core' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[0.469s] Level 5:colcon.colcon_core.verb:set package 'altair_core' build argument 'cmake_clean_cache' from command line to 'False'
+[0.469s] Level 5:colcon.colcon_core.verb:set package 'altair_core' build argument 'cmake_clean_first' from command line to 'False'
+[0.469s] Level 5:colcon.colcon_core.verb:set package 'altair_core' build argument 'cmake_force_configure' from command line to 'False'
+[0.469s] Level 5:colcon.colcon_core.verb:set package 'altair_core' build argument 'ament_cmake_args' from command line to 'None'
+[0.470s] Level 5:colcon.colcon_core.verb:set package 'altair_core' build argument 'catkin_cmake_args' from command line to 'None'
+[0.470s] Level 5:colcon.colcon_core.verb:set package 'altair_core' build argument 'catkin_skip_building_tests' from command line to 'False'
+[0.470s] DEBUG:colcon.colcon_core.verb:Building package 'altair_core' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/altair/altair_framework/build/altair_core', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/altair/altair_framework/install/altair_core', 'merge_install': False, 'path': '/home/altair/altair_framework/altair_core', 'symlink_install': True, 'test_result_base': None}
+[0.470s] Level 5:colcon.colcon_core.verb:set package 'altair_web_server' build argument 'cmake_args' from command line to 'None'
+[0.470s] Level 5:colcon.colcon_core.verb:set package 'altair_web_server' build argument 'cmake_target' from command line to 'None'
+[0.470s] Level 5:colcon.colcon_core.verb:set package 'altair_web_server' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[0.470s] Level 5:colcon.colcon_core.verb:set package 'altair_web_server' build argument 'cmake_clean_cache' from command line to 'False'
+[0.470s] Level 5:colcon.colcon_core.verb:set package 'altair_web_server' build argument 'cmake_clean_first' from command line to 'False'
+[0.470s] Level 5:colcon.colcon_core.verb:set package 'altair_web_server' build argument 'cmake_force_configure' from command line to 'False'
+[0.471s] Level 5:colcon.colcon_core.verb:set package 'altair_web_server' build argument 'ament_cmake_args' from command line to 'None'
+[0.471s] Level 5:colcon.colcon_core.verb:set package 'altair_web_server' build argument 'catkin_cmake_args' from command line to 'None'
+[0.471s] Level 5:colcon.colcon_core.verb:set package 'altair_web_server' build argument 'catkin_skip_building_tests' from command line to 'False'
+[0.471s] DEBUG:colcon.colcon_core.verb:Building package 'altair_web_server' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/altair/altair_framework/build/altair_web_server', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/altair/altair_framework/install/altair_web_server', 'merge_install': False, 'path': '/home/altair/altair_framework/altair_web_server', 'symlink_install': True, 'test_result_base': None}
+[0.471s] INFO:colcon.colcon_core.executor:Executing jobs using 'parallel' executor
+[0.472s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:run_until_complete
+[0.472s] INFO:colcon.colcon_ros.task.ament_cmake.build:Building ROS package in '/home/altair/altair_framework/altair_interfaces' with build type 'ament_cmake'
+[0.473s] INFO:colcon.colcon_cmake.task.cmake.build:Building CMake package in '/home/altair/altair_framework/altair_interfaces'
+[0.477s] INFO:colcon.colcon_core.plugin_system:Skipping extension 'colcon_core.shell.bat': Not used on non-Windows systems
+[0.477s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[0.477s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[0.500s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/altair/altair_framework/build/altair_interfaces': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake /home/altair/altair_framework/altair_interfaces -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/altair/altair_framework/install/altair_interfaces
+[3.083s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/altair/altair_framework/build/altair_interfaces' returned '0': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake /home/altair/altair_framework/altair_interfaces -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/altair/altair_framework/install/altair_interfaces
+[3.086s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/altair/altair_framework/build/altair_interfaces': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --build /home/altair/altair_framework/build/altair_interfaces -- -j8 -l8
+[20.960s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/altair/altair_framework/build/altair_interfaces' returned '0': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --build /home/altair/altair_framework/build/altair_interfaces -- -j8 -l8
+[20.968s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/altair/altair_framework/build/altair_interfaces': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --install /home/altair/altair_framework/build/altair_interfaces
+[22.257s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(altair_interfaces)
+[22.259s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/altair/altair_framework/build/altair_interfaces' returned '0': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --install /home/altair/altair_framework/build/altair_interfaces
+[22.261s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_interfaces' for CMake module files
+[22.262s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_interfaces' for CMake config files
+[22.263s] Level 1:colcon.colcon_core.shell:create_environment_hook('altair_interfaces', 'cmake_prefix_path')
+[22.264s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/altair/altair_framework/install/altair_interfaces/share/altair_interfaces/hook/cmake_prefix_path.ps1'
+[22.265s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/altair/altair_framework/install/altair_interfaces/share/altair_interfaces/hook/cmake_prefix_path.dsv'
+[22.266s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/altair/altair_framework/install/altair_interfaces/share/altair_interfaces/hook/cmake_prefix_path.sh'
+[22.267s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_interfaces/lib'
+[22.267s] Level 1:colcon.colcon_core.shell:create_environment_hook('altair_interfaces', 'ld_library_path_lib')
+[22.267s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/altair/altair_framework/install/altair_interfaces/share/altair_interfaces/hook/ld_library_path_lib.ps1'
+[22.268s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/altair/altair_framework/install/altair_interfaces/share/altair_interfaces/hook/ld_library_path_lib.dsv'
+[22.268s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/altair/altair_framework/install/altair_interfaces/share/altair_interfaces/hook/ld_library_path_lib.sh'
+[22.269s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_interfaces/bin'
+[22.269s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_interfaces/lib/pkgconfig/altair_interfaces.pc'
+[22.270s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_interfaces/lib/python3.10/site-packages'
+[22.271s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_interfaces/bin'
+[22.272s] INFO:colcon.colcon_core.shell:Creating package script '/home/altair/altair_framework/install/altair_interfaces/share/altair_interfaces/package.ps1'
+[22.273s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/altair/altair_framework/install/altair_interfaces/share/altair_interfaces/package.dsv'
+[22.274s] INFO:colcon.colcon_core.shell:Creating package script '/home/altair/altair_framework/install/altair_interfaces/share/altair_interfaces/package.sh'
+[22.275s] INFO:colcon.colcon_core.shell:Creating package script '/home/altair/altair_framework/install/altair_interfaces/share/altair_interfaces/package.bash'
+[22.276s] INFO:colcon.colcon_core.shell:Creating package script '/home/altair/altair_framework/install/altair_interfaces/share/altair_interfaces/package.zsh'
+[22.277s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/altair/altair_framework/install/altair_interfaces/share/colcon-core/packages/altair_interfaces)
+[22.278s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(altair_interfaces)
+[22.278s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_interfaces' for CMake module files
+[22.279s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_interfaces' for CMake config files
+[22.280s] Level 1:colcon.colcon_core.shell:create_environment_hook('altair_interfaces', 'cmake_prefix_path')
+[22.281s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/altair/altair_framework/install/altair_interfaces/share/altair_interfaces/hook/cmake_prefix_path.ps1'
+[22.282s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/altair/altair_framework/install/altair_interfaces/share/altair_interfaces/hook/cmake_prefix_path.dsv'
+[22.282s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/altair/altair_framework/install/altair_interfaces/share/altair_interfaces/hook/cmake_prefix_path.sh'
+[22.283s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_interfaces/lib'
+[22.283s] Level 1:colcon.colcon_core.shell:create_environment_hook('altair_interfaces', 'ld_library_path_lib')
+[22.284s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/altair/altair_framework/install/altair_interfaces/share/altair_interfaces/hook/ld_library_path_lib.ps1'
+[22.284s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/altair/altair_framework/install/altair_interfaces/share/altair_interfaces/hook/ld_library_path_lib.dsv'
+[22.285s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/altair/altair_framework/install/altair_interfaces/share/altair_interfaces/hook/ld_library_path_lib.sh'
+[22.285s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_interfaces/bin'
+[22.285s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_interfaces/lib/pkgconfig/altair_interfaces.pc'
+[22.286s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_interfaces/lib/python3.10/site-packages'
+[22.287s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_interfaces/bin'
+[22.287s] INFO:colcon.colcon_core.shell:Creating package script '/home/altair/altair_framework/install/altair_interfaces/share/altair_interfaces/package.ps1'
+[22.289s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/altair/altair_framework/install/altair_interfaces/share/altair_interfaces/package.dsv'
+[22.290s] INFO:colcon.colcon_core.shell:Creating package script '/home/altair/altair_framework/install/altair_interfaces/share/altair_interfaces/package.sh'
+[22.290s] INFO:colcon.colcon_core.shell:Creating package script '/home/altair/altair_framework/install/altair_interfaces/share/altair_interfaces/package.bash'
+[22.291s] INFO:colcon.colcon_core.shell:Creating package script '/home/altair/altair_framework/install/altair_interfaces/share/altair_interfaces/package.zsh'
+[22.291s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/altair/altair_framework/install/altair_interfaces/share/colcon-core/packages/altair_interfaces)
+[22.292s] INFO:colcon.colcon_ros.task.ament_cmake.build:Building ROS package in '/home/altair/altair_framework/altair_can_bridge' with build type 'ament_cmake'
+[22.292s] INFO:colcon.colcon_cmake.task.cmake.build:Building CMake package in '/home/altair/altair_framework/altair_can_bridge'
+[22.292s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[22.292s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[22.296s] INFO:colcon.colcon_ros.task.ament_python.build:Building ROS package in '/home/altair/altair_framework/altair_core' with build type 'ament_python'
+[22.297s] Level 1:colcon.colcon_core.shell:create_environment_hook('altair_core', 'ament_prefix_path')
+[22.297s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/altair/altair_framework/install/altair_core/share/altair_core/hook/ament_prefix_path.ps1'
+[22.298s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/altair/altair_framework/install/altair_core/share/altair_core/hook/ament_prefix_path.dsv'
+[22.299s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/altair/altair_framework/install/altair_core/share/altair_core/hook/ament_prefix_path.sh'
+[22.300s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[22.300s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[22.307s] INFO:colcon.colcon_ros.task.ament_python.build:Building ROS package in '/home/altair/altair_framework/altair_web_server' with build type 'ament_python'
+[22.307s] Level 1:colcon.colcon_core.shell:create_environment_hook('altair_web_server', 'ament_prefix_path')
+[22.307s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/altair/altair_framework/install/altair_web_server/share/altair_web_server/hook/ament_prefix_path.ps1'
+[22.309s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/altair/altair_framework/install/altair_web_server/share/altair_web_server/hook/ament_prefix_path.dsv'
+[22.309s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/altair/altair_framework/install/altair_web_server/share/altair_web_server/hook/ament_prefix_path.sh'
+[22.310s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[22.311s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[22.325s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/altair/altair_framework/build/altair_can_bridge': AMENT_PREFIX_PATH=/home/altair/altair_framework/install/altair_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/altair/altair_framework/install/altair_interfaces:/opt/ros/humble LD_LIBRARY_PATH=/home/altair/altair_framework/install/altair_interfaces/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/altair/altair_framework/install/altair_interfaces/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/cmake /home/altair/altair_framework/altair_can_bridge -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/altair/altair_framework/install/altair_can_bridge
+[22.855s] INFO:colcon.colcon_core.task.python.build:Building Python package in '/home/altair/altair_framework/altair_core'
+[22.856s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[22.856s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[23.354s] INFO:colcon.colcon_core.task.python.build:Building Python package in '/home/altair/altair_framework/altair_web_server'
+[23.355s] INFO:colcon.colcon_core.shell:Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[23.355s] DEBUG:colcon.colcon_core.shell:Skip shell extension 'dsv' for command environment
+[24.980s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/altair/altair_framework/build/altair_can_bridge' returned '0': AMENT_PREFIX_PATH=/home/altair/altair_framework/install/altair_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/altair/altair_framework/install/altair_interfaces:/opt/ros/humble LD_LIBRARY_PATH=/home/altair/altair_framework/install/altair_interfaces/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/altair/altair_framework/install/altair_interfaces/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/cmake /home/altair/altair_framework/altair_can_bridge -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/altair/altair_framework/install/altair_can_bridge
+[24.990s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/altair/altair_framework/build/altair_can_bridge': AMENT_PREFIX_PATH=/home/altair/altair_framework/install/altair_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/altair/altair_framework/install/altair_interfaces:/opt/ros/humble LD_LIBRARY_PATH=/home/altair/altair_framework/install/altair_interfaces/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/altair/altair_framework/install/altair_interfaces/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/cmake --build /home/altair/altair_framework/build/altair_can_bridge -- -j8 -l8
+[25.582s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/altair/altair_framework/build/altair_web_server': AMENT_PREFIX_PATH=/home/altair/altair_framework/install/altair_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/altair/altair_framework/install/altair_interfaces LD_LIBRARY_PATH=/home/altair/altair_framework/install/altair_interfaces/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/altair/altair_framework/build/altair_web_server/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/altair/altair_framework/install/altair_web_server/lib/python3.10/site-packages:/home/altair/altair_framework/install/altair_interfaces/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /home/altair/altair_framework/build/altair_web_server/build --no-deps symlink_data
+[25.596s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/altair/altair_framework/build/altair_core': AMENT_PREFIX_PATH=/home/altair/altair_framework/install/altair_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/altair/altair_framework/install/altair_interfaces LD_LIBRARY_PATH=/home/altair/altair_framework/install/altair_interfaces/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/altair/altair_framework/build/altair_core/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/altair/altair_framework/install/altair_core/lib/python3.10/site-packages:/home/altair/altair_framework/install/altair_interfaces/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /home/altair/altair_framework/build/altair_core/build --no-deps symlink_data
+[28.175s] Level 1:colcon.colcon_core.shell:create_environment_hook('altair_web_server', 'pythonpath_develop')
+[28.179s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/altair/altair_framework/build/altair_web_server/share/altair_web_server/hook/pythonpath_develop.ps1'
+[28.179s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/altair/altair_framework/build/altair_web_server' returned '0': AMENT_PREFIX_PATH=/home/altair/altair_framework/install/altair_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/altair/altair_framework/install/altair_interfaces LD_LIBRARY_PATH=/home/altair/altair_framework/install/altair_interfaces/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/altair/altair_framework/build/altair_web_server/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/altair/altair_framework/install/altair_web_server/lib/python3.10/site-packages:/home/altair/altair_framework/install/altair_interfaces/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /home/altair/altair_framework/build/altair_web_server/build --no-deps symlink_data
+[28.180s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/altair/altair_framework/build/altair_web_server/share/altair_web_server/hook/pythonpath_develop.dsv'
+[28.181s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/altair/altair_framework/build/altair_web_server/share/altair_web_server/hook/pythonpath_develop.sh'
+[28.182s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_web_server' for CMake module files
+[28.183s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_web_server' for CMake config files
+[28.185s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_web_server/lib'
+[28.185s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_web_server/bin'
+[28.185s] Level 1:colcon.colcon_core.shell:create_environment_hook('altair_web_server', 'path')
+[28.186s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/altair/altair_framework/install/altair_web_server/share/altair_web_server/hook/path.ps1'
+[28.187s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/altair/altair_framework/install/altair_web_server/share/altair_web_server/hook/path.dsv'
+[28.187s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/altair/altair_framework/install/altair_web_server/share/altair_web_server/hook/path.sh'
+[28.188s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_web_server/lib/pkgconfig/altair_web_server.pc'
+[28.189s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_web_server/lib/python3.10/site-packages'
+[28.189s] Level 1:colcon.colcon_core.shell:create_environment_hook('altair_web_server', 'pythonpath')
+[28.190s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/altair/altair_framework/install/altair_web_server/share/altair_web_server/hook/pythonpath.ps1'
+[28.191s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/altair/altair_framework/install/altair_web_server/share/altair_web_server/hook/pythonpath.dsv'
+[28.192s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/altair/altair_framework/install/altair_web_server/share/altair_web_server/hook/pythonpath.sh'
+[28.193s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_web_server/bin'
+[28.193s] Level 1:colcon.colcon_core.shell:create_environment_hook('altair_web_server', 'pythonscriptspath')
+[28.194s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/altair/altair_framework/install/altair_web_server/share/altair_web_server/hook/pythonscriptspath.ps1'
+[28.194s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/altair/altair_framework/install/altair_web_server/share/altair_web_server/hook/pythonscriptspath.dsv'
+[28.194s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/altair/altair_framework/install/altair_web_server/share/altair_web_server/hook/pythonscriptspath.sh'
+[28.195s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(altair_web_server)
+[28.196s] INFO:colcon.colcon_core.shell:Creating package script '/home/altair/altair_framework/install/altair_web_server/share/altair_web_server/package.ps1'
+[28.197s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/altair/altair_framework/install/altair_web_server/share/altair_web_server/package.dsv'
+[28.198s] INFO:colcon.colcon_core.shell:Creating package script '/home/altair/altair_framework/install/altair_web_server/share/altair_web_server/package.sh'
+[28.199s] INFO:colcon.colcon_core.shell:Creating package script '/home/altair/altair_framework/install/altair_web_server/share/altair_web_server/package.bash'
+[28.200s] INFO:colcon.colcon_core.shell:Creating package script '/home/altair/altair_framework/install/altair_web_server/share/altair_web_server/package.zsh'
+[28.200s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/altair/altair_framework/install/altair_web_server/share/colcon-core/packages/altair_web_server)
+[28.203s] Level 1:colcon.colcon_core.shell:create_environment_hook('altair_core', 'pythonpath_develop')
+[28.203s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/altair/altair_framework/build/altair_core/share/altair_core/hook/pythonpath_develop.ps1'
+[28.204s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/altair/altair_framework/build/altair_core' returned '0': AMENT_PREFIX_PATH=/home/altair/altair_framework/install/altair_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/altair/altair_framework/install/altair_interfaces LD_LIBRARY_PATH=/home/altair/altair_framework/install/altair_interfaces/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/altair/altair_framework/build/altair_core/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/altair/altair_framework/install/altair_core/lib/python3.10/site-packages:/home/altair/altair_framework/install/altair_interfaces/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /home/altair/altair_framework/build/altair_core/build --no-deps symlink_data
+[28.207s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/altair/altair_framework/build/altair_core/share/altair_core/hook/pythonpath_develop.dsv'
+[28.207s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/altair/altair_framework/build/altair_core/share/altair_core/hook/pythonpath_develop.sh'
+[28.209s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_core' for CMake module files
+[28.210s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_core' for CMake config files
+[28.211s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_core/lib'
+[28.212s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_core/bin'
+[28.212s] Level 1:colcon.colcon_core.shell:create_environment_hook('altair_core', 'path')
+[28.212s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/altair/altair_framework/install/altair_core/share/altair_core/hook/path.ps1'
+[28.213s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/altair/altair_framework/install/altair_core/share/altair_core/hook/path.dsv'
+[28.214s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/altair/altair_framework/install/altair_core/share/altair_core/hook/path.sh'
+[28.215s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_core/lib/pkgconfig/altair_core.pc'
+[28.216s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_core/lib/python3.10/site-packages'
+[28.216s] Level 1:colcon.colcon_core.shell:create_environment_hook('altair_core', 'pythonpath')
+[28.217s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/altair/altair_framework/install/altair_core/share/altair_core/hook/pythonpath.ps1'
+[28.218s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/altair/altair_framework/install/altair_core/share/altair_core/hook/pythonpath.dsv'
+[28.218s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/altair/altair_framework/install/altair_core/share/altair_core/hook/pythonpath.sh'
+[28.220s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_core/bin'
+[28.220s] Level 1:colcon.colcon_core.shell:create_environment_hook('altair_core', 'pythonscriptspath')
+[28.221s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/altair/altair_framework/install/altair_core/share/altair_core/hook/pythonscriptspath.ps1'
+[28.222s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/altair/altair_framework/install/altair_core/share/altair_core/hook/pythonscriptspath.dsv'
+[28.222s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/altair/altair_framework/install/altair_core/share/altair_core/hook/pythonscriptspath.sh'
+[28.223s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(altair_core)
+[28.225s] INFO:colcon.colcon_core.shell:Creating package script '/home/altair/altair_framework/install/altair_core/share/altair_core/package.ps1'
+[28.228s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/altair/altair_framework/install/altair_core/share/altair_core/package.dsv'
+[28.229s] INFO:colcon.colcon_core.shell:Creating package script '/home/altair/altair_framework/install/altair_core/share/altair_core/package.sh'
+[28.230s] INFO:colcon.colcon_core.shell:Creating package script '/home/altair/altair_framework/install/altair_core/share/altair_core/package.bash'
+[28.231s] INFO:colcon.colcon_core.shell:Creating package script '/home/altair/altair_framework/install/altair_core/share/altair_core/package.zsh'
+[28.232s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/altair/altair_framework/install/altair_core/share/colcon-core/packages/altair_core)
+[43.744s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/altair/altair_framework/build/altair_can_bridge' returned '0': AMENT_PREFIX_PATH=/home/altair/altair_framework/install/altair_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/altair/altair_framework/install/altair_interfaces:/opt/ros/humble LD_LIBRARY_PATH=/home/altair/altair_framework/install/altair_interfaces/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/altair/altair_framework/install/altair_interfaces/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/cmake --build /home/altair/altair_framework/build/altair_can_bridge -- -j8 -l8
+[43.746s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoking command in '/home/altair/altair_framework/build/altair_can_bridge': AMENT_PREFIX_PATH=/home/altair/altair_framework/install/altair_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/altair/altair_framework/install/altair_interfaces:/opt/ros/humble LD_LIBRARY_PATH=/home/altair/altair_framework/install/altair_interfaces/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/altair/altair_framework/install/altair_interfaces/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/cmake --install /home/altair/altair_framework/build/altair_can_bridge
+[43.857s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(altair_can_bridge)
+[43.858s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_can_bridge' for CMake module files
+[43.858s] DEBUG:colcon.colcon_core.event_handler.log_command:Invoked command in '/home/altair/altair_framework/build/altair_can_bridge' returned '0': AMENT_PREFIX_PATH=/home/altair/altair_framework/install/altair_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/altair/altair_framework/install/altair_interfaces:/opt/ros/humble LD_LIBRARY_PATH=/home/altair/altair_framework/install/altair_interfaces/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/altair/altair_framework/install/altair_interfaces/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/cmake --install /home/altair/altair_framework/build/altair_can_bridge
+[43.859s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_can_bridge' for CMake config files
+[43.859s] Level 1:colcon.colcon_core.shell:create_environment_hook('altair_can_bridge', 'cmake_prefix_path')
+[43.859s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/altair/altair_framework/install/altair_can_bridge/share/altair_can_bridge/hook/cmake_prefix_path.ps1'
+[43.860s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/altair/altair_framework/install/altair_can_bridge/share/altair_can_bridge/hook/cmake_prefix_path.dsv'
+[43.861s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/altair/altair_framework/install/altair_can_bridge/share/altair_can_bridge/hook/cmake_prefix_path.sh'
+[43.862s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_can_bridge/lib'
+[43.863s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_can_bridge/bin'
+[43.863s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_can_bridge/lib/pkgconfig/altair_can_bridge.pc'
+[43.863s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_can_bridge/lib/python3.10/site-packages'
+[43.864s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_can_bridge/bin'
+[43.865s] INFO:colcon.colcon_core.shell:Creating package script '/home/altair/altair_framework/install/altair_can_bridge/share/altair_can_bridge/package.ps1'
+[43.866s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/altair/altair_framework/install/altair_can_bridge/share/altair_can_bridge/package.dsv'
+[43.866s] INFO:colcon.colcon_core.shell:Creating package script '/home/altair/altair_framework/install/altair_can_bridge/share/altair_can_bridge/package.sh'
+[43.867s] INFO:colcon.colcon_core.shell:Creating package script '/home/altair/altair_framework/install/altair_can_bridge/share/altair_can_bridge/package.bash'
+[43.867s] INFO:colcon.colcon_core.shell:Creating package script '/home/altair/altair_framework/install/altair_can_bridge/share/altair_can_bridge/package.zsh'
+[43.868s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/altair/altair_framework/install/altair_can_bridge/share/colcon-core/packages/altair_can_bridge)
+[43.869s] Level 1:colcon.colcon_core.environment:create_environment_scripts_only(altair_can_bridge)
+[43.869s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_can_bridge' for CMake module files
+[43.869s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_can_bridge' for CMake config files
+[43.870s] Level 1:colcon.colcon_core.shell:create_environment_hook('altair_can_bridge', 'cmake_prefix_path')
+[43.870s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/altair/altair_framework/install/altair_can_bridge/share/altair_can_bridge/hook/cmake_prefix_path.ps1'
+[43.871s] INFO:colcon.colcon_core.shell:Creating environment descriptor '/home/altair/altair_framework/install/altair_can_bridge/share/altair_can_bridge/hook/cmake_prefix_path.dsv'
+[43.871s] INFO:colcon.colcon_core.shell:Creating environment hook '/home/altair/altair_framework/install/altair_can_bridge/share/altair_can_bridge/hook/cmake_prefix_path.sh'
+[43.872s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_can_bridge/lib'
+[43.872s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_can_bridge/bin'
+[43.872s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_can_bridge/lib/pkgconfig/altair_can_bridge.pc'
+[43.872s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_can_bridge/lib/python3.10/site-packages'
+[43.872s] Level 1:colcon.colcon_core.environment:checking '/home/altair/altair_framework/install/altair_can_bridge/bin'
+[43.873s] INFO:colcon.colcon_core.shell:Creating package script '/home/altair/altair_framework/install/altair_can_bridge/share/altair_can_bridge/package.ps1'
+[43.873s] INFO:colcon.colcon_core.shell:Creating package descriptor '/home/altair/altair_framework/install/altair_can_bridge/share/altair_can_bridge/package.dsv'
+[43.874s] INFO:colcon.colcon_core.shell:Creating package script '/home/altair/altair_framework/install/altair_can_bridge/share/altair_can_bridge/package.sh'
+[43.874s] INFO:colcon.colcon_core.shell:Creating package script '/home/altair/altair_framework/install/altair_can_bridge/share/altair_can_bridge/package.bash'
+[43.875s] INFO:colcon.colcon_core.shell:Creating package script '/home/altair/altair_framework/install/altair_can_bridge/share/altair_can_bridge/package.zsh'
+[43.875s] Level 1:colcon.colcon_core.environment:create_file_with_runtime_dependencies(/home/altair/altair_framework/install/altair_can_bridge/share/colcon-core/packages/altair_can_bridge)
+[43.876s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:closing loop
+[43.876s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:loop closed
+[43.876s] DEBUG:colcon.colcon_parallel_executor.executor.parallel:run_until_complete finished with '0'
+[43.876s] DEBUG:colcon.colcon_core.event_reactor:joining thread
+[43.901s] INFO:colcon.colcon_core.plugin_system:Skipping extension 'colcon_notification.desktop_notification.terminal_notifier': Not used on non-Darwin systems
+[43.901s] INFO:colcon.colcon_core.plugin_system:Skipping extension 'colcon_notification.desktop_notification.win32': Not used on non-Windows systems
+[43.901s] INFO:colcon.colcon_notification.desktop_notification:Sending desktop notification using 'notify2'
+[43.919s] DEBUG:colcon.colcon_core.event_reactor:joined thread
+[43.919s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/altair/altair_framework/install/local_setup.ps1'
+[43.920s] INFO:colcon.colcon_core.shell:Creating prefix util module '/home/altair/altair_framework/install/_local_setup_util_ps1.py'
+[43.922s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/altair/altair_framework/install/setup.ps1'
+[43.923s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/altair/altair_framework/install/local_setup.sh'
+[43.923s] INFO:colcon.colcon_core.shell:Creating prefix util module '/home/altair/altair_framework/install/_local_setup_util_sh.py'
+[43.924s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/altair/altair_framework/install/setup.sh'
+[43.925s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/altair/altair_framework/install/local_setup.bash'
+[43.926s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/altair/altair_framework/install/setup.bash'
+[43.928s] INFO:colcon.colcon_core.shell:Creating prefix script '/home/altair/altair_framework/install/local_setup.zsh'
+[43.929s] INFO:colcon.colcon_core.shell:Creating prefix chain script '/home/altair/altair_framework/install/setup.zsh'

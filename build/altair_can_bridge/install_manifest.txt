@@ -1,0 +1,1 @@
+/home/altair/altair_framework/install/altair_can_bridge/share/altair_can_bridge/scripts/setup_slcan.sh

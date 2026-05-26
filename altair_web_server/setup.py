@@ -23,7 +23,9 @@ setup(
     maintainer_email='106no@users.noreply.github.com',
     description='操縦者PC/NUC側：FastAPI Webサーバーおよびモダンなブラウザ制御ダッシュボードUI',
     license='MIT',
-    tests_require=['pytest'],
+    extras_require={
+        'test': ['pytest'],
+    },
     entry_points={
         'console_scripts': [
             'web_server_node = altair_web_server.web_server_node:main',

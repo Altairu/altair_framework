@@ -1,0 +1,29 @@
+[3.274s] Invoking command in '/home/altair/altair_framework/build/altair_web_server': AMENT_PREFIX_PATH=/home/altair/altair_framework/install/altair_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/altair/altair_framework/install/altair_interfaces LD_LIBRARY_PATH=/home/altair/altair_framework/install/altair_interfaces/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/altair/altair_framework/build/altair_web_server/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/altair/altair_framework/install/altair_web_server/lib/python3.10/site-packages:/home/altair/altair_framework/install/altair_interfaces/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /home/altair/altair_framework/build/altair_web_server/build --no-deps symlink_data
+[4.378s] running develop
+[5.419s] running egg_info
+[5.479s] creating altair_web_server.egg-info
+[5.479s] writing altair_web_server.egg-info/PKG-INFO
+[5.480s] writing dependency_links to altair_web_server.egg-info/dependency_links.txt
+[5.480s] writing entry points to altair_web_server.egg-info/entry_points.txt
+[5.480s] writing requirements to altair_web_server.egg-info/requires.txt
+[5.480s] writing top-level names to altair_web_server.egg-info/top_level.txt
+[5.480s] writing manifest file 'altair_web_server.egg-info/SOURCES.txt'
+[5.600s] reading manifest file 'altair_web_server.egg-info/SOURCES.txt'
+[5.604s] writing manifest file 'altair_web_server.egg-info/SOURCES.txt'
+[5.745s] running build_ext
+[5.746s] Creating /home/altair/altair_framework/install/altair_web_server/lib/python3.10/site-packages/altair-web-server.egg-link (link to .)
+[5.747s] Installing web_server_node script to /home/altair/altair_framework/install/altair_web_server/bin
+[5.749s] 
+[5.750s] Installed /home/altair/altair_framework/build/altair_web_server
+[5.750s] running symlink_data
+[5.750s] creating /home/altair/altair_framework/install/altair_web_server/share/ament_index/resource_index/packages
+[5.751s] symbolically linking /home/altair/altair_framework/build/altair_web_server/resource/altair_web_server -> /home/altair/altair_framework/install/altair_web_server/share/ament_index/resource_index/packages
+[5.755s] symbolically linking /home/altair/altair_framework/build/altair_web_server/package.xml -> /home/altair/altair_framework/install/altair_web_server/share/altair_web_server
+[5.756s] creating /home/altair/altair_framework/install/altair_web_server/share/altair_web_server/frontend
+[5.756s] symbolically linking /home/altair/altair_framework/build/altair_web_server/frontend/index.html -> /home/altair/altair_framework/install/altair_web_server/share/altair_web_server/frontend
+[5.756s] creating /home/altair/altair_framework/install/altair_web_server/share/altair_web_server/frontend/css
+[5.756s] symbolically linking /home/altair/altair_framework/build/altair_web_server/frontend/css/styles.css -> /home/altair/altair_framework/install/altair_web_server/share/altair_web_server/frontend/css
+[5.756s] creating /home/altair/altair_framework/install/altair_web_server/share/altair_web_server/frontend/js
+[5.757s] symbolically linking /home/altair/altair_framework/build/altair_web_server/frontend/js/gamepad.js -> /home/altair/altair_framework/install/altair_web_server/share/altair_web_server/frontend/js
+[5.757s] symbolically linking /home/altair/altair_framework/build/altair_web_server/frontend/js/app.js -> /home/altair/altair_framework/install/altair_web_server/share/altair_web_server/frontend/js
+[5.870s] Invoked command in '/home/altair/altair_framework/build/altair_web_server' returned '0': AMENT_PREFIX_PATH=/home/altair/altair_framework/install/altair_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/altair/altair_framework/install/altair_interfaces LD_LIBRARY_PATH=/home/altair/altair_framework/install/altair_interfaces/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/altair/altair_framework/build/altair_web_server/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/altair/altair_framework/install/altair_web_server/lib/python3.10/site-packages:/home/altair/altair_framework/install/altair_interfaces/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /home/altair/altair_framework/build/altair_web_server/build --no-deps symlink_data

@@ -1,0 +1,29 @@
+[3.299s] Invoking command in '/home/altair/altair_framework/build/altair_core': AMENT_PREFIX_PATH=/home/altair/altair_framework/install/altair_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/altair/altair_framework/install/altair_interfaces LD_LIBRARY_PATH=/home/altair/altair_framework/install/altair_interfaces/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/altair/altair_framework/build/altair_core/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/altair/altair_framework/install/altair_core/lib/python3.10/site-packages:/home/altair/altair_framework/install/altair_interfaces/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /home/altair/altair_framework/build/altair_core/build --no-deps symlink_data
+[4.361s] running develop
+[5.420s] running egg_info
+[5.471s] creating altair_core.egg-info
+[5.473s] writing altair_core.egg-info/PKG-INFO
+[5.473s] writing dependency_links to altair_core.egg-info/dependency_links.txt
+[5.479s] writing entry points to altair_core.egg-info/entry_points.txt
+[5.479s] writing requirements to altair_core.egg-info/requires.txt
+[5.479s] writing top-level names to altair_core.egg-info/top_level.txt
+[5.479s] writing manifest file 'altair_core.egg-info/SOURCES.txt'
+[5.607s] reading manifest file 'altair_core.egg-info/SOURCES.txt'
+[5.608s] writing manifest file 'altair_core.egg-info/SOURCES.txt'
+[5.758s] running build_ext
+[5.760s] Creating /home/altair/altair_framework/install/altair_core/lib/python3.10/site-packages/altair-core.egg-link (link to .)
+[5.761s] Installing behavior_runner script to /home/altair/altair_framework/install/altair_core/bin
+[5.761s] Installing module_manager script to /home/altair/altair_framework/install/altair_core/bin
+[5.766s] 
+[5.766s] Installed /home/altair/altair_framework/build/altair_core
+[5.766s] running symlink_data
+[5.767s] creating /home/altair/altair_framework/install/altair_core/share/ament_index/resource_index/packages
+[5.768s] symbolically linking /home/altair/altair_framework/build/altair_core/resource/altair_core -> /home/altair/altair_framework/install/altair_core/share/ament_index/resource_index/packages
+[5.768s] symbolically linking /home/altair/altair_framework/build/altair_core/package.xml -> /home/altair/altair_framework/install/altair_core/share/altair_core
+[5.768s] creating /home/altair/altair_framework/install/altair_core/share/altair_core/config
+[5.768s] symbolically linking /home/altair/altair_framework/build/altair_core/config/modules_config.json -> /home/altair/altair_framework/install/altair_core/share/altair_core/config
+[5.768s] creating /home/altair/altair_framework/install/altair_core/share/altair_core/profiles
+[5.768s] symbolically linking /home/altair/altair_framework/build/altair_core/profiles/default_profile.json -> /home/altair/altair_framework/install/altair_core/share/altair_core/profiles
+[5.769s] symbolically linking /home/altair/altair_framework/build/altair_core/profiles/arm_test_profile.json -> /home/altair/altair_framework/install/altair_core/share/altair_core/profiles
+[5.769s] symbolically linking /home/altair/altair_framework/build/altair_core/profiles/base_only_profile.json -> /home/altair/altair_framework/install/altair_core/share/altair_core/profiles
+[5.907s] Invoked command in '/home/altair/altair_framework/build/altair_core' returned '0': AMENT_PREFIX_PATH=/home/altair/altair_framework/install/altair_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/altair/altair_framework/install/altair_interfaces LD_LIBRARY_PATH=/home/altair/altair_framework/install/altair_interfaces/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/altair/altair_framework/build/altair_core/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/altair/altair_framework/install/altair_core/lib/python3.10/site-packages:/home/altair/altair_framework/install/altair_interfaces/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /home/altair/altair_framework/build/altair_core/build --no-deps symlink_data

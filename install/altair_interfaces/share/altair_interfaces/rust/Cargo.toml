@@ -1,17 +1,1 @@
-[package]
-name = "altair_interfaces"
-version = "1.0.0"
-edition = "2021"
-
-[dependencies]
-rosidl_runtime_rs = "0.6"
-serde = { version = "1", optional = true, features = ["derive"] }
-serde-big-array = { version = "0.5.1", optional = true }
-
-# ROS Dependencies
-
-[features]
-serde = ['dep:serde', 'dep:serde-big-array', 'rosidl_runtime_rs/serde']
-
-[package.metadata.ros-env]
-include = true
+/home/altair/altair_framework/build/altair_interfaces/rosidl_generator_rs/altair_interfaces/rust/Cargo.toml

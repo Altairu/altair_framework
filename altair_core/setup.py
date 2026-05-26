@@ -23,7 +23,9 @@ setup(
     maintainer_email='106no@users.noreply.github.com',
     description='操縦者PC側：高レベルモジュール管理、状態遷移、およびユーザー動作プログラムランナー',
     license='MIT',
-    tests_require=['pytest'],
+    extras_require={
+        'test': ['pytest'],
+    },
     entry_points={
         'console_scripts': [
             'module_manager = altair_core.module_manager:main',
