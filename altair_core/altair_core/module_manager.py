@@ -46,11 +46,22 @@ class ModuleManager(Node):
         # モータごとの最新フィードバックデータをキャッシュする（角度と速度を1つのトピックに統合するため）
         self.mdd_feedback_cache = {}
 
+        # 指令値キャッシュ（10msの周期送信タイマーで使用する最新の目標値）
+        self.mdd_targets = {}
+        self.servo_angles = {}
+        self.solenoid_valves = {}
+
         # 制御システムの状態 (False = パラメータ送信待ち, True = 制御実行中)
         self.is_running = False
 
         # 設定ファイルのロードと動的初期化
         self.load_config_and_initialize()
+
+        # 10ms周期のCANコマンド送信タイマー (100Hz)
+        self.control_timer = self.create_timer(
+            0.01, self.publish_all_control_commands,
+            callback_group=self.callback_group
+        )
 
         self.get_logger().info("Module Manager ノードが起動しました。初期設定ロード完了。")
 
@@ -88,11 +99,14 @@ class ModuleManager(Node):
             self.get_logger().info(f"モジュールを登録: {name} (タイプ: {mtype}, BaseID: {hex(base_id)})")
 
             if mtype == 'mdd':
+                # 指令キャッシュ初期化
+                self.mdd_targets[name] = [0.0, 0.0, 0.0, 0.0]
+
                 # MDDモータ指令用サブスクライバ
                 topic_name = f"/altair/{name}/cmd"
                 self.subscriptions_dict[topic_name] = self.create_subscription(
                     MddCommand, topic_name,
-                    self.make_mdd_cmd_callback(name, base_id), 10,
+                    self.make_mdd_cmd_callback(name), 10,
                     callback_group=self.callback_group
                 )
                 
@@ -112,20 +126,26 @@ class ModuleManager(Node):
                 }
 
             elif mtype == 'servo':
+                # 指令キャッシュ初期化
+                self.servo_angles[name] = [90, 90, 90, 90, 90, 90]
+
                 # サーボ指令用サブスクライバ
                 topic_name = f"/altair/{name}/cmd"
                 self.subscriptions_dict[topic_name] = self.create_subscription(
                     ServoCommand, topic_name,
-                    self.make_servo_cmd_callback(name, base_id), 10,
+                    self.make_servo_cmd_callback(name), 10,
                     callback_group=self.callback_group
                 )
 
             elif mtype == 'solenoid':
+                # 指令キャッシュ初期化
+                self.solenoid_valves[name] = [False] * 12
+
                 # 電磁弁指令用サブスクライバ
                 topic_name = f"/altair/{name}/cmd"
                 self.subscriptions_dict[topic_name] = self.create_subscription(
                     SolenoidCommand, topic_name,
-                    self.make_solenoid_cmd_callback(name, base_id), 10,
+                    self.make_solenoid_cmd_callback(name), 10,
                     callback_group=self.callback_group
                 )
 
@@ -167,82 +187,94 @@ class ModuleManager(Node):
         # 見つからない場合は先頭候補を返して、呼び出し側のエラーログに実パスを出す
         return str(candidates[0]) if candidates else 'config/modules_config.json'
 
-    # --- 1. MDDモータ指令の送信処理 (ROS2 ➔ CAN) ---
-    def make_mdd_cmd_callback(self, name, base_id):
+    # --- 1. コールバック処理 (目標値のキャッシュ更新) ---
+    def make_mdd_cmd_callback(self, name):
         def callback(msg):
-            # 制御実行中でない場合は、指令の送信を無視する（ユーザーがStartを押すまで動かさない）
-            if not self.is_running:
-                return
-
-            cmd_id = base_id + 0x20  # 指令ID (例: 0x200 + 0x20 = 0x220)
-            
-            # 各モータの目標値を生データの10倍にして little-endian int16 配列にパッキング
-            try:
-                targets_int = [int(t * 10) for t in msg.targets]
-                payload = struct.pack('<hhhh', *targets_int)
-            except Exception as e:
-                self.get_logger().error(f"MDD目標値のエンコード失敗: {str(e)}")
-                return
-
-            frame = Frame()
-            frame.header.stamp = self.get_clock().now().to_msg()
-            frame.id = cmd_id
-            frame.dlc = 8
-            frame.is_extended = False
-            frame.is_rtr = False
-            frame.data = list(payload)
-
-            self.can_tx_pub.publish(frame)
+            self.mdd_targets[name] = [float(t) for t in msg.targets]
         return callback
 
-    # --- 2. サーボ指令の送信処理 (ROS2 ➔ CAN) ---
-    def make_servo_cmd_callback(self, name, base_id):
+    def make_servo_cmd_callback(self, name):
         def callback(msg):
-            # サーボは即時制御可能 (パラメータ待機がないため)
-            payload = list(msg.angles[:6])
-            # 180度制限
-            payload = [min(a, 180) for a in payload]
-            # パッドして6バイトにする
-            while len(payload) < 6:
-                payload.append(90)
-
-            frame = Frame()
-            frame.header.stamp = self.get_clock().now().to_msg()
-            frame.id = base_id  # 通常 0x100
-            frame.dlc = 6
-            frame.is_extended = False
-            frame.is_rtr = False
-            frame.data = payload + [0]*(8-len(payload)) # 8Bに補完
-
-            self.can_tx_pub.publish(frame)
+            self.servo_angles[name] = [int(a) for a in msg.angles]
         return callback
 
-    # --- 3. 電磁弁指令の送信処理 (ROS2 ➔ CAN) ---
-    def make_solenoid_cmd_callback(self, name, base_id):
+    def make_solenoid_cmd_callback(self, name):
         def callback(msg):
-            # 電磁弁も即時制御可能
-            # 12チャネルのON/OFFを2バイトのビットマップにパッキング
-            byte0 = 0
-            byte1 = 0
-            for i in range(min(len(msg.valves), 12)):
-                if msg.valves[i]:
-                    if i < 8:
-                        byte0 |= (1 << i)
-                    else:
-                        byte1 |= (1 << (i - 8))
-
-            frame = Frame()
-            frame.header.stamp = self.get_clock().now().to_msg()
-            frame.id = base_id  # 通常 0x300
-            frame.dlc = 2
-            frame.is_extended = False
-            frame.is_rtr = False
-            frame.data = [byte0, byte1] + [0]*6 # 8Bに補完
-
-            self.can_tx_pub.publish(frame)
+            self.solenoid_valves[name] = [bool(v) for v in msg.valves]
         return callback
 
-    # --- 4. CAN ➔ ROS2 フィードバック変換処理 (NUC ➔ PC) ---
+    # --- 2. 10ms周期 CANコマンド一括送信タイマー (100Hz) ---
+    def publish_all_control_commands(self):
+        """
+        登録されているすべてのモジュールに対して、最新の指令値を10ms（100Hz）周期で常にCANバスへ送信する
+        """
+        for module in self.config.get('modules', []):
+            name = module['name']
+            mtype = module['type']
+            base_id = int(module['base_id'], 16)
+
+            if mtype == 'mdd':
+                # 制御中でない（SETUP状態）ときは、安全のために強制的に [0.0, 0.0, 0.0, 0.0] のゼロ指令を送り続ける
+                targets = self.mdd_targets.get(name, [0.0, 0.0, 0.0, 0.0])
+                if not self.is_running:
+                    targets = [0.0, 0.0, 0.0, 0.0]
+
+                cmd_id = base_id + 0x20  # 例: 0x220
+                try:
+                    targets_int = [int(t * 10) for t in targets]
+                    payload = struct.pack('<hhhh', *targets_int)
+                except Exception as e:
+                    self.get_logger().error(f"MDD目標値の周期エンコード失敗 ({name}): {str(e)}")
+                    continue
+
+                frame = Frame()
+                frame.header.stamp = self.get_clock().now().to_msg()
+                frame.id = cmd_id
+                frame.dlc = 8
+                frame.is_extended = False
+                frame.is_rtr = False
+                frame.data = list(payload)
+                self.can_tx_pub.publish(frame)
+
+            elif mtype == 'servo':
+                # サーボはいつでも最新の指令値（デフォルト90度）を常に10msで送信
+                angles = self.servo_angles.get(name, [90, 90, 90, 90, 90, 90])
+                payload = list(angles[:6])
+                payload = [min(a, 180) for a in payload]
+                while len(payload) < 6:
+                    payload.append(90)
+
+                frame = Frame()
+                frame.header.stamp = self.get_clock().now().to_msg()
+                frame.id = base_id  # 通常 0x100
+                frame.dlc = 6
+                frame.is_extended = False
+                frame.is_rtr = False
+                frame.data = payload + [0]*(8-len(payload))
+                self.can_tx_pub.publish(frame)
+
+            elif mtype == 'solenoid':
+                # 電磁弁も常に最新のON/OFF状態を10msで送信
+                valves = self.solenoid_valves.get(name, [False] * 12)
+                byte0 = 0
+                byte1 = 0
+                for i in range(min(len(valves), 12)):
+                    if valves[i]:
+                        if i < 8:
+                            byte0 |= (1 << i)
+                        else:
+                            byte1 |= (1 << (i - 8))
+
+                frame = Frame()
+                frame.header.stamp = self.get_clock().now().to_msg()
+                frame.id = base_id  # 通常 0x300
+                frame.dlc = 2
+                frame.is_extended = False
+                frame.is_rtr = False
+                frame.data = [byte0, byte1] + [0]*6
+                self.can_tx_pub.publish(frame)
+
+    # --- 3. CAN ➔ ROS2 フィードバック変換処理 (NUC ➔ PC) ---
     def handle_can_rx_callback(self, frame):
         can_id = frame.id
 
@@ -257,6 +289,16 @@ class ModuleManager(Node):
                 cache['limit_switches'] = [bool(b) for b in data[0:4]]
                 cache['error_code'] = data[4]
                 cache['system_status'] = data[5]
+                
+                # マイコンが待機状態（0）にリセットされたことを検知したら、PC側の制御フラグも安全のために即座にFalseに戻す
+                if data[5] == 0 and self.is_running:
+                    self.is_running = False
+                    module_name = ""
+                    for module in self.config.get('modules', []):
+                        if int(module['base_id'], 16) == base_id:
+                            module_name = module['name']
+                            break
+                    self.get_logger().warn(f"マイコン '{module_name}' の待機状態へのリセットを検知したため、PC側の制御フラグを安全にリセットしました。")
                 
                 self.publish_mdd_feedback(base_id)
 
