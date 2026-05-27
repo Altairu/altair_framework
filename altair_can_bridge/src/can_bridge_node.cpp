@@ -107,8 +107,14 @@ private:
     // SocketCANに書き込み
     int bytes_sent = write(can_socket_, &frame, sizeof(struct can_frame));
     if (bytes_sent < 0) {
+      if (errno == ENOBUFS || errno == EAGAIN || errno == EWOULDBLOCK) {
+        // 送信バッファ一時満杯などの軽微なエラー時は切断せずパケットをスキップ
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, 
+          "CAN送信バッファ満杯 (ENOBUFS/EAGAIN) を検知しました。パケットをスキップします。");
+        return;
+      }
       RCLCPP_ERROR(this->get_logger(), "CANフレームの送信に失敗しました: %s", strerror(errno));
-      // 通信エラーを検知したら切断状態に移行
+      // 致命的な通信エラーのみ切断状態に移行
       handle_disconnect("CANフレーム送信失敗による通信切断");
     }
   }

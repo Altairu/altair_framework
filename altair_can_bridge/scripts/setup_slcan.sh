@@ -100,6 +100,7 @@ sleep 1
 
 # 5. インターフェースの起動
 echo "5. can0 インターフェースを起動します..."
+sudo ip link set can0 txqueuelen 1000
 sudo ip link set can0 up
 if [ $? -ne 0 ]; then
     echo "[ERROR] can0 の起動 (ip link set can0 up) に失敗しました。"
