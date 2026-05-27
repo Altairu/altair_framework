@@ -994,12 +994,27 @@ document.addEventListener("DOMContentLoaded", () => {
   // --- 14. Blockly ビジュアルマクロ統合 ＆ Pythonコードリアルタイム生成 ---
   // ==========================================================================
 
+  // 登録済みモジュールの一覧を動的に取得するドロップダウン生成ヘルパー
+  const getModuleOptionsDropdown = function(type) {
+    return function() {
+      if (!state.config || !state.config.modules) {
+        return [["未選択", "none"]];
+      }
+      const mods = state.config.modules.filter(m => m.type === type);
+      let options = mods.map(m => [m.name, m.name]);
+      if (options.length === 0) {
+        options.push(["登録なし", "none"]);
+      }
+      return options;
+    };
+  };
+
   // Blockly カスタムブロック定義
   Blockly.Blocks['mdd_move'] = {
     init: function () {
       this.appendDummyInput()
         .appendField("MDD モータ制御")
-        .appendField(new Blockly.FieldTextInput("drive_mdd"), "NAME");
+        .appendField(new Blockly.FieldDropdown(getModuleOptionsDropdown('mdd')), "NAME");
       this.appendValueInput("M1")
         .setCheck("Number")
         .appendField("M1");
@@ -1024,7 +1039,7 @@ document.addEventListener("DOMContentLoaded", () => {
     init: function () {
       this.appendDummyInput()
         .appendField("Servo 角度制御")
-        .appendField(new Blockly.FieldTextInput("arm_servo"), "NAME");
+        .appendField(new Blockly.FieldDropdown(getModuleOptionsDropdown('servo')), "NAME");
       this.appendValueInput("S1")
         .setCheck("Number")
         .appendField("S1 (0-180°)");
@@ -1055,7 +1070,7 @@ document.addEventListener("DOMContentLoaded", () => {
     init: function () {
       this.appendDummyInput()
         .appendField("Solenoid 電磁弁制御")
-        .appendField(new Blockly.FieldTextInput("valve_controller"), "NAME")
+        .appendField(new Blockly.FieldDropdown(getModuleOptionsDropdown('solenoid')), "NAME")
         .appendField("Ch")
         .appendField(new Blockly.FieldNumber(1, 1, 12, 1), "CHANNEL")
         .appendField("状態")
@@ -1146,6 +1161,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Blockly.Python ジェネレーターの定義
   Blockly.Python['mdd_move'] = function (block) {
     const name = block.getFieldValue('NAME');
+    if (name === 'none') return '';
     const m1 = Blockly.Python.valueToCode(block, 'M1', Blockly.Python.ORDER_ATOMIC) || '0.0';
     const m2 = Blockly.Python.valueToCode(block, 'M2', Blockly.Python.ORDER_ATOMIC) || '0.0';
     const m3 = Blockly.Python.valueToCode(block, 'M3', Blockly.Python.ORDER_ATOMIC) || '0.0';
@@ -1155,6 +1171,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   Blockly.Python['servo_move'] = function (block) {
     const name = block.getFieldValue('NAME');
+    if (name === 'none') return '';
     const s1 = Blockly.Python.valueToCode(block, 'S1', Blockly.Python.ORDER_ATOMIC) || '90';
     const s2 = Blockly.Python.valueToCode(block, 'S2', Blockly.Python.ORDER_ATOMIC) || '90';
     const s3 = Blockly.Python.valueToCode(block, 'S3', Blockly.Python.ORDER_ATOMIC) || '90';
@@ -1166,6 +1183,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   Blockly.Python['valve_control'] = function (block) {
     const name = block.getFieldValue('NAME');
+    if (name === 'none') return '';
     const channel = block.getFieldValue('CHANNEL');
     const state = block.getFieldValue('STATE');
     return `            self.get_module("${name}").set_valve(${channel}, ${state})\n`;
@@ -1285,18 +1303,14 @@ if __name__ == '__main__':
     </xml>
   `;
 
-  // XML を body に一時注入して injection する
-  const tDiv = document.createElement("div");
-  tDiv.innerHTML = toolboxXml;
-  document.body.appendChild(tDiv.firstElementChild);
-
   const blocklyDiv = document.getElementById('blocklyDiv');
-  const toolboxEl = document.getElementById('toolbox');
-  if (blocklyDiv && toolboxEl && typeof Blockly !== 'undefined') {
+  if (blocklyDiv && typeof Blockly !== 'undefined') {
     blocklyWorkspace = Blockly.inject('blocklyDiv', {
-      toolbox: toolboxEl,
+      toolbox: toolboxXml,
       scrollbars: true,
-      trashcan: true
+      trashcan: true,
+      grid: { spacing: 20, length: 3, colour: '#ccc', snap: true },
+      zoom: { controls: true, wheel: true }
     });
   }
 
