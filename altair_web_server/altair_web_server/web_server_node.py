@@ -405,6 +405,21 @@ async def save_profile(name: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"保存に失敗しました: {str(e)}")
 
+@app.post("/api/profiles/delete")
+async def delete_profile(name: str):
+    """指定されたプロファイルを削除"""
+    pdir = get_profiles_dir()
+    target = os.path.join(pdir, f"{name}.json")
+    
+    if not os.path.exists(target):
+        raise HTTPException(status_code=404, detail="プロファイルが見つかりません。")
+
+    try:
+        os.remove(target)
+        return {"success": True, "message": f"プロファイル '{name}' を削除しました。"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"削除に失敗しました: {str(e)}")
+
 @app.get("/api/config")
 async def get_current_config():
     """現在の modules_config.json の中身を直接返す"""

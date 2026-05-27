@@ -739,6 +739,26 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
+  // プロファイルの削除（グローバル関数化）
+  window.deleteProfileFile = async (name) => {
+    if (!confirm(`プロファイル '${name}' を本当に削除しますか？`)) {
+      return;
+    }
+    appendTerminalLog(el.behaviorTerminal, `プロファイル '${name}' を削除中...`);
+    try {
+      const res = await fetch(`/api/profiles/delete?name=${name}`, { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        appendTerminalLog(el.behaviorTerminal, `[SYSTEM] ${data.message}`, "system-msg");
+        refreshProfiles();
+      } else {
+        appendTerminalLog(el.behaviorTerminal, `[ERROR] 削除失敗: ${data.detail || data.message}`, "error-msg");
+      }
+    } catch (err) {
+      appendTerminalLog(el.behaviorTerminal, `[ERROR] 削除失敗: ${err}`, "error-msg");
+    }
+  };
+
   // プロファイル新規保存
   el.btnSaveProfile.addEventListener("click", async () => {
     const name = el.txtNewProfileName.value.trim();
