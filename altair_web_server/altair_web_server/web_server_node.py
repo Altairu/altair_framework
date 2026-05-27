@@ -229,6 +229,7 @@ class SolenoidCmdRequest(BaseModel):
 
 class SaveBlocklyRequest(BaseModel):
     code: str
+    xml: str = ""
 
 # --- REST API ルーティング ---
 
@@ -311,7 +312,7 @@ async def stop_behavior():
 
 @app.post("/api/behavior/save_blockly")
 async def save_blockly(req_data: SaveBlocklyRequest):
-    """Blocklyで生成されたPythonコードをファイルとして保存"""
+    """Blocklyで生成されたPythonコードおよびブロックXMLレイアウトをファイルとして保存"""
     paths = [
         "c:/Users/106no/Documents/GitHub/altair_framework/altair_core/user_behaviors",
         os.path.join(os.path.expanduser('~'), "ros2_ws/src/altair_framework/altair_core/user_behaviors"),
@@ -331,9 +332,45 @@ async def save_blockly(req_data: SaveBlocklyRequest):
     try:
         with open(dest_file, "w", encoding="utf-8") as f:
             f.write(req_data.code)
-        return {"success": True, "message": "Blocklyコードを blockly_behavior.py として保存しました。"}
+            
+        # XMLレイアウトデータも同じフォルダに保存
+        if req_data.xml:
+            xml_file = os.path.join(dest_dir, "blockly_workspace.xml")
+            with open(xml_file, "w", encoding="utf-8") as f:
+                f.write(req_data.xml)
+                
+        return {"success": True, "message": "Blocklyコードとレイアウトを正常に保存しました。"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"保存に失敗しました: {str(e)}")
+
+@app.get("/api/behavior/get_blockly_workspace")
+async def get_blockly_workspace():
+    """保存されているBlocklyのブロックレイアウト(XML文字列)を取得"""
+    paths = [
+        "c:/Users/106no/Documents/GitHub/altair_framework/altair_core/user_behaviors",
+        os.path.join(os.path.expanduser('~'), "ros2_ws/src/altair_framework/altair_core/user_behaviors"),
+        "./src/altair_framework/altair_core/user_behaviors",
+        "user_behaviors"
+    ]
+    dest_dir = None
+    for p in paths:
+        if os.path.exists(p):
+            dest_dir = p
+            break
+    if not dest_dir:
+        dest_dir = "user_behaviors"
+        
+    xml_file = os.path.join(dest_dir, "blockly_workspace.xml")
+    if os.path.exists(xml_file):
+        try:
+            with open(xml_file, "r", encoding="utf-8") as f:
+                return {"success": True, "xml": f.read()}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"読み込みに失敗しました: {str(e)}")
+            
+    # まだ保存されていない場合は初期のエントリポイントのみを置いたデフォルト状態を返す
+    default_xml = '<xml xmlns="https://developers.google.com/blockly/xml"><block type="event_macro" id="initial_entry" x="30" y="30"></block></xml>'
+    return {"success": True, "xml": default_xml}
 
 # --- 📁 プロファイル管理 (REST API) ---
 
@@ -491,16 +528,21 @@ async def websocket_endpoint(websocket: WebSocket):
 def get_frontend_dir():
     candidates = []
 
-    # ROS2インストール先のshareディレクトリを最優先
+    # 開発時の代表的な Windows ローカル Git パスを最優先
+    windows_git_path = Path("c:/Users/106no/Documents/GitHub/altair_framework/altair_web_server/frontend")
+    if windows_git_path.exists():
+        return str(windows_git_path)
+
+    cwd = Path.cwd()
+    candidates.append(cwd / 'altair_web_server' / 'frontend')
+    candidates.append(cwd / 'frontend')
+
+    # ROS2インストール先のshareディレクトリ
     try:
         share_dir = Path(get_package_share_directory('altair_web_server'))
         candidates.append(share_dir / 'frontend')
     except PackageNotFoundError:
         pass
-
-    cwd = Path.cwd()
-    candidates.append(cwd / 'altair_web_server' / 'frontend')
-    candidates.append(cwd / 'frontend')
 
     this_file = Path(__file__).resolve()
     candidates.append(this_file.parents[1] / 'frontend')

@@ -26,6 +26,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // 接続関連
     canStatusIndicator: document.getElementById("can-status-indicator"),
+    groupConnectionSlcan: document.getElementById("group-connection-slcan"),
+    slcanConnectionStatus: document.getElementById("slcan-connection-status"),
     chkAutoConnect: document.getElementById("chk-auto-connect"),
     selCanPort: document.getElementById("sel-can-port"),
     btnRefreshPorts: document.getElementById("btn-refresh-ports"),
@@ -171,11 +173,29 @@ document.addEventListener("DOMContentLoaded", () => {
       text.textContent = `CAN: Connected (${data.active_port})`;
       el.btnConnectCan.disabled = true;
       el.btnDisconnectCan.disabled = false;
+
+      // slcan接続グループのUI更新
+      if (el.slcanConnectionStatus) {
+        el.slcanConnectionStatus.innerHTML = `状態: <span class="badge badge-success" style="padding: 4px 8px; font-size: 11px;">接続完了 (${data.active_port})</span>`;
+      }
+      if (el.groupConnectionSlcan) {
+        el.groupConnectionSlcan.style.borderColor = "var(--success-color)";
+        el.groupConnectionSlcan.style.boxShadow = "0 0 10px rgba(19, 115, 51, 0.1)";
+      }
     } else {
       dot.className = "status-dot disconnected";
       text.textContent = "CAN: Disconnected";
       el.btnConnectCan.disabled = false;
       el.btnDisconnectCan.disabled = true;
+
+      // slcan接続グループのUI更新
+      if (el.slcanConnectionStatus) {
+        el.slcanConnectionStatus.innerHTML = `状態: <span class="badge badge-danger" style="padding: 4px 8px; font-size: 11px;">未接続</span>`;
+      }
+      if (el.groupConnectionSlcan) {
+        el.groupConnectionSlcan.style.borderColor = "var(--border-light)";
+        el.groupConnectionSlcan.style.boxShadow = "none";
+      }
 
       if (data.error_message) {
         appendTerminalLog(el.behaviorTerminal, `[CAN ERROR] ${data.error_message}`, "error-msg");
@@ -1595,6 +1615,42 @@ if __name__ == '__main__':
   // 既存コード互換のため参照名を維持
   const workspace = blocklyWorkspace;
 
+  // サーバーから保存済みBlocklyワークスペースをロードして復元
+  if (workspace && typeof Blockly !== 'undefined') {
+    fetch("/api/behavior/get_blockly_workspace")
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.xml) {
+          try {
+            workspace.clear();
+            const dom = Blockly.Xml.textToDom(data.xml);
+            Blockly.Xml.domToWorkspace(dom, workspace);
+            console.log("Blocklyワークスペースを正常に復元しました。");
+          } catch (restoreErr) {
+            console.error("Blocklyワークスペースの復元に失敗しました。デフォルトをロードします:", restoreErr);
+            loadDefaultEntryBlock(workspace);
+          }
+        } else {
+          loadDefaultEntryBlock(workspace);
+        }
+      })
+      .catch(err => {
+        console.error("Blocklyワークスペースのロードエラー:", err);
+        loadDefaultEntryBlock(workspace);
+      });
+  }
+
+  function loadDefaultEntryBlock(ws) {
+    try {
+      ws.clear();
+      const defaultXml = '<xml xmlns="https://developers.google.com/blockly/xml"><block type="event_macro" id="initial_entry" x="30" y="30"></block></xml>';
+      const dom = Blockly.Xml.textToDom(defaultXml);
+      Blockly.Xml.domToWorkspace(dom, ws);
+    } catch (e) {
+      console.error("Defaultブロック配置失敗:", e);
+    }
+  }
+
   // リアルタイムにコードを生成＆プレビュー
   if (workspace) {
     workspace.addChangeListener(() => {
@@ -1614,6 +1670,49 @@ if __name__ == '__main__':
     });
   }
 
+  // 単体「ブロックを保存」ボタンのイベント
+  const btnSaveBlocklyXml = document.getElementById("btn-save-blockly-xml");
+  if (btnSaveBlocklyXml) {
+    btnSaveBlocklyXml.addEventListener("click", async () => {
+      if (!workspace) {
+        appendTerminalLog(el.behaviorTerminal, "[ERROR] Blocklyワークスペースが初期化されていません。", "error-msg");
+        return;
+      }
+      
+      const rawCode = Blockly.Python.workspaceToCode(workspace);
+      const fullPython = generatePythonCode(rawCode);
+      
+      let xmlText = "";
+      try {
+        const dom = Blockly.Xml.workspaceToDom(workspace);
+        xmlText = Blockly.Xml.domToText(dom);
+      } catch (xmlErr) {
+        console.error("XML変換エラー:", xmlErr);
+        appendTerminalLog(el.behaviorTerminal, `[ERROR] ブロックXML変換に失敗しました: ${xmlErr.message}`, "error-msg");
+        return;
+      }
+
+      appendTerminalLog(el.behaviorTerminal, "ブロックとコードをサーバーに保存中...");
+
+      try {
+        const saveRes = await fetch("/api/behavior/save_blockly", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: fullPython, xml: xmlText })
+        });
+        const saveData = await saveRes.json();
+
+        if (saveData.success) {
+          appendTerminalLog(el.behaviorTerminal, "[SUCCESS] ブロックの配置状態と自動生成コードを保存しました！", "system-msg");
+        } else {
+          appendTerminalLog(el.behaviorTerminal, `[ERROR] 保存失敗: ${saveData.message}`, "error-msg");
+        }
+      } catch (err) {
+        appendTerminalLog(el.behaviorTerminal, `[ERROR] 保存API通信エラー: ${err.message}`, "error-msg");
+      }
+    });
+  }
+
   // マクロ実行ボタンのイベント
   const btnRunBlockly = document.getElementById("btn-run-blockly");
   if (btnRunBlockly) {
@@ -1625,13 +1724,21 @@ if __name__ == '__main__':
       const rawCode = Blockly.Python.workspaceToCode(workspace);
       const fullPython = generatePythonCode(rawCode);
 
+      let xmlText = "";
+      try {
+        const dom = Blockly.Xml.workspaceToDom(workspace);
+        xmlText = Blockly.Xml.domToText(dom);
+      } catch (xmlErr) {
+        console.error("XML変換エラー:", xmlErr);
+      }
+
       appendTerminalLog(el.behaviorTerminal, "Blocklyコードを blockly_behavior.py として保存中...");
 
       try {
         const saveRes = await fetch("/api/behavior/save_blockly", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ code: fullPython })
+          body: JSON.stringify({ code: fullPython, xml: xmlText })
         });
         const saveData = await saveRes.json();
 

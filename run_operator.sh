@@ -26,6 +26,9 @@ if [ "$SHOULD_BUILD" -eq 1 ]; then
     fi
 fi
 
+if [ -f "/opt/ros/humble/setup.bash" ]; then
+    source /opt/ros/humble/setup.bash
+fi
 source install/setup.bash
 
 # 2. シグナルトラップの設定 (Ctrl+C時にバックグラウンドプロセスを安全にキル)

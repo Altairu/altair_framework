@@ -93,8 +93,11 @@
         <!-- 上部コントロールボード -->
         <div class="control-board glass-card">
           <!-- 接続ポート設定 -->
-          <div class="control-group">
+          <div class="control-group" id="group-connection-slcan">
             <h3><i class="fa-solid fa-network-wired"></i> Connection (slcan)</h3>
+            <div class="control-status" id="slcan-connection-status" style="margin-top: 4px; margin-bottom: 12px; font-size: 13px; font-weight: 600;">
+              状態: <span class="badge badge-danger" style="padding: 4px 8px; font-size: 11px;">未接続</span>
+            </div>
             <div class="connection-controls">
               <label class="toggle-checkbox">
                 <input type="checkbox" id="chk-auto-connect" checked>
@@ -312,6 +315,9 @@
               <div class="blockly-btn-group">
                 <button class="btn btn-secondary" id="btn-toggle-code">
                   <i class="fa-solid fa-code"></i> コードを表示
+                </button>
+                <button class="btn btn-primary" id="btn-save-blockly-xml">
+                  <i class="fa-solid fa-floppy-disk"></i> ブロックを保存
                 </button>
                 <button class="btn btn-success" id="btn-run-blockly">
                   <i class="fa-solid fa-play"></i> マクロを実行

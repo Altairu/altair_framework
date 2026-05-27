@@ -27,6 +27,9 @@ if [ "$SHOULD_BUILD" -eq 1 ]; then
     fi
 fi
 
+if [ -f "/opt/ros/humble/setup.bash" ]; then
+    source /opt/ros/humble/setup.bash
+fi
 source install/setup.bash
 
 # 2. CANブリッジノードの実行 (内部で setup_slcan.sh が自動的に呼ばれてポートをマッピングします)
