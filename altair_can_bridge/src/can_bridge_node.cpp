@@ -224,9 +224,7 @@ private:
     // スクリプトの実行
     int exit_code = std::system(cmd.c_str());
     if (exit_code != 0) {
-      RCLCPP_ERROR(this->get_logger(), "接続スクリプトが異常終了しました (コード: %d)", exit_code);
-      last_error_ = "接続スクリプト実行失敗 (code: " + std::to_string(exit_code) + ")";
-      return false;
+      RCLCPP_WARN(this->get_logger(), "接続スクリプトが非ゼロで終了しました (コード: %d)。すでに can0 が起動しているか、sudo パスワードが必要です。ソケットバインドを試行します...", exit_code);
     }
 
     // SocketCAN ソケットのオープン

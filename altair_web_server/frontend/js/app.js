@@ -14,6 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
     canConnected: false,
     behaviorStatus: "IDLE",
     controlMode: "SETUP", // SETUP (送信待ち), CONTROL (制御中)
+    moduleSendToggles: {}, // 各モジュールへのUI指令値の送信ON/OFFトグル状態
     gamepadMappings: [], // コントローラーのマッピングデータ
   };
 
@@ -263,9 +264,17 @@ document.addEventListener("DOMContentLoaded", () => {
         <div class="card-header-row">
           <div class="module-title">
             <h2>${mod.name}</h2>
-            <div class="module-meta-info">
+            <div class="module-meta-info" style="margin-bottom: 2px;">
               <span>ID: ${mod.base_id}</span>
               <span>Type: ${mod.type.toUpperCase()}</span>
+            </div>
+            <!-- UI操作送信トグルスイッチ -->
+            <div class="send-toggle-row" style="display: flex; align-items: center; gap: 6px; margin-top: 6px;">
+              <label class="toggle-checkbox" style="display: flex; align-items: center; gap: 6px; cursor: pointer; margin-bottom: 0;">
+                <input type="checkbox" class="toggle-send-cmd" data-module="${mod.name}" id="toggle-send-${mod.name}" ${state.moduleSendToggles[mod.name] ? "checked" : ""}>
+                <span class="toggle-switch toggle-switch-sm"></span>
+              </label>
+              <span style="font-size: 11px; font-weight: 600; color: var(--text-muted); user-select: none;">UI操作送信</span>
             </div>
           </div>
           <div class="card-actions">
@@ -411,6 +420,62 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // --- モジュール操作イベントのバインディング ---
   function bindCardEvents(mod) {
+    // UI操作送信トグルの状態変更イベント
+    const toggleSend = document.getElementById(`toggle-send-${mod.name}`);
+    if (toggleSend) {
+      if (state.moduleSendToggles[mod.name] === undefined) {
+        state.moduleSendToggles[mod.name] = false;
+      }
+      toggleSend.checked = state.moduleSendToggles[mod.name];
+
+      toggleSend.addEventListener("change", (e) => {
+        const isChecked = e.target.checked;
+        state.moduleSendToggles[mod.name] = isChecked;
+
+        if (isChecked) {
+          appendTerminalLog(el.behaviorTerminal, `[SYSTEM] ${mod.name} へのリアルタイムUI操作送信を有効にしました。`, "system-msg");
+        } else {
+          appendTerminalLog(el.behaviorTerminal, `[SYSTEM] ${mod.name} へのリアルタイムUI操作送信を無効にしました（目標値をゼロに安全停止します）。`, "system-msg");
+          
+          // トグルOFF時は安全のために目標値を0に戻す
+          if (mod.type === "mdd") {
+            for (let i = 1; i <= 4; i++) {
+              const slider = document.getElementById(`range-${mod.name}-m${i}`);
+              const valEl = document.getElementById(`val-${mod.name}-m${i}`);
+              if (slider) slider.value = 0;
+              if (valEl) {
+                const mode = mod.parameters?.[`m${i}`]?.mode ?? 0;
+                const unit = mode === 0 ? "rps" : mode === 1 ? "deg" : "mm";
+                valEl.textContent = `0.0 ${unit}`;
+              }
+            }
+            if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+              state.ws.send(JSON.stringify({
+                type: "mdd_cmd",
+                name: mod.name,
+                targets: [0, 0, 0, 0]
+              }));
+            }
+          } else if (mod.type === "servo") {
+            // サーボは中央（90度）にリセット
+            for (let i = 1; i <= 6; i++) {
+              const slider = document.getElementById(`range-${mod.name}-s${i}`);
+              const valEl = document.getElementById(`val-${mod.name}-s${i}`);
+              if (slider) slider.value = 90;
+              if (valEl) valEl.textContent = `90°`;
+            }
+            if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+              state.ws.send(JSON.stringify({
+                type: "servo_cmd",
+                name: mod.name,
+                angles: [90, 90, 90, 90, 90, 90]
+              }));
+            }
+          }
+        }
+      });
+    }
+
     if (mod.type === "mdd") {
       // MDDスライダーのドラッグイベント
       const sliders = document.querySelectorAll(`.range-mdd[data-module="${mod.name}"]`);
@@ -424,8 +489,10 @@ document.addEventListener("DOMContentLoaded", () => {
           const unit = mode === 0 ? "rps" : mode === 1 ? "deg" : "mm";
           valEl.textContent = `${parseFloat(e.target.value).toFixed(1)} ${unit}`;
 
-          // WebSocket経由で指令送信
-          sendMddTargetCommand(mod.name);
+          // WebSocket経由で指令送信 (送信トグルがONのときのみ)
+          if (state.moduleSendToggles[mod.name]) {
+            sendMddTargetCommand(mod.name);
+          }
         });
       });
 
@@ -492,8 +559,10 @@ document.addEventListener("DOMContentLoaded", () => {
           const valEl = document.getElementById(`val-${mod.name}-s${servoIdx}`);
           valEl.textContent = `${e.target.value}°`;
 
-          // 即時送信
-          sendServoAngleCommand(mod.name);
+          // 即時送信 (送信トグルがONのときのみ)
+          if (state.moduleSendToggles[mod.name]) {
+            sendServoAngleCommand(mod.name);
+          }
         });
       });
 
@@ -504,8 +573,14 @@ document.addEventListener("DOMContentLoaded", () => {
         btn.addEventListener("click", (e) => {
           btn.classList.toggle("active");
 
-          // 即時送信
-          sendSolenoidCommand(mod.name);
+          // 即時送信 (送信トグルがONのときのみ)
+          if (state.moduleSendToggles[mod.name]) {
+            sendSolenoidCommand(mod.name);
+          } else {
+            // トグルOFFの場合はクリックされてもスタイルをもとに戻す
+            btn.classList.toggle("active");
+            appendTerminalLog(el.behaviorTerminal, `[WARNING] ${mod.name} の「UI操作送信」がOFFのためバルブ制御は送信されません。`, "error-msg");
+          }
         });
       });
     }
@@ -595,6 +670,17 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
       const card = document.getElementById(`module-card-${name}`);
       if (card) card.style.borderColor = "var(--border-light)";
+    }
+
+    // マイコン側のモード判定による自動リセット検知
+    if (typeof data.system_status !== 'undefined') {
+      if (data.system_status === 0 && state.controlMode === "CONTROL") {
+        state.controlMode = "SETUP";
+        if (el.lblControlModeStatus) {
+          el.lblControlModeStatus.innerHTML = 'ステータス: <span class="badge badge-warning">パラメータ未送信 (待機中)</span>';
+        }
+        appendTerminalLog(el.behaviorTerminal, `[SYSTEM] マイコン '${name}' の待機状態（パラメータ設定モード）へのリセットを検知しました。パラメータを再送信してください。`, "system-msg");
+      }
     }
   }
 

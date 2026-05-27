@@ -502,6 +502,24 @@ body {
   left: 23px;
 }
 
+/* 小型トグルスイッチ */
+.toggle-switch-sm {
+  width: 36px !important;
+  height: 20px !important;
+  border-radius: 10px !important;
+}
+
+.toggle-switch-sm::after {
+  width: 14px !important;
+  height: 14px !important;
+  top: 3px !important;
+  left: 3px !important;
+}
+
+.toggle-checkbox input:checked + .toggle-switch-sm::after {
+  left: 19px !important;
+}
+
 .toggle-label {
   font-size: 14px;
   font-weight: 500;
