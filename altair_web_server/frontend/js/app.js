@@ -1305,8 +1305,9 @@ if __name__ == '__main__':
 
   const blocklyDiv = document.getElementById('blocklyDiv');
   if (blocklyDiv && typeof Blockly !== 'undefined') {
+    const toolboxDom = Blockly.utils.xml.textToDom(toolboxXml);
     blocklyWorkspace = Blockly.inject('blocklyDiv', {
-      toolbox: toolboxXml,
+      toolbox: toolboxDom,
       scrollbars: true,
       trashcan: true,
       grid: { spacing: 20, length: 3, colour: '#ccc', snap: true },
