@@ -1239,15 +1239,17 @@ document.addEventListener("DOMContentLoaded", () => {
   let pyGen = null;
   if (typeof python !== 'undefined' && python.pythonGenerator) {
     pyGen = python.pythonGenerator;
-    // 古いコードへの互換マッピング
-    Blockly.Python = pyGen;
+    // 古いコードへの互換マッピングを安全に行う
+    if (typeof Blockly !== 'undefined') {
+      Blockly.Python = pyGen;
+    }
   } else if (typeof Blockly !== 'undefined' && Blockly.Python) {
     pyGen = Blockly.Python;
   }
   if (pyGen) {
     pyGen.INDENT = "    "; // Pythonの標準インデント幅を4スペースに統一
   }
-  if (Blockly.Python) {
+  if (typeof Blockly !== 'undefined' && Blockly.Python) {
     Blockly.Python.INDENT = "    ";
   }
 
