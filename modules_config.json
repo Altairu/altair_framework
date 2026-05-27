@@ -45,6 +45,12 @@
       "type": "servo",
       "base_id": "0x100",
       "description": ""
+    },
+    {
+      "name": "Solenoid1",
+      "type": "solenoid",
+      "base_id": "0x300",
+      "description": ""
     }
   ]
 }
