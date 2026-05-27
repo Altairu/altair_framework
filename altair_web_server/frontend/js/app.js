@@ -1128,16 +1128,27 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
+  Blockly.Blocks['event_macro'] = {
+    init: function() {
+      this.appendDummyInput()
+          .appendField("🏁 マクロ実行時 (エントリポイント)");
+      this.appendStatementInput("DO")
+          .setCheck(null);
+      this.setColour('#f59e0b');
+      this.setTooltip("「マクロを実行」ボタンを押した時に、この中に接続されたブロックが上から順に実行されます。");
+    }
+  };
+
   Blockly.Blocks['delay_wait'] = {
     init: function () {
       this.appendDummyInput()
         .appendField("遅延ウェイト")
-        .appendField(new Blockly.FieldNumber(1.0, 0.0, 100.0, 0.1), "SEC")
-        .appendField("秒");
+        .appendField(new Blockly.FieldNumber(500, 0, 60000, 10), "MS")
+        .appendField("ミリ秒 (ms)");
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
       this.setColour(120);
-      this.setTooltip("指定された秒数処理を一時停止します。");
+      this.setTooltip("指定されたミリ秒数処理を一時停止します。1000ミリ秒＝1秒です。");
       this.setHelpUrl("");
     }
   };
@@ -1145,12 +1156,13 @@ document.addEventListener("DOMContentLoaded", () => {
   Blockly.Blocks['print_log'] = {
     init: function () {
       this.appendDummyInput()
-        .appendField("ログ出力")
-        .appendField(new Blockly.FieldTextInput("マクロを実行中..."), "TEXT");
+        .appendField("ログ出力");
+      this.appendValueInput("TEXT")
+        .setCheck(null);
       this.setPreviousStatement(true, null);
       this.setNextStatement(true, null);
       this.setColour(180);
-      this.setTooltip("プログラム出力ログにメッセージを出力します。");
+      this.setTooltip("ROS2ログ出力画面に変数の値や文字列を出力します。");
       this.setHelpUrl("");
     }
   };
@@ -1230,7 +1242,15 @@ document.addEventListener("DOMContentLoaded", () => {
     return 99; // fallback
   };
 
+  registerGenerator('event_macro', function (block, generator) {
+    const gen = generator || pyGen;
+    const branch = gen.statementToCode(block, 'DO');
+    return branch;
+  });
+
   registerGenerator('mdd_move', function (block, generator) {
+    const root = block.getRootBlock();
+    if (!root || root.type !== 'event_macro') return '';
     const name = block.getFieldValue('NAME');
     if (name === 'none') return '';
     const gen = generator || pyGen;
@@ -1243,6 +1263,8 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   registerGenerator('servo_move', function (block, generator) {
+    const root = block.getRootBlock();
+    if (!root || root.type !== 'event_macro') return '';
     const name = block.getFieldValue('NAME');
     if (name === 'none') return '';
     const gen = generator || pyGen;
@@ -1257,6 +1279,8 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   registerGenerator('valve_control', function (block, generator) {
+    const root = block.getRootBlock();
+    if (!root || root.type !== 'event_macro') return '';
     const name = block.getFieldValue('NAME');
     if (name === 'none') return '';
     const channel = block.getFieldValue('CHANNEL');
@@ -1265,13 +1289,18 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   registerGenerator('delay_wait', function (block, generator) {
-    const sec = block.getFieldValue('SEC');
-    return `            time.sleep(${sec})\n`;
+    const root = block.getRootBlock();
+    if (!root || root.type !== 'event_macro') return '';
+    const ms = block.getFieldValue('MS');
+    return `            time.sleep(${ms} / 1000.0)\n`;
   });
 
   registerGenerator('print_log', function (block, generator) {
-    const text = block.getFieldValue('TEXT');
-    return `            print("[BLOCKLY] ${text}")\n`;
+    const root = block.getRootBlock();
+    if (!root || root.type !== 'event_macro') return '';
+    const gen = generator || pyGen;
+    const val = gen.valueToCode(block, 'TEXT', getAtomicOrder()) || '"マクロを実行中..."';
+    return `            self.get_logger().info(f"[BLOCKLY] {${val}}")\n`;
   });
 
   registerGenerator('gamepad_button', function (block, generator) {
@@ -1356,12 +1385,19 @@ if __name__ == '__main__':
 `;
   }
 
-  // ツールボックスの定義 XML (Logic, Math, Loops, Gamepad, アクチュエータ, センサーの統合)
+  // ツールボックスの定義 XML (Logic, Math, Loops, Gamepad, 変数, テキスト, アクチュエータ, センサーの統合)
   const toolboxXml = `
     <xml id="toolbox" style="display: none">
+      <category name="イベント" colour="#f59e0b">
+        <block type="event_macro"></block>
+      </category>
       <category name="基本動作" colour="120">
-        <block type="delay_wait"></block>
-        <block type="print_log"></block>
+        <block type="delay_wait">
+          <value name="MS"><block type="math_number"><field name="NUM">500</field></block></value>
+        </block>
+        <block type="print_log">
+          <value name="TEXT"><block type="text"><field name="TEXT">マクロを実行中...</field></block></value>
+        </block>
       </category>
       <category name="条件分岐 (Logic)" colour="210">
         <block type="controls_if"></block>
@@ -1384,6 +1420,10 @@ if __name__ == '__main__':
         <block type="math_number"></block>
         <block type="math_arithmetic"></block>
       </category>
+      <category name="テキスト" colour="160">
+        <block type="text"></block>
+      </category>
+      <category name="変数" custom="VARIABLE" colour="330"></category>
       <category name="コントローラー" colour="290">
         <block type="gamepad_button"></block>
         <block type="gamepad_axis"></block>
