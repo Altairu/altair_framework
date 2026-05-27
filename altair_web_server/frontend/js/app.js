@@ -1244,6 +1244,12 @@ document.addEventListener("DOMContentLoaded", () => {
   } else if (typeof Blockly !== 'undefined' && Blockly.Python) {
     pyGen = Blockly.Python;
   }
+  if (pyGen) {
+    pyGen.INDENT = "    "; // Pythonの標準インデント幅を4スペースに統一
+  }
+  if (Blockly.Python) {
+    Blockly.Python.INDENT = "    ";
+  }
 
   // ジェネレーター登録ヘルパー（最新・旧バージョン両対応）
   const registerGenerator = function(blockName, generatorFunc) {
@@ -1279,7 +1285,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const m2 = gen.valueToCode(block, 'M2', order) || '0.0';
     const m3 = gen.valueToCode(block, 'M3', order) || '0.0';
     const m4 = gen.valueToCode(block, 'M4', order) || '0.0';
-    return `            self.get_module("${name}").set_targets([${m1}, ${m2}, ${m3}, ${m4}])\n`;
+    return `self.get_module("${name}").set_targets([${m1}, ${m2}, ${m3}, ${m4}])\n`;
   });
 
   registerGenerator('servo_move', function (block, generator) {
@@ -1295,7 +1301,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const s4 = gen.valueToCode(block, 'S4', order) || '90';
     const s5 = gen.valueToCode(block, 'S5', order) || '90';
     const s6 = gen.valueToCode(block, 'S6', order) || '90';
-    return `            self.get_module("${name}").set_angles([${s1}, ${s2}, ${s3}, ${s4}, ${s5}, ${s6}])\n`;
+    return `self.get_module("${name}").set_angles([${s1}, ${s2}, ${s3}, ${s4}, ${s5}, ${s6}])\n`;
   });
 
   registerGenerator('valve_control', function (block, generator) {
@@ -1305,14 +1311,14 @@ document.addEventListener("DOMContentLoaded", () => {
     if (name === 'none') return '';
     const channel = block.getFieldValue('CHANNEL');
     const state = block.getFieldValue('STATE');
-    return `            self.get_module("${name}").set_valve(${channel}, ${state})\n`;
+    return `self.get_module("${name}").set_valve(${channel}, ${state})\n`;
   });
 
   registerGenerator('delay_wait', function (block, generator) {
     const root = block.getRootBlock();
     if (!root || root.type !== 'event_macro') return '';
     const ms = block.getFieldValue('MS');
-    return `            time.sleep(${ms} / 1000.0)\n`;
+    return `time.sleep(${ms} / 1000.0)\n`;
   });
 
   registerGenerator('print_log', function (block, generator) {
@@ -1320,7 +1326,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!root || root.type !== 'event_macro') return '';
     const gen = generator || pyGen;
     const val = gen.valueToCode(block, 'TEXT', getAtomicOrder()) || '"マクロを実行中..."';
-    return `            self.get_logger().info(f"[BLOCKLY] {${val}}")\n`;
+    return `self.get_logger().info(f"[BLOCKLY] {${val}}")\n`;
   });
 
   registerGenerator('gamepad_button', function (block, generator) {
@@ -1361,6 +1367,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // フルPythonコードに組み立てるヘルパー
   function generatePythonCode(blocklyCode) {
+    // すべての行に対して一律で 12スペース（tryブロックのインデント）を動的に付与する
+    const indentedCode = blocklyCode
+      .split('\n')
+      .map(line => {
+        if (line.trim() === '') return '';
+        return '            ' + line;
+      })
+      .join('\n');
+
     return `#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
@@ -1388,7 +1403,7 @@ class BlocklyBehavior(AltairBehavior):
         
         try:
             print("--- Blocklyマクロの実行を開始します ---")
-${blocklyCode}
+${indentedCode}
             print("--- Blocklyマクロの実行が完了しました ---")
         except Exception as e:
             self.get_logger().error(f"マクロ実行中にエラーが発生しました: {str(e)}")
