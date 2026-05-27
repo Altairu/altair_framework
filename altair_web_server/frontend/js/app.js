@@ -1083,6 +1083,51 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
+  Blockly.Blocks['mdd_sw_val'] = {
+    init: function () {
+      this.appendDummyInput()
+        .appendField("MDD SW:")
+        .appendField(new Blockly.FieldDropdown(getModuleOptionsDropdown('mdd')), "NAME")
+        .appendField("の リミットSW")
+        .appendField(new Blockly.FieldDropdown([["SW1", "0"], ["SW2", "1"], ["SW3", "2"], ["SW4", "3"]]), "SW_IDX")
+        .appendField("状態 (ON/OFF)");
+      this.setOutput(true, "Boolean");
+      this.setColour(80);
+      this.setTooltip("対象MDDのリミットスイッチ状態(True=ON / 押されている, False=OFF)を取得します。");
+      this.setHelpUrl("");
+    }
+  };
+
+  Blockly.Blocks['mdd_enc_deg_val'] = {
+    init: function () {
+      this.appendDummyInput()
+        .appendField("MDD エンコーダー:")
+        .appendField(new Blockly.FieldDropdown(getModuleOptionsDropdown('mdd')), "NAME")
+        .appendField("の モータ")
+        .appendField(new Blockly.FieldDropdown([["M1", "0"], ["M2", "1"], ["M3", "2"], ["M4", "3"]]), "MOTOR_IDX")
+        .appendField("の現在角度 (度)");
+      this.setOutput(true, "Number");
+      this.setColour(80);
+      this.setTooltip("対象MDDのモータの現在角度(度)を取得します。");
+      this.setHelpUrl("");
+    }
+  };
+
+  Blockly.Blocks['mdd_enc_rps_val'] = {
+    init: function () {
+      this.appendDummyInput()
+        .appendField("MDD エンコーダー:")
+        .appendField(new Blockly.FieldDropdown(getModuleOptionsDropdown('mdd')), "NAME")
+        .appendField("の モータ")
+        .appendField(new Blockly.FieldDropdown([["M1", "0"], ["M2", "1"], ["M3", "2"], ["M4", "3"]]), "MOTOR_IDX")
+        .appendField("の現在速度 (rps)");
+      this.setOutput(true, "Number");
+      this.setColour(80);
+      this.setTooltip("対象MDDのモータの現在回転速度(rps)を取得します。");
+      this.setHelpUrl("");
+    }
+  };
+
   Blockly.Blocks['delay_wait'] = {
     init: function () {
       this.appendDummyInput()
@@ -1241,6 +1286,30 @@ document.addEventListener("DOMContentLoaded", () => {
     return [code, getAtomicOrder()];
   });
 
+  registerGenerator('mdd_sw_val', function (block, generator) {
+    const name = block.getFieldValue('NAME');
+    if (name === 'none') return ['False', getAtomicOrder()];
+    const swIdx = block.getFieldValue('SW_IDX');
+    const code = `self.get_module("${name}").get_feedback().limit_switches[${swIdx}]`;
+    return [code, getAtomicOrder()];
+  });
+
+  registerGenerator('mdd_enc_deg_val', function (block, generator) {
+    const name = block.getFieldValue('NAME');
+    if (name === 'none') return ['0.0', getAtomicOrder()];
+    const motorIdx = block.getFieldValue('MOTOR_IDX');
+    const code = `self.get_module("${name}").get_feedback().angles[${motorIdx}]`;
+    return [code, getAtomicOrder()];
+  });
+
+  registerGenerator('mdd_enc_rps_val', function (block, generator) {
+    const name = block.getFieldValue('NAME');
+    if (name === 'none') return ['0.0', getAtomicOrder()];
+    const motorIdx = block.getFieldValue('MOTOR_IDX');
+    const code = `self.get_module("${name}").get_feedback().speeds[${motorIdx}]`;
+    return [code, getAtomicOrder()];
+  });
+
   // フルPythonコードに組み立てるヘルパー
   function generatePythonCode(blocklyCode) {
     return `#!/usr/bin/env python3
@@ -1287,7 +1356,7 @@ if __name__ == '__main__':
 `;
   }
 
-  // ツールボックスの定義 XML (Logic, Math, Gamepad, アクチュエータの統合)
+  // ツールボックスの定義 XML (Logic, Math, Loops, Gamepad, アクチュエータ, センサーの統合)
   const toolboxXml = `
     <xml id="toolbox" style="display: none">
       <category name="基本動作" colour="120">
@@ -1300,6 +1369,16 @@ if __name__ == '__main__':
         <block type="logic_operation"></block>
         <block type="logic_negate"></block>
         <block type="logic_boolean"></block>
+      </category>
+      <category name="繰り返し (Loops)" colour="120">
+        <block type="controls_repeat_ext">
+          <value name="TIMES">
+            <shadow type="math_number">
+              <field name="NUM">10</field>
+            </shadow>
+          </value>
+        </block>
+        <block type="controls_whileUntil"></block>
       </category>
       <category name="計算・数値 (Math)" colour="230">
         <block type="math_number"></block>
@@ -1316,6 +1395,11 @@ if __name__ == '__main__':
           <value name="M3"><block type="math_number"><field name="NUM">0</field></block></value>
           <value name="M4"><block type="math_number"><field name="NUM">0</field></block></value>
         </block>
+      </category>
+      <category name="MDDセンサー値" colour="80">
+        <block type="mdd_sw_val"></block>
+        <block type="mdd_enc_deg_val"></block>
+        <block type="mdd_enc_rps_val"></block>
       </category>
       <category name="サーボ" colour="60">
         <block type="servo_move">
