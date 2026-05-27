@@ -1158,58 +1158,88 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
-  // Blockly.Python ジェネレーターの定義
-  Blockly.Python['mdd_move'] = function (block) {
+  // Blockly.Python ジェネレーターの定義と互換性ポリフィル
+  let pyGen = null;
+  if (typeof python !== 'undefined' && python.pythonGenerator) {
+    pyGen = python.pythonGenerator;
+    // 古いコードへの互換マッピング
+    Blockly.Python = pyGen;
+  } else if (typeof Blockly !== 'undefined' && Blockly.Python) {
+    pyGen = Blockly.Python;
+  }
+
+  // ジェネレーター登録ヘルパー（最新・旧バージョン両対応）
+  const registerGenerator = function(blockName, generatorFunc) {
+    if (!pyGen) return;
+    if (pyGen.forBlock) {
+      pyGen.forBlock[blockName] = generatorFunc;
+    } else {
+      pyGen[blockName] = generatorFunc;
+    }
+  };
+
+  // アトミックオーダー取得ヘルパー
+  const getAtomicOrder = function() {
+    if (pyGen && pyGen.Order) return pyGen.Order.ATOMIC;
+    if (Blockly.Python && typeof Blockly.Python.ORDER_ATOMIC !== 'undefined') return Blockly.Python.ORDER_ATOMIC;
+    return 99; // fallback
+  };
+
+  registerGenerator('mdd_move', function (block, generator) {
     const name = block.getFieldValue('NAME');
     if (name === 'none') return '';
-    const m1 = Blockly.Python.valueToCode(block, 'M1', Blockly.Python.ORDER_ATOMIC) || '0.0';
-    const m2 = Blockly.Python.valueToCode(block, 'M2', Blockly.Python.ORDER_ATOMIC) || '0.0';
-    const m3 = Blockly.Python.valueToCode(block, 'M3', Blockly.Python.ORDER_ATOMIC) || '0.0';
-    const m4 = Blockly.Python.valueToCode(block, 'M4', Blockly.Python.ORDER_ATOMIC) || '0.0';
+    const gen = generator || pyGen;
+    const order = getAtomicOrder();
+    const m1 = gen.valueToCode(block, 'M1', order) || '0.0';
+    const m2 = gen.valueToCode(block, 'M2', order) || '0.0';
+    const m3 = gen.valueToCode(block, 'M3', order) || '0.0';
+    const m4 = gen.valueToCode(block, 'M4', order) || '0.0';
     return `            self.get_module("${name}").set_targets([${m1}, ${m2}, ${m3}, ${m4}])\n`;
-  };
+  });
 
-  Blockly.Python['servo_move'] = function (block) {
+  registerGenerator('servo_move', function (block, generator) {
     const name = block.getFieldValue('NAME');
     if (name === 'none') return '';
-    const s1 = Blockly.Python.valueToCode(block, 'S1', Blockly.Python.ORDER_ATOMIC) || '90';
-    const s2 = Blockly.Python.valueToCode(block, 'S2', Blockly.Python.ORDER_ATOMIC) || '90';
-    const s3 = Blockly.Python.valueToCode(block, 'S3', Blockly.Python.ORDER_ATOMIC) || '90';
-    const s4 = Blockly.Python.valueToCode(block, 'S4', Blockly.Python.ORDER_ATOMIC) || '90';
-    const s5 = Blockly.Python.valueToCode(block, 'S5', Blockly.Python.ORDER_ATOMIC) || '90';
-    const s6 = Blockly.Python.valueToCode(block, 'S6', Blockly.Python.ORDER_ATOMIC) || '90';
+    const gen = generator || pyGen;
+    const order = getAtomicOrder();
+    const s1 = gen.valueToCode(block, 'S1', order) || '90';
+    const s2 = gen.valueToCode(block, 'S2', order) || '90';
+    const s3 = gen.valueToCode(block, 'S3', order) || '90';
+    const s4 = gen.valueToCode(block, 'S4', order) || '90';
+    const s5 = gen.valueToCode(block, 'S5', order) || '90';
+    const s6 = gen.valueToCode(block, 'S6', order) || '90';
     return `            self.get_module("${name}").set_angles([${s1}, ${s2}, ${s3}, ${s4}, ${s5}, ${s6}])\n`;
-  };
+  });
 
-  Blockly.Python['valve_control'] = function (block) {
+  registerGenerator('valve_control', function (block, generator) {
     const name = block.getFieldValue('NAME');
     if (name === 'none') return '';
     const channel = block.getFieldValue('CHANNEL');
     const state = block.getFieldValue('STATE');
     return `            self.get_module("${name}").set_valve(${channel}, ${state})\n`;
-  };
+  });
 
-  Blockly.Python['delay_wait'] = function (block) {
+  registerGenerator('delay_wait', function (block, generator) {
     const sec = block.getFieldValue('SEC');
     return `            time.sleep(${sec})\n`;
-  };
+  });
 
-  Blockly.Python['print_log'] = function (block) {
+  registerGenerator('print_log', function (block, generator) {
     const text = block.getFieldValue('TEXT');
     return `            print("[BLOCKLY] ${text}")\n`;
-  };
+  });
 
-  Blockly.Python['gamepad_button'] = function (block) {
+  registerGenerator('gamepad_button', function (block, generator) {
     const buttonIdx = block.getFieldValue('BUTTON');
     const code = `self.gamepad.get_button(${buttonIdx})`;
-    return [code, Blockly.Python.ORDER_ATOMIC];
-  };
+    return [code, getAtomicOrder()];
+  });
 
-  Blockly.Python['gamepad_axis'] = function (block) {
+  registerGenerator('gamepad_axis', function (block, generator) {
     const axisIdx = block.getFieldValue('AXIS');
     const code = `self.gamepad.get_axis(${axisIdx})`;
-    return [code, Blockly.Python.ORDER_ATOMIC];
-  };
+    return [code, getAtomicOrder()];
+  });
 
   // フルPythonコードに組み立てるヘルパー
   function generatePythonCode(blocklyCode) {
