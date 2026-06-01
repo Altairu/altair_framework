@@ -193,8 +193,22 @@ private:
   }
 
   // --- 3. 接続処理コア ---
-  bool trigger_connect(const std::string& port, bool auto_connect)
+  bool trigger_connect(const std::string& req_port, bool auto_connect)
   {
+    std::string port = req_port;
+
+    if (auto_connect) {
+      // 事前にslcandをキルしてシリアルポートを解放
+      std::system("echo 'altair' | sudo -S killall slcand 2>/dev/null");
+      std::this_thread::sleep_for(200ms);
+
+      port = detect_can_port();
+      if (port.empty()) {
+        last_error_ = "自動検出に失敗しました";
+        return false;
+      }
+    }
+
     std::lock_guard<std::mutex> lock(socket_mutex_);
     
     // 一度既存のソケットを閉じる
@@ -220,14 +234,7 @@ private:
       script_path = "./src/altair_framework/altair_can_bridge/scripts/setup_slcan.sh";
     }
     
-    std::string cmd;
-    if (auto_connect) {
-      // should not happen with new logic, but fallback just in case
-      RCLCPP_ERROR(this->get_logger(), "auto_connectフラグは非推奨です。ポートを明示指定してください。");
-      return false;
-    } else {
-      cmd = "echo 'altair' | sudo -S bash " + script_path + " " + port + " 1000000";
-    }
+    std::string cmd = "echo 'altair' | sudo -S bash " + script_path + " " + port + " 1000000";
 
     RCLCPP_INFO(this->get_logger(), "接続スクリプトを実行中: %s", cmd.c_str());
     
@@ -343,6 +350,16 @@ private:
   {
     RCLCPP_INFO(this->get_logger(), "CAN接続サービス要求を受信しました。");
     
+    if (is_connected_) {
+      // 既に接続されている場合で、ポート指定が同じまたはauto_connectの場合は無視する
+      if (request->auto_connect || request->port == active_port_) {
+        RCLCPP_INFO(this->get_logger(), "既に接続されています。再接続をスキップします。");
+        response->success = true;
+        response->message = "既に接続されています。";
+        return;
+      }
+    }
+
     // 非同期で接続プロセスを実行 (ブロッキングを避けるため)
     bool success = trigger_connect(request->port, request->auto_connect);
     
@@ -432,6 +449,10 @@ private:
         std::this_thread::sleep_for(1000ms);
         continue;
       }
+
+      // 未接続時はまずslcandをキルしてポートを解放
+      std::system("echo 'altair' | sudo -S killall slcand 2>/dev/null");
+      std::this_thread::sleep_for(200ms);
 
       std::string port = detect_can_port();
       if (!port.empty()) {

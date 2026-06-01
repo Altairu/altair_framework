@@ -31,6 +31,7 @@ if [ -f "/opt/ros/humble/setup.bash" ]; then
 fi
 source install/setup.bash
 
+export ROS_DOMAIN_ID=0
 # 2. シグナルトラップの設定 (Ctrl+C時にバックグラウンドプロセスを安全にキル)
 cleanup() {
     echo "バックグラウンドノードを安全に終了しています..."

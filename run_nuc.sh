@@ -32,6 +32,7 @@ if [ -f "/opt/ros/humble/setup.bash" ]; then
 fi
 source install/setup.bash
 
+export ROS_DOMAIN_ID=0
 # 2. CANブリッジノードの実行 (内部で setup_slcan.sh が自動的に呼ばれてポートをマッピングします)
 echo "SocketCANブリッジノードを起動します..."
 ros2 run altair_can_bridge can_bridge_node
