@@ -1,7 +1,7 @@
 {
   "modules": [
     {
-      "name": "drive_mdd",
+      "name": "MDD1",
       "type": "mdd",
       "base_id": "0x200",
       "description": "走行用4chモータドライバ",

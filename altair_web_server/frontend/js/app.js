@@ -322,26 +322,50 @@ document.addEventListener("DOMContentLoaded", () => {
   function renderMddCardHtml(mod) {
     let slidersHtml = "";
     for (let i = 1; i <= 4; i++) {
+      const motorParam = mod.parameters?.[`m${i}`] ?? { mode: 0, p: 10.0, i: 0.0, d: 0.0, diameter: 100.0, direction: 1 };
+      const mode = motorParam.mode ?? 0;
+      
+      let min = -10;
+      let max = 10;
+      let step = 0.1;
+      let unit = "rps";
+      
+      if (mode === 1) {
+        min = -360;
+        max = 360;
+        step = 1;
+        unit = "deg";
+      } else if (mode === 2) {
+        min = -1000;
+        max = 1000;
+        step = 1;
+        unit = "mm";
+      }
+
       slidersHtml += `
         <div class="control-slider-group mt-2">
-          <div class="slider-label-row">
+          <div class="slider-label-row" style="display: flex; justify-content: space-between; align-items: center;">
             <span class="slider-name">Motor ${i} Goal</span>
-            <span class="slider-val" id="val-${mod.name}-m${i}">0.0 rps</span>
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <button class="btn btn-secondary btn-xs btn-target-adjust" data-module="${mod.name}" data-motor="${i}" data-action="minus" style="padding: 0; width: 16px; height: 16px; font-size: 10px; line-height: 1; font-weight: bold;">-</button>
+              <span class="slider-val" id="val-${mod.name}-m${i}" style="min-width: 60px; text-align: center; font-weight: 500;">0.0 ${unit}</span>
+              <button class="btn btn-secondary btn-xs btn-target-adjust" data-module="${mod.name}" data-motor="${i}" data-action="plus" style="padding: 0; width: 16px; height: 16px; font-size: 10px; line-height: 1; font-weight: bold;">+</button>
+            </div>
           </div>
           <input type="range" class="custom-range range-mdd" data-module="${mod.name}" data-motor="${i}" 
-                 min="-10" max="10" step="0.1" value="0" id="range-${mod.name}-m${i}">
+                 min="${min}" max="${max}" step="${step}" value="0" id="range-${mod.name}-m${i}">
         </div>`;
     }
 
-    // M1〜M4のパラメータ（モード, P, I, D）編集テーブル
+    // M1〜M4のパラメータ（モード, P, I, D, diameter, direction）編集テーブル
     let paramsRowsHtml = "";
     for (let i = 1; i <= 4; i++) {
-      const motorParam = mod.parameters?.[`m${i}`] ?? { mode: 0, p: 10.0, i: 0.0, d: 0.0 };
+      const motorParam = mod.parameters?.[`m${i}`] ?? { mode: 0, p: 10.0, i: 0.0, d: 0.0, diameter: 100.0, direction: 1 };
       paramsRowsHtml += `
         <tr style="border-bottom: 1px solid var(--border-light);">
           <td style="padding: 4px 0; font-weight: 500;">M${i}</td>
           <td style="padding: 4px 0;">
-            <select class="form-input form-input-sm select-mdd-mode" data-module="${mod.name}" data-motor="${i}" style="padding: 2px 4px; font-size: 11px; height: 22px; width: 68px;">
+            <select class="form-input form-input-sm select-mdd-mode" data-module="${mod.name}" data-motor="${i}" style="padding: 2px 4px; font-size: 11px; height: 22px; width: 62px;">
               <option value="0" ${motorParam.mode === 0 ? "selected" : ""}>Speed</option>
               <option value="1" ${motorParam.mode === 1 ? "selected" : ""}>Angle</option>
               <option value="2" ${motorParam.mode === 2 ? "selected" : ""}>Pos</option>
@@ -349,24 +373,33 @@ document.addEventListener("DOMContentLoaded", () => {
           </td>
           <td style="padding: 4px 0; text-align: center;">
             <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
-              <button class="btn btn-secondary btn-xs btn-pid-adjust" data-module="${mod.name}" data-motor="${i}" data-param="p" data-action="minus" style="padding: 0; width: 14px; height: 18px; font-size: 9px; line-height: 1;">-</button>
-              <input type="number" class="form-input form-input-sm input-mdd-p" data-module="${mod.name}" data-motor="${i}" step="0.1" value="${motorParam.p}" style="padding: 2px 0; font-size: 11px; height: 22px; width: 34px; text-align: center; display: inline-block; margin: 0;">
-              <button class="btn btn-secondary btn-xs btn-pid-adjust" data-module="${mod.name}" data-motor="${i}" data-param="p" data-action="plus" style="padding: 0; width: 14px; height: 18px; font-size: 9px; line-height: 1;">+</button>
+              <button class="btn btn-secondary btn-xs btn-pid-adjust" data-module="${mod.name}" data-motor="${i}" data-param="p" data-action="minus" style="padding: 0; width: 12px; height: 18px; font-size: 9px; line-height: 1;">-</button>
+              <input type="number" class="form-input form-input-sm input-mdd-p" data-module="${mod.name}" data-motor="${i}" step="0.1" value="${motorParam.p}" style="padding: 2px 0; font-size: 11px; height: 22px; width: 30px; text-align: center; display: inline-block; margin: 0;">
+              <button class="btn btn-secondary btn-xs btn-pid-adjust" data-module="${mod.name}" data-motor="${i}" data-param="p" data-action="plus" style="padding: 0; width: 12px; height: 18px; font-size: 9px; line-height: 1;">+</button>
             </div>
           </td>
           <td style="padding: 4px 0; text-align: center;">
             <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
-              <button class="btn btn-secondary btn-xs btn-pid-adjust" data-module="${mod.name}" data-motor="${i}" data-param="i" data-action="minus" style="padding: 0; width: 14px; height: 18px; font-size: 9px; line-height: 1;">-</button>
-              <input type="number" class="form-input form-input-sm input-mdd-i" data-module="${mod.name}" data-motor="${i}" step="0.01" value="${motorParam.i}" style="padding: 2px 0; font-size: 11px; height: 22px; width: 34px; text-align: center; display: inline-block; margin: 0;">
-              <button class="btn btn-secondary btn-xs btn-pid-adjust" data-module="${mod.name}" data-motor="${i}" data-param="i" data-action="plus" style="padding: 0; width: 14px; height: 18px; font-size: 9px; line-height: 1;">+</button>
+              <button class="btn btn-secondary btn-xs btn-pid-adjust" data-module="${mod.name}" data-motor="${i}" data-param="i" data-action="minus" style="padding: 0; width: 12px; height: 18px; font-size: 9px; line-height: 1;">-</button>
+              <input type="number" class="form-input form-input-sm input-mdd-i" data-module="${mod.name}" data-motor="${i}" step="0.01" value="${motorParam.i}" style="padding: 2px 0; font-size: 11px; height: 22px; width: 30px; text-align: center; display: inline-block; margin: 0;">
+              <button class="btn btn-secondary btn-xs btn-pid-adjust" data-module="${mod.name}" data-motor="${i}" data-param="i" data-action="plus" style="padding: 0; width: 12px; height: 18px; font-size: 9px; line-height: 1;">+</button>
             </div>
           </td>
           <td style="padding: 4px 0; text-align: center;">
             <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
-              <button class="btn btn-secondary btn-xs btn-pid-adjust" data-module="${mod.name}" data-motor="${i}" data-param="d" data-action="minus" style="padding: 0; width: 14px; height: 18px; font-size: 9px; line-height: 1;">-</button>
-              <input type="number" class="form-input form-input-sm input-mdd-d" data-module="${mod.name}" data-motor="${i}" step="0.01" value="${motorParam.d}" style="padding: 2px 0; font-size: 11px; height: 22px; width: 34px; text-align: center; display: inline-block; margin: 0;">
-              <button class="btn btn-secondary btn-xs btn-pid-adjust" data-module="${mod.name}" data-motor="${i}" data-param="d" data-action="plus" style="padding: 0; width: 14px; height: 18px; font-size: 9px; line-height: 1;">+</button>
+              <button class="btn btn-secondary btn-xs btn-pid-adjust" data-module="${mod.name}" data-motor="${i}" data-param="d" data-action="minus" style="padding: 0; width: 12px; height: 18px; font-size: 9px; line-height: 1;">-</button>
+              <input type="number" class="form-input form-input-sm input-mdd-d" data-module="${mod.name}" data-motor="${i}" step="0.01" value="${motorParam.d}" style="padding: 2px 0; font-size: 11px; height: 22px; width: 30px; text-align: center; display: inline-block; margin: 0;">
+              <button class="btn btn-secondary btn-xs btn-pid-adjust" data-module="${mod.name}" data-motor="${i}" data-param="d" data-action="plus" style="padding: 0; width: 12px; height: 18px; font-size: 9px; line-height: 1;">+</button>
             </div>
+          </td>
+          <td style="padding: 4px 0; text-align: center;">
+            <input type="number" class="form-input form-input-sm input-mdd-wheel" data-module="${mod.name}" data-motor="${i}" step="1" value="${motorParam.diameter ?? 100.0}" style="padding: 2px 4px; font-size: 11px; height: 22px; width: 36px; text-align: center; display: inline-block; margin: 0;">
+          </td>
+          <td style="padding: 4px 0; text-align: center;">
+            <select class="form-input form-input-sm select-mdd-dir" data-module="${mod.name}" data-motor="${i}" style="padding: 2px 4px; font-size: 11px; height: 22px; width: 34px; text-align: center; display: inline-block; font-weight: bold;">
+              <option value="1" ${(motorParam.direction ?? 1) >= 0 ? "selected" : ""}>+</option>
+              <option value="-1" ${(motorParam.direction ?? 1) < 0 ? "selected" : ""}>-</option>
+            </select>
           </td>
         </tr>`;
     }
@@ -377,11 +410,13 @@ document.addEventListener("DOMContentLoaded", () => {
         <table class="mdd-params-table" style="width: 100%; border-collapse: collapse; font-size: 11px;">
           <thead>
             <tr style="border-bottom: 1px solid var(--border-light); text-align: left; color: var(--text-muted);">
-              <th style="padding-bottom: 4px; width: 10%;">Ch</th>
-              <th style="padding-bottom: 4px; width: 30%;">Mode</th>
-              <th style="padding-bottom: 4px; text-align: center; width: 20%;">P</th>
-              <th style="padding-bottom: 4px; text-align: center; width: 20%;">I</th>
-              <th style="padding-bottom: 4px; text-align: center; width: 20%;">D</th>
+              <th style="padding-bottom: 4px; width: 8%;">Ch</th>
+              <th style="padding-bottom: 4px; width: 22%;">Mode</th>
+              <th style="padding-bottom: 4px; text-align: center; width: 14%;">P</th>
+              <th style="padding-bottom: 4px; text-align: center; width: 14%;">I</th>
+              <th style="padding-bottom: 4px; text-align: center; width: 14%;">D</th>
+              <th style="padding-bottom: 4px; text-align: center; width: 16%;">Wheel</th>
+              <th style="padding-bottom: 4px; text-align: center; width: 12%;">Dir</th>
             </tr>
           </thead>
           <tbody>
@@ -543,11 +578,112 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             moduleObj.parameters[`m${motorIdx}`].mode = modeVal;
 
-            // スライダー単位の更新
+            // スライダーおよび単位の動的更新
             const valEl = document.getElementById(`val-${mod.name}-m${motorIdx}`);
             const slider = document.getElementById(`range-${mod.name}-m${motorIdx}`);
-            const unit = modeVal === 0 ? "rps" : modeVal === 1 ? "deg" : "mm";
-            if (valEl) valEl.textContent = `${parseFloat(slider.value).toFixed(1)} ${unit}`;
+            
+            let min = -10;
+            let max = 10;
+            let step = 0.1;
+            let unit = "rps";
+            
+            if (modeVal === 1) {
+              min = -360;
+              max = 360;
+              step = 1;
+              unit = "deg";
+            } else if (modeVal === 2) {
+              min = -1000;
+              max = 1000;
+              step = 1;
+              unit = "mm";
+            }
+            
+            if (slider) {
+              slider.min = min;
+              slider.max = max;
+              slider.step = step;
+              slider.value = 0; // モード切替時にリセット
+            }
+            if (valEl) valEl.textContent = `0.0 ${unit}`;
+
+            // 設定ファイルを自動保存
+            await saveConfigToServer();
+          }
+        });
+      });
+
+      // 目標値（スライダー値）の微調整ボタンイベントリスナー
+      const adjustBtns = document.querySelectorAll(`.btn-target-adjust[data-module="${mod.name}"]`);
+      adjustBtns.forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          const motorIdx = btn.getAttribute("data-motor");
+          const action = btn.getAttribute("data-action");
+          
+          const slider = document.getElementById(`range-${mod.name}-m${motorIdx}`);
+          const valEl = document.getElementById(`val-${mod.name}-m${motorIdx}`);
+          if (!slider) return;
+          
+          let curVal = parseFloat(slider.value) || 0.0;
+          let step = parseFloat(slider.step) || 0.1;
+          
+          if (action === "plus") {
+            curVal = Math.min(parseFloat(slider.max), curVal + step);
+          } else {
+            curVal = Math.max(parseFloat(slider.min), curVal - step);
+          }
+          
+          slider.value = curVal;
+          
+          // モード表示の読み込み
+          const mode = mod.parameters?.[`m${motorIdx}`]?.mode ?? 0;
+          const unit = mode === 0 ? "rps" : mode === 1 ? "deg" : "mm";
+          if (valEl) {
+            valEl.textContent = `${curVal.toFixed(mode === 0 ? 1 : 0)} ${unit}`;
+          }
+          
+          // WebSocket経由で指令送信 (送信トグルがONのときのみ)
+          if (state.moduleSendToggles[mod.name]) {
+            sendMddTargetCommand(mod.name);
+          }
+        });
+      });
+
+      // PIDの向き (direction) 変更イベントリスナーの追加
+      const dirSelects = document.querySelectorAll(`.select-mdd-dir[data-module="${mod.name}"]`);
+      dirSelects.forEach(sel => {
+        sel.addEventListener("change", async (e) => {
+          const motorIdx = e.target.getAttribute("data-motor");
+          const dirVal = parseInt(e.target.value) || 1;
+
+          const moduleObj = state.config.modules.find(m => m.name === mod.name);
+          if (moduleObj) {
+            if (!moduleObj.parameters) moduleObj.parameters = {};
+            if (!moduleObj.parameters[`m${motorIdx}`]) {
+              moduleObj.parameters[`m${motorIdx}`] = { p: 10.0, i: 0.0, d: 0.0, diameter: 100.0, direction: 1, mode: 0 };
+            }
+            moduleObj.parameters[`m${motorIdx}`].direction = dirVal;
+
+            // 設定ファイルを自動保存
+            await saveConfigToServer();
+          }
+        });
+      });
+
+      // 車輪直径 (diameter) 変更イベントリスナーの追加
+      const wheelInputs = document.querySelectorAll(`.input-mdd-wheel[data-module="${mod.name}"]`);
+      wheelInputs.forEach(input => {
+        input.addEventListener("change", async (e) => {
+          const motorIdx = e.target.getAttribute("data-motor");
+          const wheelVal = parseFloat(e.target.value) || 100.0;
+
+          const moduleObj = state.config.modules.find(m => m.name === mod.name);
+          if (moduleObj) {
+            if (!moduleObj.parameters) moduleObj.parameters = {};
+            if (!moduleObj.parameters[`m${motorIdx}`]) {
+              moduleObj.parameters[`m${motorIdx}`] = { p: 10.0, i: 0.0, d: 0.0, diameter: 100.0, direction: 1, mode: 0 };
+            }
+            moduleObj.parameters[`m${motorIdx}`].diameter = wheelVal;
 
             // 設定ファイルを自動保存
             await saveConfigToServer();

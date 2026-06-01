@@ -9,6 +9,7 @@ from std_srvs.srv import Trigger
 from ament_index_python.packages import PackageNotFoundError, get_package_share_directory
 
 # ROS2 標準 ＆ カスタムメッセージ
+from std_msgs.msg import String
 from can_msgs.msg import Frame
 from altair_interfaces.msg import MddFeedback, MddCommand, ServoCommand, SolenoidCommand
 from altair_interfaces.srv import TriggerControl
@@ -24,6 +25,12 @@ class ModuleManager(Node):
         # サブスクライバ: NUCからのCAN受信用のトピック
         self.can_rx_sub = self.create_subscription(
             Frame, '/altair/can/rx', self.handle_can_rx_callback, 100,
+            callback_group=self.callback_group
+        )
+
+        # サブスクライバ: 構成ファイル同期用トピック
+        self.config_sync_sub = self.create_subscription(
+            String, '/altair/config_sync', self.handle_config_sync_callback, 10,
             callback_group=self.callback_group
         )
 
@@ -221,7 +228,7 @@ class ModuleManager(Node):
 
                 cmd_id = base_id + 0x20  # 例: 0x220
                 try:
-                    targets_int = [int(t * 10) for t in targets]
+                    targets_int = [max(-32768, min(32767, int(t * 10))) for t in targets]
                     payload = struct.pack('<hhhh', *targets_int)
                 except Exception as e:
                     self.get_logger().error(f"MDD目標値の周期エンコード失敗 ({name}): {str(e)}")
@@ -277,52 +284,56 @@ class ModuleManager(Node):
     # --- 3. CAN ➔ ROS2 フィードバック変換処理 (NUC ➔ PC) ---
     def handle_can_rx_callback(self, frame):
         can_id = frame.id
+        # self.get_logger().info(f"[CAN_RX] ID: {hex(can_id)}, DLC: {frame.dlc}, Data: {list(frame.data)}")
 
-        # 現在キャッシュに登録されているMDD Base IDを走査
-        for base_id, cache in self.mdd_feedback_cache.items():
-            # A. ステータス返信 (Base ID + 0x30 = 0x230)
-            if can_id == (base_id + 0x30):
-                if frame.dlc < 6:
-                    continue
-                data = bytes(frame.data[:6])
-                # アンパック (Limit SW1-4, Error Code, System Status)
-                cache['limit_switches'] = [bool(b) for b in data[0:4]]
-                cache['error_code'] = data[4]
-                cache['system_status'] = data[5]
-                
-                # マイコンが待機状態（0）にリセットされたことを検知したら、PC側の制御フラグも安全のために即座にFalseに戻す
-                if data[5] == 0 and self.is_running:
-                    self.is_running = False
-                    module_name = ""
-                    for module in self.config.get('modules', []):
-                        if int(module['base_id'], 16) == base_id:
-                            module_name = module['name']
-                            break
-                    self.get_logger().warn(f"マイコン '{module_name}' の待機状態へのリセットを検知したため、PC側の制御フラグを安全にリセットしました。")
-                
-                self.publish_mdd_feedback(base_id)
+        try:
+            # 現在キャッシュに登録されているMDD Base IDを走査
+            for base_id, cache in self.mdd_feedback_cache.items():
+                # A. ステータス返信 (Base ID + 0x30 = 0x230)
+                if can_id == (base_id + 0x30):
+                    if frame.dlc < 6:
+                        continue
+                    data = bytes(frame.data[:6])
+                    # アンパック (Limit SW1-4, Error Code, System Status)
+                    cache['limit_switches'] = [bool(b) for b in data[0:4]]
+                    cache['error_code'] = data[4]
+                    cache['system_status'] = data[5]
+                    
+                    # マイコンが待機状態（0）にリセットされたことを検知したら、PC側の制御フラグも安全のために即座にFalseに戻す
+                    if data[5] == 0 and self.is_running:
+                        self.is_running = False
+                        module_name = ""
+                        for module in self.config.get('modules', []):
+                            if int(module['base_id'], 16) == base_id:
+                                module_name = module['name']
+                                break
+                        self.get_logger().warn(f"マイコン '{module_name}' の待機状態へのリセットを検知したため、PC側の制御フラグを安全にリセットしました。")
+                    
+                    self.publish_mdd_feedback(base_id)
 
-            # B. エンコーダ角度 (Base ID + 0x40 = 0x240)
-            elif can_id == (base_id + 0x40):
-                if frame.dlc < 8:
-                    continue
-                # int16_t * 4 のデコード (リトルエンディアン)
-                angles_raw = struct.unpack('<hhhh', bytes(frame.data[:8]))
-                # 0.1 deg 単位を度(degree)に変換
-                cache['angles'] = [float(a) / 10.0 for a in angles_raw]
-                
-                self.publish_mdd_feedback(base_id)
+                # B. エンコーダ角度 (Base ID + 0x40 = 0x240)
+                elif can_id == (base_id + 0x40):
+                    if frame.dlc < 8:
+                        continue
+                    # int16_t * 4 のデコード (リトルエンディアン)
+                    angles_raw = struct.unpack('<hhhh', bytes(frame.data[:8]))
+                    # 0.1 deg 単位を度(degree)に変換
+                    cache['angles'] = [float(a) / 10.0 for a in angles_raw]
+                    
+                    self.publish_mdd_feedback(base_id)
 
-            # C. エンコーダ回転速度 (Base ID + 0x50 = 0x250)
-            elif can_id == (base_id + 0x50):
-                if frame.dlc < 8:
-                    continue
-                # int16_t * 4 のデコード
-                speeds_raw = struct.unpack('<hhhh', bytes(frame.data[:8]))
-                # 0.01 rps 単位を rps に変換
-                cache['speeds'] = [float(s) / 100.0 for s in speeds_raw]
-                
-                self.publish_mdd_feedback(base_id)
+                # C. エンコーダ回転速度 (Base ID + 0x50 = 0x250)
+                elif can_id == (base_id + 0x50):
+                    if frame.dlc < 8:
+                        continue
+                    # int16_t * 4 のデコード
+                    speeds_raw = struct.unpack('<hhhh', bytes(frame.data[:8]))
+                    # 0.01 rps 単位を rps に変換
+                    cache['speeds'] = [float(s) / 100.0 for s in speeds_raw]
+                    
+                    self.publish_mdd_feedback(base_id)
+        except Exception as e:
+            self.get_logger().error(f"CAN受信コールバック処理中にエラーが発生しました: {str(e)}")
 
     def publish_mdd_feedback(self, base_id):
         """
@@ -370,12 +381,20 @@ class ModuleManager(Node):
                 for idx, motor_key in enumerate(['m1', 'm2', 'm3', 'm4']):
                     m_param = params.get(motor_key, {"p": 1.0, "i": 0.0, "d": 0.0, "diameter": 100.0, "direction": 1})
                     
-                    p_gain = int(m_param['p'] * 1000)
-                    i_gain = int(m_param['i'] * 1000)
-                    d_gain = int(m_param['d'] * 1000)
+                    p_gain = int(float(m_param.get('p', 1.0)) * 1000)
+                    p_gain = max(-32768, min(32767, p_gain))
+                    
+                    i_gain = int(float(m_param.get('i', 0.0)) * 1000)
+                    i_gain = max(-32768, min(32767, i_gain))
+                    
+                    d_gain = int(float(m_param.get('d', 0.0)) * 1000)
+                    d_gain = max(-32768, min(32767, d_gain))
                     
                     # 直径に方向の符号をかける (例: 100 * 1 = 100, 100 * -1 = -100)
-                    diameter_dir = int(m_param['diameter'] * m_param['direction'])
+                    diameter = float(m_param.get('diameter', 100.0))
+                    direction = float(m_param.get('direction', 1.0))
+                    diameter_dir = int(diameter * direction)
+                    diameter_dir = max(-32768, min(32767, diameter_dir))
                     
                     payload = struct.pack('<hhhh', p_gain, i_gain, d_gain, diameter_dir)
                     
@@ -394,14 +413,14 @@ class ModuleManager(Node):
 
                 # 4ch モード設定 (0x210) の送信
                 modes = [
-                    params.get('m1', {}).get('mode', 0),
-                    params.get('m2', {}).get('mode', 0),
-                    params.get('m3', {}).get('mode', 0),
-                    params.get('m4', {}).get('mode', 0)
+                    int(params.get('m1', {}).get('mode', 0)),
+                    int(params.get('m2', {}).get('mode', 0)),
+                    int(params.get('m3', {}).get('mode', 0)),
+                    int(params.get('m4', {}).get('mode', 0))
                 ]
                 
-                # Payload 4B: 各モータのモード (0=速度, 1=角度, 2=位置)
-                mode_payload = list(modes) + [0]*4 # 8Bにアライン
+                # Payload 4B: 各モータのモード (0=速度, 1=角度, 2=位置) を 8B にアライン
+                mode_payload = modes + [0]*4
                 
                 mode_frame = Frame()
                 mode_frame.id = base_id + 0x10  # 例: 0x210
@@ -439,6 +458,26 @@ class ModuleManager(Node):
             response.message = f"リロード失敗: {str(e)}"
             self.get_logger().error(f"リロード失敗: {str(e)}")
         return response
+
+    def handle_config_sync_callback(self, msg):
+        """
+        WebServerから送信された最新のモジュール構成設定を受信し、
+        NUC側の modules_config.json に上書き保存する
+        """
+        self.get_logger().info("モジュール構成同期メッセージを受信しました。")
+        try:
+            config_data = json.loads(msg.data)
+            config_path = self.get_config_path()
+            
+            # ディレクトリの存在確認
+            Path(config_path).parent.mkdir(parents=True, exist_ok=True)
+            
+            with open(config_path, 'w', encoding='utf-8') as f:
+                json.dump(config_data, f, indent=2, ensure_ascii=False)
+                
+            self.get_logger().info(f"NUC側の設定ファイルを同期保存しました: {config_path}")
+        except Exception as e:
+            self.get_logger().error(f"構成同期データの保存に失敗しました: {str(e)}")
 
 def main(args=None):
     rclpy.init(args=args)

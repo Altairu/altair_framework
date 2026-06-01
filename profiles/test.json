@@ -4,36 +4,36 @@
       "name": "MDD1",
       "type": "mdd",
       "base_id": "0x200",
-      "description": "",
+      "description": "走行用4chモータドライバ",
       "parameters": {
         "m1": {
-          "p": 1.5,
-          "i": 0.1,
-          "d": 0.05,
+          "p": 10,
+          "i": 0,
+          "d": 0,
           "diameter": 100,
-          "direction": 1,
-          "mode": 0
+          "direction": -1,
+          "mode": 1
         },
         "m2": {
-          "p": 1.5,
-          "i": 0.1,
-          "d": 0.05,
+          "p": 10,
+          "i": 0,
+          "d": 0,
           "diameter": 100,
           "direction": 1,
           "mode": 0
         },
         "m3": {
-          "p": 1.5,
-          "i": 0.1,
-          "d": 0.05,
+          "p": 10,
+          "i": 0,
+          "d": 0,
           "diameter": 100,
           "direction": 1,
           "mode": 0
         },
         "m4": {
-          "p": 1.5,
-          "i": 0.1,
-          "d": 0.05,
+          "p": 10,
+          "i": 0,
+          "d": 0,
           "diameter": 100,
           "direction": 1,
           "mode": 0
@@ -44,13 +44,7 @@
       "name": "Servo1",
       "type": "servo",
       "base_id": "0x100",
-      "description": ""
-    },
-    {
-      "name": "Solenoid1",
-      "type": "solenoid",
-      "base_id": "0x300",
-      "description": ""
+      "description": "アーム制御用6chサーボ"
     }
   ]
 }

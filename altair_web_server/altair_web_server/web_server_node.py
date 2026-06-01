@@ -85,6 +85,9 @@ class WebServerROSNode(Node):
         # ゲームコントローラー状態のパブリッシャ
         self.gamepad_pub = self.create_publisher(String, '/altair/gamepad/state', 10)
 
+        # モジュール構成同期用パブリッシャ (操縦PCからNUCへの同期用)
+        self.config_sync_pub = self.create_publisher(String, '/altair/config_sync', 10)
+
         # 1秒周期でモジュール設定ファイルを監視し、動的にMDDフィードバックサブスクライバを作成
         self.create_timer(2.0, self.sync_mdd_subscriptions, callback_group=self.callback_group)
 
@@ -432,8 +435,12 @@ async def load_profile(name: str):
     try:
         shutil.copy2(src, dest)
         
-        # モジュール構成リロードサービスを呼ぶ (ROS2側のリロード)
-        # 後ほど /altair/reload_config サービスをmodule_managerに実装します
+        # ロードしたプロファイルの設定をNUC側へパブリッシュして同期する
+        with open(dest, 'r', encoding='utf-8') as f:
+            config_data = json.load(f)
+        sync_msg = String()
+        sync_msg.data = json.dumps(config_data, ensure_ascii=False)
+        ros_node.config_sync_pub.publish(sync_msg)
         std_srv = ros_node.create_client(Trigger, '/altair/reload_config')
         if std_srv.wait_for_service(timeout_sec=1.0):
             req = Trigger.Request()
@@ -494,6 +501,11 @@ async def update_current_config(config_data: dict):
     try:
         with open(dest, 'w', encoding='utf-8') as f:
             json.dump(config_data, f, indent=2, ensure_ascii=False)
+            
+        # 最新の設定をNUC側へパブリッシュして同期する
+        sync_msg = String()
+        sync_msg.data = json.dumps(config_data, ensure_ascii=False)
+        ros_node.config_sync_pub.publish(sync_msg)
             
         # ROS2側にリロード要求を送る
         std_srv = ros_node.create_client(Trigger, '/altair/reload_config')
