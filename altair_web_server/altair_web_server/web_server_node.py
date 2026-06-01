@@ -571,8 +571,8 @@ def run_ros2_spin(node):
 def main(args=None):
     rclpy.init(args=args)
 
-    # FastAPI用の非同期イベントループを取得
-    loop = asyncio.get_event_loop()
+    # FastAPI用の明示的な非同期イベントループを作成
+    loop = asyncio.new_event_loop()
 
     # グローバルなROS2ノードの作成
     global ros_node
@@ -583,11 +583,23 @@ def main(args=None):
     ros_thread.daemon = True
     ros_thread.start()
 
-    # Webサーバーの起動 (すべてのWiFiネットワークからアクセス可能にするため 0.0.0.0 でバインド)
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+    # Uvicorn サーバーの設定と明示的ループでの起動
+    config = uvicorn.Config(
+        app,
+        host="0.0.0.0",
+        port=8000,
+        loop="asyncio",
+        log_level="info"
+    )
+    server = uvicorn.Server(config)
 
-    # 終了処理
-    rclpy.shutdown()
+    try:
+        loop.run_until_complete(server.serve())
+    except KeyboardInterrupt:
+        pass
+    finally:
+        # 終了処理
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
