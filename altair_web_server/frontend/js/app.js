@@ -348,13 +348,25 @@ document.addEventListener("DOMContentLoaded", () => {
             </select>
           </td>
           <td style="padding: 4px 0; text-align: center;">
-            <input type="number" class="form-input form-input-sm input-mdd-p" data-module="${mod.name}" data-motor="${i}" step="0.1" value="${motorParam.p}" style="padding: 2px 4px; font-size: 11px; height: 22px; width: 42px; text-align: center; display: inline-block;">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
+              <button class="btn btn-secondary btn-xs btn-pid-adjust" data-module="${mod.name}" data-motor="${i}" data-param="p" data-action="minus" style="padding: 0; width: 14px; height: 18px; font-size: 9px; line-height: 1;">-</button>
+              <input type="number" class="form-input form-input-sm input-mdd-p" data-module="${mod.name}" data-motor="${i}" step="0.1" value="${motorParam.p}" style="padding: 2px 0; font-size: 11px; height: 22px; width: 34px; text-align: center; display: inline-block; margin: 0;">
+              <button class="btn btn-secondary btn-xs btn-pid-adjust" data-module="${mod.name}" data-motor="${i}" data-param="p" data-action="plus" style="padding: 0; width: 14px; height: 18px; font-size: 9px; line-height: 1;">+</button>
+            </div>
           </td>
           <td style="padding: 4px 0; text-align: center;">
-            <input type="number" class="form-input form-input-sm input-mdd-i" data-module="${mod.name}" data-motor="${i}" step="0.01" value="${motorParam.i}" style="padding: 2px 4px; font-size: 11px; height: 22px; width: 42px; text-align: center; display: inline-block;">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
+              <button class="btn btn-secondary btn-xs btn-pid-adjust" data-module="${mod.name}" data-motor="${i}" data-param="i" data-action="minus" style="padding: 0; width: 14px; height: 18px; font-size: 9px; line-height: 1;">-</button>
+              <input type="number" class="form-input form-input-sm input-mdd-i" data-module="${mod.name}" data-motor="${i}" step="0.01" value="${motorParam.i}" style="padding: 2px 0; font-size: 11px; height: 22px; width: 34px; text-align: center; display: inline-block; margin: 0;">
+              <button class="btn btn-secondary btn-xs btn-pid-adjust" data-module="${mod.name}" data-motor="${i}" data-param="i" data-action="plus" style="padding: 0; width: 14px; height: 18px; font-size: 9px; line-height: 1;">+</button>
+            </div>
           </td>
           <td style="padding: 4px 0; text-align: center;">
-            <input type="number" class="form-input form-input-sm input-mdd-d" data-module="${mod.name}" data-motor="${i}" step="0.01" value="${motorParam.d}" style="padding: 2px 4px; font-size: 11px; height: 22px; width: 42px; text-align: center; display: inline-block;">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
+              <button class="btn btn-secondary btn-xs btn-pid-adjust" data-module="${mod.name}" data-motor="${i}" data-param="d" data-action="minus" style="padding: 0; width: 14px; height: 18px; font-size: 9px; line-height: 1;">-</button>
+              <input type="number" class="form-input form-input-sm input-mdd-d" data-module="${mod.name}" data-motor="${i}" step="0.01" value="${motorParam.d}" style="padding: 2px 0; font-size: 11px; height: 22px; width: 34px; text-align: center; display: inline-block; margin: 0;">
+              <button class="btn btn-secondary btn-xs btn-pid-adjust" data-module="${mod.name}" data-motor="${i}" data-param="d" data-action="plus" style="padding: 0; width: 14px; height: 18px; font-size: 9px; line-height: 1;">+</button>
+            </div>
           </td>
         </tr>`;
     }

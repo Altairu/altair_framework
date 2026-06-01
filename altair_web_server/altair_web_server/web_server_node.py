@@ -164,15 +164,36 @@ class WebServerROSNode(Node):
         asyncio.run_coroutine_threadsafe(manager.broadcast(log_data), self.loop)
 
     def get_config_path(self):
-        paths = [
-            "c:/Users/106no/Documents/GitHub/altair_framework/altair_core/config/modules_config.json",
-            os.path.join(os.path.expanduser('~'), 'ros2_ws/install/altair_core/share/altair_core/config/modules_config.json'),
-            "./src/altair_framework/altair_core/config/modules_config.json",
-            "modules_config.json"
-        ]
-        for p in paths:
-            if os.path.exists(p):
-                return p
+        """
+        モジュール構成ファイルの絶対パスを探索して返す
+        """
+        candidates = []
+
+        # 明示指定があれば最優先
+        env_path = os.getenv('ALTAIR_MODULES_CONFIG')
+        if env_path:
+            candidates.append(Path(env_path).expanduser())
+
+        # ROS2インストール先 (share/altair_core/config)
+        try:
+            share_dir = Path(get_package_share_directory('altair_core'))
+            candidates.append(share_dir / 'config' / 'modules_config.json')
+        except PackageNotFoundError:
+            pass
+
+        # 開発時の代表的な相対パス
+        cwd = Path.cwd()
+        candidates.append(cwd / 'altair_core' / 'config' / 'modules_config.json')
+        candidates.append(cwd / 'config' / 'modules_config.json')
+
+        # モジュールファイル基準の相対パス
+        this_file = Path(__file__).resolve()
+        candidates.append(this_file.parent.parent / 'config' / 'modules_config.json')
+
+        for path in candidates:
+            if path.exists():
+                return str(path)
+
         return "modules_config.json"
 
     # --- コマンドパブリッシュヘルパー ---
