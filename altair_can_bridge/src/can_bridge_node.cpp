@@ -226,7 +226,7 @@ private:
       RCLCPP_ERROR(this->get_logger(), "auto_connectフラグは非推奨です。ポートを明示指定してください。");
       return false;
     } else {
-      cmd = "bash " + script_path + " " + port + " 1000000";
+      cmd = "echo 'altair' | sudo -S bash " + script_path + " " + port + " 1000000";
     }
 
     RCLCPP_INFO(this->get_logger(), "接続スクリプトを実行中: %s", cmd.c_str());
@@ -399,26 +399,25 @@ private:
       std::this_thread::sleep_for(100ms);
       tcflush(fd, TCIFLUSH);
       
-      // ボーレート設定 (1Mbps = S8)
-      write(fd, "S8\r", 3);
+      // バージョン取得 (V\r) でデバイスを判定
+      // CANable2 の一部ファームウェアは O\r に対する応答を返さないため、
+      // 確実に応答がある V\r コマンドを使用する
+      write(fd, "V\r", 2);
       std::this_thread::sleep_for(100ms);
-      
-      // オープン
-      write(fd, "O\r", 2);
-      std::this_thread::sleep_for(150ms);
 
       // 応答確認
-      char buf[32];
+      char buf[128];
       int n = read(fd, buf, sizeof(buf));
       
-      // slcandで使えるように再度クローズしておく
+      // slcandで使えるように念のためクローズコマンド
       write(fd, "C\r", 2);
       std::this_thread::sleep_for(50ms);
       
       close(fd);
 
       if (n > 0) {
-        RCLCPP_INFO(this->get_logger(), "slcanデバイス検出: %s (応答あり)", port.c_str());
+        std::string resp(buf, n);
+        RCLCPP_INFO(this->get_logger(), "slcanデバイス検出: %s (応答=%s)", port.c_str(), resp.c_str());
         return port;
       }
     }
