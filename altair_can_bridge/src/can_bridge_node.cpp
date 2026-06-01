@@ -11,7 +11,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <cerrno>
-
+#include <termios.h>
 // Linux SocketCAN ヘッダー
 #include <sys/socket.h>
 #include <sys/ioctl.h>
@@ -66,15 +66,17 @@ public:
 
     RCLCPP_INFO(this->get_logger(), "Altair CAN Bridge Node が起動しました。接続待ち状態です。");
 
-    // デフォルトで自動接続を試みる (自動接続モードが標準ONを想定)
-    std::thread([this]() {
-      RCLCPP_INFO(this->get_logger(), "起動時自動接続プロセスを開始します...");
-      trigger_connect("", true);
-    }).detach();
+    // 自動接続・再接続スレッドの起動
+    auto_connect_running_ = true;
+    auto_connect_thread_ = std::thread(&CanBridgeNode::auto_connect_loop, this);
   }
 
   ~CanBridgeNode()
   {
+    auto_connect_running_ = false;
+    if (auto_connect_thread_.joinable()) {
+      auto_connect_thread_.join();
+    }
     rx_thread_running_ = false;
     if (rx_thread_.joinable()) {
       rx_thread_.join();
@@ -218,10 +220,11 @@ private:
       script_path = "./src/altair_framework/altair_can_bridge/scripts/setup_slcan.sh";
     }
     
-    // WSL環境か否かに応じてコマンド構築
     std::string cmd;
     if (auto_connect) {
-      cmd = "bash " + script_path + " auto 1000000";
+      // should not happen with new logic, but fallback just in case
+      RCLCPP_ERROR(this->get_logger(), "auto_connectフラグは非推奨です。ポートを明示指定してください。");
+      return false;
     } else {
       cmd = "bash " + script_path + " " + port + " 1000000";
     }
@@ -274,7 +277,7 @@ private:
 
     // 接続成功
     is_connected_ = true;
-    active_port_ = auto_connect ? "Auto-Detected Port" : port;
+    active_port_ = port;
     last_error_ = "";
     RCLCPP_INFO(this->get_logger(), "SocketCAN can0 への接続が完了しました！");
     return true;
@@ -351,6 +354,97 @@ private:
     }
   }
 
+  // --- 6. 自動接続・デバイス検出 ---
+  std::string detect_can_port()
+  {
+    std::vector<std::string> candidates;
+    try {
+      if (fs::exists("/dev")) {
+        for (const auto& entry : fs::directory_iterator("/dev")) {
+          std::string name = entry.path().filename().string();
+          if (name.find("ttyACM") == 0 || name.find("ttyUSB") == 0) {
+            candidates.push_back(entry.path().string());
+          }
+        }
+      }
+    } catch (...) {}
+
+    for (const auto& port : candidates) {
+      int fd = open(port.c_str(), O_RDWR | O_NOCTTY | O_NDELAY);
+      if (fd == -1) continue;
+
+      struct termios options;
+      tcgetattr(fd, &options);
+      cfsetispeed(&options, B115200);
+      cfsetospeed(&options, B115200);
+      options.c_cflag |= (CLOCAL | CREAD);
+      options.c_cflag &= ~PARENB;
+      options.c_cflag &= ~CSTOPB;
+      options.c_cflag &= ~CSIZE;
+      options.c_cflag |= CS8;
+      options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
+      options.c_iflag &= ~(IXON | IXOFF | IXANY);
+      options.c_oflag &= ~OPOST;
+      
+      // non-blocking off for read timeout
+      fcntl(fd, F_SETFL, 0); 
+      
+      // Set read timeout to 0.1s
+      options.c_cc[VMIN]  = 0;
+      options.c_cc[VTIME] = 1;
+      tcsetattr(fd, TCSANOW, &options);
+
+      // リセット
+      write(fd, "C\r", 2);
+      std::this_thread::sleep_for(100ms);
+      tcflush(fd, TCIFLUSH);
+      
+      // ボーレート設定 (1Mbps = S8)
+      write(fd, "S8\r", 3);
+      std::this_thread::sleep_for(100ms);
+      
+      // オープン
+      write(fd, "O\r", 2);
+      std::this_thread::sleep_for(150ms);
+
+      // 応答確認
+      char buf[32];
+      int n = read(fd, buf, sizeof(buf));
+      
+      // slcandで使えるように再度クローズしておく
+      write(fd, "C\r", 2);
+      std::this_thread::sleep_for(50ms);
+      
+      close(fd);
+
+      if (n > 0) {
+        RCLCPP_INFO(this->get_logger(), "slcanデバイス検出: %s (応答あり)", port.c_str());
+        return port;
+      }
+    }
+    return "";
+  }
+
+  void auto_connect_loop()
+  {
+    RCLCPP_INFO(this->get_logger(), "自動接続ループを開始します...");
+    while (auto_connect_running_ && rclcpp::ok()) {
+      if (is_connected_) {
+        std::this_thread::sleep_for(1000ms);
+        continue;
+      }
+
+      std::string port = detect_can_port();
+      if (!port.empty()) {
+        RCLCPP_INFO(this->get_logger(), "自動接続: %s に接続を試みます...", port.c_str());
+        trigger_connect(port, false);
+      } else {
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000, "CANデバイスが見つかりません。再スキャンします...");
+      }
+      std::this_thread::sleep_for(1000ms);
+    }
+  }
+
   // --- 5. 接続ステータス配信 ---
   void publish_status()
   {
@@ -372,6 +466,9 @@ private:
 
   std::thread rx_thread_;
   std::atomic<bool> rx_thread_running_;
+
+  std::thread auto_connect_thread_;
+  std::atomic<bool> auto_connect_running_;
 
   // ROS2 インターフェース
   rclcpp::Publisher<can_msgs::msg::Frame>::SharedPtr can_rx_pub_;

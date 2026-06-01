@@ -55,30 +55,7 @@ if [ -n "$PORT_ARG" ] && [ "$PORT_ARG" != "auto" ]; then
         exit 1
     fi
 else
-    # 自動探索モード (ttyACM* をスキャン)
-    echo "2. シリアルポート (ttyACM*) を自動探索しています..."
-    for dev in /dev/ttyACM*; do
-        if [ -e "$dev" ]; then
-            TARGET_PORT=$dev
-            echo "ポートが見つかりました: $TARGET_PORT"
-            break
-        fi
-    done
-
-    # ttyACMが見つからなければ ttyUSB も探す
-    if [ -z "$TARGET_PORT" ]; then
-        for dev in /dev/ttyUSB*; do
-            if [ -e "$dev" ]; then
-                TARGET_PORT=$dev
-                echo "ポートが見つかりました: $TARGET_PORT"
-                break
-            fi
-        done
-    fi
-fi
-
-if [ -z "$TARGET_PORT" ]; then
-    echo "[ERROR] 利用可能なシリアルポート (ttyACM* / ttyUSB*) が検出されませんでした。"
+    echo "[ERROR] ポートが指定されていません。正しいデバイスパスを引数に渡してください。"
     exit 1
 fi
 
