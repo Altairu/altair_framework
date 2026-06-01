@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <iostream>
 #include <cstdlib>
+#include <cerrno>
 
 // Linux SocketCAN ヘッダー
 #include <sys/socket.h>
