@@ -1623,7 +1623,7 @@ if __name__ == '__main__':
         if (data.success && data.xml) {
           try {
             workspace.clear();
-            const dom = Blockly.Xml.textToDom(data.xml);
+            const dom = Blockly.utils.xml.textToDom(data.xml);
             Blockly.Xml.domToWorkspace(dom, workspace);
             console.log("Blocklyワークスペースを正常に復元しました。");
           } catch (restoreErr) {
@@ -1644,7 +1644,7 @@ if __name__ == '__main__':
     try {
       ws.clear();
       const defaultXml = '<xml xmlns="https://developers.google.com/blockly/xml"><block type="event_macro" id="initial_entry" x="30" y="30"></block></xml>';
-      const dom = Blockly.Xml.textToDom(defaultXml);
+      const dom = Blockly.utils.xml.textToDom(defaultXml);
       Blockly.Xml.domToWorkspace(dom, ws);
     } catch (e) {
       console.error("Defaultブロック配置失敗:", e);
