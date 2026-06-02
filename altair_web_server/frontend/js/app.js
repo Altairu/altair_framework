@@ -1489,6 +1489,78 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
+  Blockly.Blocks['gamepad_axis_scaled'] = {
+    init: function () {
+      this.appendDummyInput()
+        .appendField("コントローラー ")
+        .appendField(new Blockly.FieldDropdown([
+          ["L-Stick 左右 (X)", "0"],
+          ["L-Stick 上下 (Y)", "1"],
+          ["R-Stick 左右 (X)", "2"],
+          ["R-Stick 上下 (Y)", "3"]
+        ]), "AXIS")
+        .appendField("の傾き × 係数")
+        .appendField(new Blockly.FieldNumber(1000, -10000, 10000, 1), "SCALE");
+      this.setOutput(true, "Number");
+      this.setColour(290);
+      this.setTooltip("コントローラーの指定されたスティックの傾き値(-1.0〜1.0)に指定した係数を掛けた値を取得します。");
+      this.setHelpUrl("");
+    }
+  };
+
+  Blockly.Blocks['robot_kinematics'] = {
+    init: function () {
+      this.appendDummyInput()
+        .appendField("🤖 ロボット運動学制御")
+        .appendField(new Blockly.FieldDropdown([
+          ["3輪オムニ", "3_OMNI"],
+          ["4輪オムニ", "4_OMNI"],
+          ["4輪メカナム", "4_MECANUM"],
+          ["差動2輪", "2_DIFF"]
+        ]), "TYPE");
+      this.appendDummyInput()
+        .appendField("モータドライバ:")
+        .appendField(new Blockly.FieldDropdown(getModuleOptionsDropdown('mdd')), "MDD")
+        .appendField("  旋回直径:")
+        .appendField(new Blockly.FieldNumber(300, 10, 2000, 1), "L")
+        .appendField("mm");
+      this.appendDummyInput()
+        .appendField("モータ割当: LF/左前/左輪:")
+        .appendField(new Blockly.FieldDropdown([["M1", "m1"], ["M2", "m2"], ["M3", "m3"], ["M4", "m4"], ["なし", "none"]]), "M_LF")
+        .appendField(" 反転:")
+        .appendField(new Blockly.FieldCheckbox("FALSE"), "INV_LF");
+      this.appendDummyInput()
+        .appendField("            RF/右前/右輪:")
+        .appendField(new Blockly.FieldDropdown([["M1", "m1"], ["M2", "m2"], ["M3", "m3"], ["M4", "m4"], ["なし", "none"]]), "M_RF")
+        .appendField(" 反転:")
+        .appendField(new Blockly.FieldCheckbox("FALSE"), "INV_RF");
+      this.appendDummyInput()
+        .appendField("            LR/左後/左輪:")
+        .appendField(new Blockly.FieldDropdown([["M1", "m1"], ["M2", "m2"], ["M3", "m3"], ["M4", "m4"], ["なし", "none"]]), "M_LR")
+        .appendField(" 反転:")
+        .appendField(new Blockly.FieldCheckbox("FALSE"), "INV_LR");
+      this.appendDummyInput()
+        .appendField("            RR/右後/右輪:")
+        .appendField(new Blockly.FieldDropdown([["M1", "m1"], ["M2", "m2"], ["M3", "m3"], ["M4", "m4"], ["なし", "none"]]), "M_RR")
+        .appendField(" 反転:")
+        .appendField(new Blockly.FieldCheckbox("FALSE"), "INV_RR");
+      this.appendValueInput("VX")
+        .setCheck("Number")
+        .appendField("入力 Vx (左右速度 mm/s)");
+      this.appendValueInput("VY")
+        .setCheck("Number")
+        .appendField("入力 Vy (前後速度 mm/s)");
+      this.appendValueInput("OMEGA")
+        .setCheck("Number")
+        .appendField("入力 ω (旋回角速度 rad/s)");
+      this.setPreviousStatement(true, null);
+      this.setNextStatement(true, null);
+      this.setColour(260);
+      this.setTooltip("Vx, Vy, ω から足回りの逆運動学を計算し、指定したMDDモータの目標値へ指示します。各タイヤ直径はパラメータ設定の値が自動使用されます。");
+      this.setHelpUrl("");
+    }
+  };
+
   // Blockly.Python ジェネレーターの定義と互換性ポリフィル
   let pyGen = null;
   if (typeof python !== 'undefined' && python.pythonGenerator) {
@@ -1629,6 +1701,117 @@ document.addEventListener("DOMContentLoaded", () => {
     return [code, getAtomicOrder()];
   });
 
+  registerGenerator('gamepad_axis_scaled', function (block, generator) {
+    const axisIdx = block.getFieldValue('AXIS');
+    const scale = block.getFieldValue('SCALE') || '1.0';
+    const code = `(self.gamepad.get_axis(${axisIdx}) * ${scale})`;
+    return [code, getAtomicOrder()];
+  });
+
+  registerGenerator('robot_kinematics', function (block, generator) {
+    const root = block.getRootBlock();
+    if (!root || root.type !== 'event_macro') return '';
+    const gen = generator || pyGen;
+    const order = getAtomicOrder();
+    
+    const type = block.getFieldValue('TYPE');
+    const mddName = block.getFieldValue('MDD');
+    const tread = block.getFieldValue('L') || '300.0';
+    
+    const mLf = block.getFieldValue('M_LF');
+    const mRf = block.getFieldValue('M_RF');
+    const mLr = block.getFieldValue('M_LR');
+    const mRr = block.getFieldValue('M_RR');
+
+    const invLf = block.getFieldValue('INV_LF') === 'TRUE' ? '-1.0' : '1.0';
+    const invRf = block.getFieldValue('INV_RF') === 'TRUE' ? '-1.0' : '1.0';
+    const invLr = block.getFieldValue('INV_LR') === 'TRUE' ? '-1.0' : '1.0';
+    const invRr = block.getFieldValue('INV_RR') === 'TRUE' ? '-1.0' : '1.0';
+    
+    const vx = gen.valueToCode(block, 'VX', order) || '0.0';
+    const vy = gen.valueToCode(block, 'VY', order) || '0.0';
+    const omega = gen.valueToCode(block, 'OMEGA', order) || '0.0';
+    
+    return `
+# 運動学計算実行
+def _calc_kinematics():
+    import math
+    vx_val = float(${vx}) / 1000.0
+    vy_val = float(${vy}) / 1000.0
+    omega_val = float(${omega})
+    
+    r_t = ${tread} / 2000.0
+    
+    def get_dia(m_name):
+        if m_name == 'none': return 100.0
+        for m in self.config.get('modules', []):
+            if m.get('name') == "${mddName}":
+                return m.get('parameters', {}).get(m_name, {}).get('diameter', 100.0)
+        return 100.0
+        
+    dia_lf = get_dia("${mLf}")
+    dia_rf = get_dia("${mRf}")
+    dia_lr = get_dia("${mLr}")
+    dia_rr = get_dia("${mRr}")
+    
+    k_lf = 1000.0 / (math.pi * dia_lf) if dia_lf > 0 else 1.0
+    k_rf = 1000.0 / (math.pi * dia_rf) if dia_rf > 0 else 1.0
+    k_lr = 1000.0 / (math.pi * dia_lr) if dia_lr > 0 else 1.0
+    k_rr = 1000.0 / (math.pi * dia_rr) if dia_rr > 0 else 1.0
+    
+    target_speeds = [0.0, 0.0, 0.0, 0.0]
+    
+    if "${type}" == "3_OMNI":
+        v1 = (vy_val + r_t * omega_val) * ${invLf}
+        v2 = (-0.866025 * vx_val - 0.5 * vy_val + r_t * omega_val) * ${invRf}
+        v3 = (0.866025 * vx_val - 0.5 * vy_val + r_t * omega_val) * ${invLr}
+        
+        for slot, val in [("${mLf}", v1 * k_lf), ("${mRf}", v2 * k_rf), ("${mLr}", v3 * k_lr)]:
+            if slot != 'none':
+                idx = int(slot[1]) - 1
+                target_speeds[idx] = val
+                
+    elif "${type}" == "4_OMNI":
+        v_lf = (-0.707107 * vx_val + 0.707107 * vy_val + r_t * omega_val) * ${invLf}
+        v_rf = (0.707107 * vx_val + 0.707107 * vy_val - r_t * omega_val) * ${invRf}
+        v_lr = (-0.707107 * vx_val - 0.707107 * vy_val + r_t * omega_val) * ${invLr}
+        v_rr = (0.707107 * vx_val - 0.707107 * vy_val - r_t * omega_val) * ${invRr}
+        
+        for slot, val in [("${mLf}", v_lf * k_lf), ("${mRf}", v_rf * k_rf), ("${mLr}", v_lr * k_lr), ("${mRr}", v_rr * k_rr)]:
+            if slot != 'none':
+                idx = int(slot[1]) - 1
+                target_speeds[idx] = val
+                
+    elif "${type}" == "4_MECANUM":
+        v_lf = (vy_val - vx_val - r_t * omega_val) * ${invLf}
+        v_rf = (vy_val + vx_val + r_t * omega_val) * ${invRf}
+        v_lr = (vy_val + vx_val - r_t * omega_val) * ${invLr}
+        v_rr = (vy_val - vx_val + r_t * omega_val) * ${invRr}
+        
+        for slot, val in [("${mLf}", v_lf * k_lf), ("${mRf}", v_rf * k_rf), ("${mLr}", v_lr * k_lr), ("${mRr}", v_rr * k_rr)]:
+            if slot != 'none':
+                idx = int(slot[1]) - 1
+                target_speeds[idx] = val
+                
+    elif "${type}" == "2_DIFF":
+        v_l = vy_val - r_t * omega_val
+        v_r = vy_val + r_t * omega_val
+        
+        for slot, val in [("${mLf}", v_l * k_lf * ${invLf}), ("${mLr}", v_l * k_lr * ${invLr})]:
+            if slot != 'none':
+                idx = int(slot[1]) - 1
+                target_speeds[idx] = val
+        for slot, val in [("${mRf}", v_r * k_rf * ${invRf}), ("${mRr}", v_r * k_rr * ${invRr})]:
+            if slot != 'none':
+                idx = int(slot[1]) - 1
+                target_speeds[idx] = val
+                
+    self.get_module("${mddName}").set_targets(target_speeds)
+
+_calc_kinematics()
+`;
+  });
+
   // フルPythonコードに組み立てるヘルパー
   function generatePythonCode(blocklyCode) {
     // すべての行に対して一律で 12スペース（tryブロックのインデント）を動的に付与する
@@ -1726,6 +1909,9 @@ if __name__ == '__main__':
       <category name="コントローラー" colour="290">
         <block type="gamepad_button"></block>
         <block type="gamepad_axis"></block>
+        <block type="gamepad_axis_scaled">
+          <field name="SCALE">1000</field>
+        </block>
       </category>
       <category name="MDDモータ" colour="230">
         <block type="mdd_move">
@@ -1733,6 +1919,32 @@ if __name__ == '__main__':
           <value name="M2"><block type="math_number"><field name="NUM">0</field></block></value>
           <value name="M3"><block type="math_number"><field name="NUM">0</field></block></value>
           <value name="M4"><block type="math_number"><field name="NUM">0</field></block></value>
+        </block>
+        <block type="robot_kinematics">
+          <field name="TYPE">4_MECANUM</field>
+          <field name="L">300</field>
+          <field name="M_LF">m1</field>
+          <field name="M_RF">m2</field>
+          <field name="M_LR">m3</field>
+          <field name="M_RR">m4</field>
+          <value name="VX">
+            <block type="gamepad_axis_scaled">
+              <field name="AXIS">0</field>
+              <field name="SCALE">1000</field>
+            </block>
+          </value>
+          <value name="VY">
+            <block type="gamepad_axis_scaled">
+              <field name="AXIS">1</field>
+              <field name="SCALE">1000</field>
+            </block>
+          </value>
+          <value name="OMEGA">
+            <block type="gamepad_axis_scaled">
+              <field name="AXIS">2</field>
+              <field name="SCALE">2.0</field>
+            </block>
+          </value>
         </block>
       </category>
       <category name="MDDセンサー値" colour="80">
