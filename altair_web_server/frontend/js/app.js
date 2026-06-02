@@ -1527,7 +1527,15 @@ document.addEventListener("DOMContentLoaded", () => {
   registerGenerator('event_macro', function (block, generator) {
     const gen = generator || pyGen;
     const branch = gen.statementToCode(block, 'DO');
-    return branch;
+    // statementToCode が自動付与する先頭のインデントを1レベル分削除する
+    const indent = gen.INDENT || '    ';
+    const cleanedBranch = branch.split('\n').map(line => {
+      if (line.startsWith(indent)) {
+        return line.substring(indent.length);
+      }
+      return line;
+    }).join('\n');
+    return cleanedBranch;
   });
 
   registerGenerator('mdd_move', function (block, generator) {
@@ -1669,7 +1677,7 @@ ${indentedCode}
 def main(args=None):
     rclpy.init(args=args)
     behavior = BlocklyBehavior("blockly_behavior_node")
-    behavior.run(rate_hz=10.0)
+    behavior.run(rate_hz=60.0)
 
 if __name__ == '__main__':
     main()

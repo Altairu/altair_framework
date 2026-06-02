@@ -25,13 +25,11 @@ class BlocklyBehavior(AltairBehavior):
         
         try:
             print("--- Blocklyマクロの実行を開始します ---")
-                while True:
-                    if self.gamepad.get_button(0) == True:
-                        self.get_logger().info(f"[BLOCKLY] {'ON'}")
-                        self.get_module("Servo1").set_angles([180, 90, 90, 90, 90, 90])
-                    else:
-                        self.get_logger().info(f"[BLOCKLY] {'OFF'}")
-                        self.get_module("Servo1").set_angles([90, 90, 90, 90, 90, 90])
+            while True:
+                if self.gamepad.get_button(7) == True:
+                    self.get_module("MDD1").set_targets([(self.gamepad.get_axis(1) * -5), (self.gamepad.get_axis(3) * 5), 0, 0])
+                else:
+                    self.get_module("MDD1").set_targets([(self.gamepad.get_axis(1) * -10), (self.gamepad.get_axis(3) * 10), 0, 0])
 
             print("--- Blocklyマクロの実行が完了しました ---")
         except Exception as e:
@@ -42,7 +40,7 @@ class BlocklyBehavior(AltairBehavior):
 def main(args=None):
     rclpy.init(args=args)
     behavior = BlocklyBehavior("blockly_behavior_node")
-    behavior.run(rate_hz=10.0)
+    behavior.run(rate_hz=60.0)
 
 if __name__ == '__main__':
     main()

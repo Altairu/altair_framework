@@ -125,7 +125,7 @@ class AltairBehavior(Node):
     def __init__(self, node_name="user_behavior_node"):
         super().__init__(node_name)
         self.callback_group = ReentrantCallbackGroup()
-        self.clients = {}
+        self._module_clients = {}
         
         # 設定のロード
         self.config = self._load_config()
@@ -170,8 +170,8 @@ class AltairBehavior(Node):
         """
         モジュール名から、そのモジュールを操作するための簡易クライアントを取得します。
         """
-        if name in self.clients:
-            return self.clients[name]
+        if name in self._module_clients:
+            return self._module_clients[name]
 
         # 設定からモジュールタイプを特定
         mtype = None
@@ -195,7 +195,7 @@ class AltairBehavior(Node):
             self.get_logger().error(f"未知のモジュールタイプ: '{mtype}'")
             raise ValueError(f"Unknown module type '{mtype}'")
 
-        self.clients[name] = client
+        self._module_clients[name] = client
         return client
 
     def on_init(self):
@@ -210,10 +210,10 @@ class AltairBehavior(Node):
         """
         pass
 
-    def run(self, rate_hz=20.0):
+    def run(self, rate_hz=60.0):
         """
         動作プログラムの周期実行ループを開始します。
-        rate_hz: 周期の周波数（デフォルト 20 Hz = 50 ms 周期）
+        rate_hz: 周期の周波数（デフォルト 60 Hz）
         """
         self.timer = self.create_timer(
             1.0 / rate_hz, self.loop,
@@ -221,12 +221,12 @@ class AltairBehavior(Node):
         )
         
         # マルチスレッドエグゼキュータを使用して非同期通信とループを両立
-        self.executor = rclpy.executors.MultiThreadedExecutor()
-        self.executor.add_node(self)
+        self._ros_executor = rclpy.executors.MultiThreadedExecutor()
+        self._ros_executor.add_node(self)
         
         try:
             self.get_logger().info(f"周期実行ループを開始します (周波数: {rate_hz} Hz)...")
-            self.executor.spin()
+            self._ros_executor.spin()
         except KeyboardInterrupt:
             pass
         finally:
