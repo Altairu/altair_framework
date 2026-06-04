@@ -126,11 +126,11 @@ class WebServerROSNode(Node):
                 "type": "mdd_feedback",
                 "name": name,
                 "data": {
-                    "limit_switches": list(msg.limit_switches),
-                    "error_code": msg.error_code,
-                    "system_status": msg.system_status,
-                    "angles": list(msg.angles),
-                    "speeds": list(msg.speeds)
+                    "limit_switches": [bool(x) for x in msg.limit_switches],
+                    "error_code": int(msg.error_code),
+                    "system_status": int(msg.system_status),
+                    "angles": [float(x) for x in msg.angles],
+                    "speeds": [float(x) for x in msg.speeds]
                 }
             }
             # asyncio イベントループを通じて WebSocket 送信を実行
@@ -192,6 +192,10 @@ class WebServerROSNode(Node):
         # モジュールファイル基準の相対パス
         this_file = Path(__file__).resolve()
         candidates.append(this_file.parent.parent / 'config' / 'modules_config.json')
+
+        # ワークスペース内開発時の altair_core 基準の相対パス
+        if len(this_file.parents) >= 3:
+            candidates.append(this_file.parents[2] / 'altair_core' / 'config' / 'modules_config.json')
 
         for path in candidates:
             if path.exists():

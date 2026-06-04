@@ -7,11 +7,11 @@
       "description": "走行用4chモータドライバ",
       "parameters": {
         "m1": {
-          "p": 10,
+          "p": 50,
           "i": 0,
           "d": 0,
           "diameter": 200,
-          "direction": 1,
+          "direction": -1,
           "mode": 0
         },
         "m2": {

@@ -179,9 +179,9 @@ private:
       rx_msg->header.stamp = this->now();
       rx_msg->header.frame_id = "can0";
       
-      rx_msg->id = frame.can_id & CAN_EFF_MASK;
-      rx_msg->is_rtr = (frame.can_id & CAN_RTR_FLAG) != 0;
       rx_msg->is_extended = (frame.can_id & CAN_EFF_FLAG) != 0;
+      rx_msg->id = rx_msg->is_extended ? (frame.can_id & CAN_EFF_MASK) : (frame.can_id & CAN_SFF_MASK);
+      rx_msg->is_rtr = (frame.can_id & CAN_RTR_FLAG) != 0;
       rx_msg->is_error = (frame.can_id & CAN_ERR_FLAG) != 0;
       rx_msg->dlc = frame.can_dlc;
       
