@@ -40,7 +40,7 @@ class BlocklyBehavior(AltairBehavior):
 def main(args=None):
     rclpy.init(args=args)
     behavior = BlocklyBehavior("blockly_behavior_node")
-    behavior.run(rate_hz=60.0)
+    behavior.run(rate_hz=100.0)
 
 if __name__ == '__main__':
     main()

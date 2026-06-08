@@ -1,14 +1,14 @@
-# Altair Framework 動作プログラム記述仕様書 (behavior_programming_guide.md)
+# Altair Framework 動作プログラム記述仕様書
 
-本ドキュメントは、Altair Module System において、人間および **AIアシスタント（ChatGPT, Claude, Gemini等）** がバグのない安全な自律動作プログラム（Pythonスクリプト）を記述するためのAPI完全仕様書です。
+本ドキュメントは、Altair Module Systemにおいて、人間やAIアシスタントがバグのない安全な自律動作プログラムとして動作するPythonスクリプトを記述するためのAPI仕様書です。
 
-AIにコードを書かせる際は、**「このマークダウンファイルの中身をそのままAIのプロンプトに貼り付ける」** ことで、AIがシステムの仕様を100%理解し、完全動作するPython制御プログラムを出力します。
+AIへコードの記述を指示する際は、このファイルの内容をそのままAIのプロンプトに貼り付けることで、システムの仕様を理解して動作するPython制御プログラムを作成させることができます。
 
 ---
 
-## 1. 動作プログラムの基本構造
+## 動作プログラムの基本構造
 
-すべての動作プログラムは、`altair_core` の `base_behavior.py` に実装された **`AltairBehavior`** クラスを継承した単一のPythonクラスとして記述します。
+すべての動作プログラムは、altair_core の base_behavior.py に実装された AltairBehavior クラスを継承した単一のPythonクラスとして記述します。
 
 ```python
 #!/usr/bin/env python3
@@ -18,27 +18,27 @@ import sys
 import rclpy
 import os
 
-# パスハック
+# パスを設定します
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from altair_core.base_behavior import AltairBehavior
 
 class MyCustomBehavior(AltairBehavior):
     def on_init(self):
-        """起動時の初期化処理（1回だけ実行）"""
-        # ここで get_module を使ってモジュールを取得
+        """起動時に一度だけ実行する初期化処理です。"""
+        # get_moduleを使用してモジュールを取得します
         self.mdd = self.get_module("drive_mdd")
         self.servo = self.get_module("arm_servo")
         self.valve = self.get_module("valve_controller")
 
     def loop(self):
-        """周期実行処理（デフォルト 20 Hz = 50msごとに実行）"""
-        # ここに制御ロジックを記述
+        """デフォルトで10ミリ秒ごとに周期実行する処理です。"""
+        # 制御ロジックを記述します
         pass
 
 def main(args=None):
     rclpy.init(args=args)
     behavior = MyCustomBehavior("my_behavior_node")
-    behavior.run(rate_hz=20.0)
+    behavior.run(rate_hz=100.0)
 
 if __name__ == '__main__':
     main()
@@ -46,62 +46,71 @@ if __name__ == '__main__':
 
 ---
 
-## 2. モジュール操作 API 仕様一覧
+## モジュール操作APIの仕様一覧
 
-`self.get_module("名前")` を呼び出すと、設定ファイルに基づいた各モジュール専用のクライアントオブジェクトが返されます。これらは以下のAPIを提供します。
+self.get_moduleを呼び出すと、設定ファイルに基づいた各モジュール専用のクライアントオブジェクトが返されます。これらのオブジェクトは以下のAPIを提供します。
 
-### A. MDDモータドライバ・クライアント (`MddClient`)
-4つのDCモータを一括制御・監視するオブジェクトです。
+### MDDモータドライバクライアント
 
-- **`set_targets(targets)`** (送信)
-  - 引数 `targets`: 4つのモータの目標値の配列 (float `[m1, m2, m3, m4]`)。
-  - **目標値の解釈 (制御モードによる)**:
-    - 速度モード: `rps` (回転毎秒)
-    - 角度モード: `degree` (度)
-    - 位置モード: `mm` (ミリメートル)
-- **`get_feedback()`** (受信)
-  - 返り値の型: `MddFeedback` オブジェクト。
-  - 提供される属性:
-    - **`.limit_switches`**: `bool[4]` 配列。各Limitスイッチの状態 (True=ON/押されている, False=OFF)。
-    - **`.angles`**: `float32[4]` 配列。各モータの現在角度 `[degree]`。
-    - **`.speeds`**: `float32[4]` 配列。各モータの現在回転速度 `[rps]`。
-    - **`.error_code`**: `uint8`。システムエラーコード (0=正常, 1=初期化タイムアウト, 2=CAN受信タイムアウト, 4=送信失敗)。
-    - **`.system_status`**: `uint8`。動作モード状態 (0=パラメータ設定中, 1=制御中)。
+4つのDCモータを一括で制御または監視するオブジェクトです。クラス名は MddClient です。
 
-### B. サーボモータ・クライアント (`ServoClient`)
-最大6つのPWMサーボの角度を一括指定するオブジェクトです。
+* set_targets(targets)
+  引数の targets には、4つのモータの目標値を配列で指定します。
+  目標値は制御モードによって以下のように解釈されます。
+  * 速度モードは秒間回転数
+  * 角度モードは度
+  * 位置モードはミリメートル
+* get_feedback()
+  MddFeedbackオブジェクトを返します。以下の属性を提供します。
+  * limit_switches
+    各リミットスイッチの状態を示す真偽値の配列です。スイッチが押されている場合は True になります。
+  * angles
+    各モータの現在角度を度数法で示す配列です。
+  * speeds
+    各モータの現在の回転速度を示す配列です。
+  * error_code
+    システムのエラーコードです。0は正常、1は初期化タイムアウト、2はCAN受信タイムアウト、4は送信失敗を示します。
+  * system_status
+    動作モードの状態です。0はパラメータ設定中、1は制御中を示します。
 
-- **`set_angles(angles)`** (送信)
-  - 引数 `angles`: 6ch分の目標角度の配列 (uint8 `[s1, s2, s3, s4, s5, s6]`)。
-  - 設定可能範囲: `0` 〜 `180` 度。
-  - (※ 180を超える値はマイコン側で180に自動でクリップされます)
+### サーボモータクライアント
 
-### C. 電磁弁クライアント (`SolenoidClient`)
-最大12チャネルの電磁弁(ソレノイド)をON/OFF制御するオブジェクトです。
+最大6つのPWMサーボの角度を一括指定するオブジェクトです。クラス名は ServoClient です。
 
-- **`set_valves(valves)`** (一括送信)
-  - 引数 `valves`: 12チャネルのON/OFF状態の配列 (bool `[v1, v2, ..., v12]`)。
-- **`set_valve(channel, state)`** (個別送信)
-  - 引数 `channel`: 設定するチャネル番号 (`1` 〜 `12`)。
-  - 引数 `state`: `True` (ON/開く) または `False` (OFF/閉じる)。
+* set_angles(angles)
+  引数の angles には、6チャンネル分の目標角度を配列で指定します。
+  設定できる範囲は0度から180度までです。180を超える値はマイコン側で180に自動で調整されます。
+
+### 電磁弁クライアント
+
+最大12チャンネルの電磁弁を一括または個別に制御するオブジェクトです。クラス名は SolenoidClient です。
+
+* set_valves(valves)
+  引数の valves には、12チャンネルの動作状態を真偽値の配列で指定します。
+* set_valve(channel, state)
+  特定のチャンネルを個別に制御します。
+  引数の channel には、1から12までのチャンネル番号を指定します。
+  引数の state には、開く場合は True を、閉じる場合は False を指定します。
 
 ---
 
-## 3. ノンブロッキング・ステートマシン記述の厳守
+## ノンブロッキングステートマシン記述の厳守
 
-ROS2は非同期通信をバックグラウンドで処理しています。そのため、動作プログラム内で `time.sleep(3.0)` のような **スレッドブロッキング（停止）関数を実行すると、トピックの送受信がすべて停止し、モータが暴走する原因** になります。
+ROS2は非同期通信をバックグラウンドで処理しています。そのため、動作プログラム内で time.sleep(3.0) のようなスレッドを一時停止させる関数を実行すると、通信の送受信がすべて停止してモータが暴走する原因になります。
 
-一定時間の遅延や待機をプログラムに組み込む場合は、必ず `time.time()` を用いた **「ノンブロッキングなステートマシン（状態遷移モデル）」** で記述してください。
+プログラムへ待機処理を組み込む場合は、time.time() を使用してノンブロッキングな状態遷移モデルで記述してください。
 
-### ❌ 悪い例（トピック送受信がフリーズする）
+### 悪い例
+
 ```python
 def loop(self):
     self.mdd.set_targets([1.0, 1.0, 1.0, 1.0])
-    time.sleep(3.0) # 絶対にNG！ループ全体がフリーズします
+    time.sleep(3.0) # ループ全体がフリーズするため使用しないでください
     self.mdd.set_targets([0.0, 0.0, 0.0, 0.0])
 ```
 
-### ⭕ 正しい例（通信ループを妨げないノンブロッキング記述）
+### 正しい例
+
 ```python
 def on_init(self):
     self.mdd = self.get_module("drive_mdd")
@@ -111,11 +120,11 @@ def on_init(self):
 def loop(self):
     if self.state == "START":
         self.mdd.set_targets([1.0, 1.0, 1.0, 1.0])
-        self.timer = time.time()  # 時刻を記録
+        self.timer = time.time()  # 現在の時刻を記録します
         self.state = "WAITING"
         
     elif self.state == "WAITING":
-        # 3秒経過したかをノンブロッキングで判定
+        # 3秒が経過したかを判定します
         if time.time() - self.timer >= 3.0:
             self.mdd.set_targets([0.0, 0.0, 0.0, 0.0])
             self.state = "FINISHED"
@@ -123,25 +132,23 @@ def loop(self):
 
 ---
 
-## 🤖 AI向けコピペ用指示プロンプトテンプレート
+## プロンプトテンプレート
 
-AIにプログラムを記述させる際は、本ファイルをコピーしてAIに送信した後、以下のテンプレートを貼り付けて指示を出してください。
+AIへプログラムの記述を指示する際は、このファイルの内容を送信した後に、以下のテンプレートを貼り付けてください。
 
 ```text
-【現在のシステム構成】
-現在、システムは以下のモジュール構成です：
-- MDDモータドライバ: 名前 "drive_mdd"
-- Servoサーボモジュール: 名前 "arm_servo"
-- Solenoid電磁弁モジュール: 名前 "valve_controller"
+現在のシステム構成は以下の通りです。
+* MDDモータドライバの名前は drive_mdd です。
+* サーボモジュールの名前は arm_servo です。
+* 電磁弁モジュールの名前は valve_controller です。
 
-【記述したいシナリオ】
-以下を実行する動作プログラムのコードを作成してください：
-1. 最初に drive_mdd のモータ1〜4をすべて 1.5 rps で回転させて前進させます。
-2. drive_mdd の Limitスイッチ1 (SW1) が押されたら、モータをすべて停止（0.0）します。
-3. 停止後、arm_servo の サーボ1を 120度、サーボ2を 45度にしてアームを下降させます。
-4. 下降完了と同時に valve_controller の 1ch と 2ch の電磁弁を ON にして吸引を開始します。
-5. 吸引開始から 2秒間待機（※ノンブロッキングで実装すること）します。
-6. 2秒後、arm_servo をホームポジション（すべて 90度）に上昇させ、吸引を維持したままプログラムを正常終了 (rclpy.shutdown) します。
+以下の動作を行うプログラムを作成してください。
+* 最初に drive_mdd のモータをすべて 1.5 rps で回転させて前進させます。
+* drive_mdd のリミットスイッチの1番が押されたら、すべてのモータを停止します。
+* 停止した後に、arm_servo のサーボの1番を120度、2番を45度にしてアームを下降させます。
+* 下降した直後に、valve_controller の1番と2番の電磁弁を開いて吸引を開始します。
+* 吸引を開始してから2秒間待機します。待機処理はノンブロッキングで実装してください。
+* 2秒が経過した後に、arm_servo のサーボをすべて90度にしてホームポジションへ上昇させます。吸引は維持したままプログラムを正常に終了してください。
 
-これまでに共有した『動作プログラム記述仕様書 (behavior_programming_guide.md)』の仕様を厳格に守り、バグのないPythonコードを出力してください。
+動作プログラム記述仕様書に従い、プログラムを作成してください。
 ```

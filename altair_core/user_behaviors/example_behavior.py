@@ -47,7 +47,7 @@ class PickAndPlaceBehavior(AltairBehavior):
 
     def loop(self):
         """
-        20 Hz (50ms周期) で動作するメインループ。
+        100 Hzで動作するメインループ。10ミリ秒周期です。
         ROS2の通信スレッドをブロッキング（time.sleep等）させないよう、ノンブロッキングなステートマシンで記述します。
         """
         try:
@@ -111,7 +111,7 @@ class PickAndPlaceBehavior(AltairBehavior):
 def main(args=None):
     rclpy.init(args=args)
     behavior = PickAndPlaceBehavior("example_behavior_node")
-    behavior.run(rate_hz=20.0)
+    behavior.run(rate_hz=100.0)
 
 if __name__ == '__main__':
     main()

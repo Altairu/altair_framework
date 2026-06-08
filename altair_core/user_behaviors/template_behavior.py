@@ -32,7 +32,7 @@ class TemplateBehavior(AltairBehavior):
     def loop(self):
         """
         [周期実行フェーズ]
-        一定周期 (デフォルト 20 Hz = 50ms 周期) で繰り返し呼び出されます。
+        一定周期で繰り返し呼び出されます。デフォルトの動作周波数は100 Hzで、10ミリ秒周期です。
         センサー（Limit SW、エンコーダ）のフィードバックを参照し、アクチュエータへ目標値を指示するロジックをここに記述します。
         """
         try:
@@ -61,8 +61,8 @@ def main(args=None):
     # 動作プログラムインスタンスを作成
     behavior = TemplateBehavior("my_custom_behavior")
     
-    # 周期ループを開始 (20 Hz = 50ms 周期)
-    behavior.run(rate_hz=20.0)
+    # 周期ループを開始します。周波数は100 Hzで、10ミリ秒周期です。
+    behavior.run(rate_hz=100.0)
     
     # 終了処理は自動で行われます
 
