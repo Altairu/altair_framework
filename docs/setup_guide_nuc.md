@@ -129,3 +129,37 @@ NUC側のブリッジ自動起動において、`slcand` の実行や `ip link s
    sudo systemctl status altair_can.service
    ```
    「● Active: active (running)」と表示されれば、ロボットの主電源を入れるだけで自動認識からブリッジ起動までが自動で行われます！
+
+---
+
+## 4. Ethernet-CAN 変換モジュールの設定と使用方法
+
+新しく開発されたイーサネット-CAN変換回路（ethernet-can）を使用する場合、NUCとモジュールをイーサネットケーブルで接続し、TCP経由でCAN通信を行います。
+
+### ネットワーク設定
+
+* 変換モジュールのデフォルトIPアドレス: `192.168.2.123`
+* 接続ポート番号: `5000`
+
+NUC側の有線LANインターフェースのIPアドレスを `192.168.2.xxx`（例: `192.168.2.100` / サブネットマスク `255.255.255.0`）などの同一セグメントの固定IPに設定してください。
+
+### 起動パラメータ
+
+ROS2ノード起動時に、接続モードを `ethernet` に設定し、IPアドレスおよびポート番号を指定します。
+
+```bash
+ros2 run altair_can_bridge can_bridge_node --ros-args -p connection_mode:=ethernet -p ethernet_ip:=192.168.2.123 -p ethernet_port:=5000
+```
+
+* `connection_mode`: `ethernet` を指定（デフォルトは `usb`）
+* `ethernet_ip`: 変換回路のIPアドレスを指定
+* `ethernet_port`: ポート番号を指定
+* `ethernet_tx_size`: 送信サイズを指定（通常は `10`。CAN1とCAN2の両方に同期して送信する場合は `20`）
+
+### 動的な接続先の切り替え
+
+ノード稼働中に、`ConnectCan` サービスを呼び出すことで、動的にEthernetモードへの切り替えや接続先の変更を行うことも可能です。
+
+```bash
+ros2 service call /altair/can/connect altair_interfaces/srv/ConnectCan "{port: '192.168.2.123:5000', auto_connect: false}"
+```

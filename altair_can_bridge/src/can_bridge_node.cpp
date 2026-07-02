@@ -21,6 +21,8 @@
 #include <fcntl.h>
 #include <linux/can.h>
 #include <linux/can/raw.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 // ROS2 ヘッダー
 #include "rclcpp/rclcpp.hpp"
@@ -39,6 +41,16 @@ public:
   CanBridgeNode()
   : Node("can_bridge_node"), is_connected_(false), can_socket_(-1)
   {
+    // パラメータの宣言と取得
+    this->declare_parameter<std::string>("connection_mode", "usb");
+    this->declare_parameter<std::string>("ethernet_ip", "192.168.2.123");
+    this->declare_parameter<int>("ethernet_port", 5000);
+    this->declare_parameter<int>("ethernet_tx_size", 10);
+
+    this->get_parameter("connection_mode", connection_mode_);
+    this->get_parameter("ethernet_ip", ethernet_ip_);
+    this->get_parameter("ethernet_port", ethernet_port_);
+    this->get_parameter("ethernet_tx_size", ethernet_tx_size_);
     // ROS2パブリッシャ・サブスクライバの初期化
     can_rx_pub_ = this->create_publisher<can_msgs::msg::Frame>("/altair/can/rx", 100);
     can_status_pub_ = this->create_publisher<altair_interfaces::msg::CanStatus>("/altair/can/status", 10);
@@ -94,31 +106,54 @@ private:
       return;
     }
 
-    struct can_frame frame;
-    memset(&frame, 0, sizeof(frame));
-
-    frame.can_id = msg->id;
-    if (msg->is_rtr) {
-      frame.can_id |= CAN_RTR_FLAG;
-    }
-    if (msg->is_extended) {
-      frame.can_id |= CAN_EFF_FLAG;
-    }
-    frame.can_dlc = msg->dlc;
-    memcpy(frame.data, msg->data.data(), msg->dlc);
-
-    // SocketCANに書き込み
-    int bytes_sent = write(can_socket_, &frame, sizeof(struct can_frame));
-    if (bytes_sent < 0) {
-      if (errno == ENOBUFS || errno == EAGAIN || errno == EWOULDBLOCK) {
-        // 送信バッファ一時満杯などの軽微なエラー時は切断せずパケットをスキップ
-        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, 
-          "CAN送信バッファ満杯 (ENOBUFS/EAGAIN) を検知しました。パケットをスキップします。");
-        return;
+    if (connection_mode_ == "ethernet") {
+      this->get_parameter("ethernet_tx_size", ethernet_tx_size_);
+      
+      std::vector<uint8_t> buf(ethernet_tx_size_, 0);
+      if (ethernet_tx_size_ >= 10) {
+        buf[0] = (msg->id >> 8) & 0xFF;
+        buf[1] = msg->id & 0xFF;
+        size_t copy_len = std::min(static_cast<size_t>(msg->dlc), static_cast<size_t>(8));
+        std::copy(msg->data.begin(), msg->data.begin() + copy_len, buf.begin() + 2);
       }
-      RCLCPP_ERROR(this->get_logger(), "CANフレームの送信に失敗しました: %s", strerror(errno));
-      // 致命的な通信エラーのみ切断状態に移行
-      handle_disconnect("CANフレーム送信失敗による通信切断");
+      
+      int bytes_sent = write(can_socket_, buf.data(), buf.size());
+      if (bytes_sent < 0) {
+        if (errno == ENOBUFS || errno == EAGAIN || errno == EWOULDBLOCK) {
+          RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, 
+            "TCP送信バッファ満杯 (ENOBUFS/EAGAIN) を検知しました。パケットをスキップします。");
+          return;
+        }
+        RCLCPP_ERROR(this->get_logger(), "TCPでのCANフレーム送信に失敗しました: %s", strerror(errno));
+        handle_disconnect("TCPでのCANフレーム送信失敗");
+      }
+    } else {
+      struct can_frame frame;
+      memset(&frame, 0, sizeof(frame));
+
+      frame.can_id = msg->id;
+      if (msg->is_rtr) {
+        frame.can_id |= CAN_RTR_FLAG;
+      }
+      if (msg->is_extended) {
+        frame.can_id |= CAN_EFF_FLAG;
+      }
+      frame.can_dlc = msg->dlc;
+      memcpy(frame.data, msg->data.data(), msg->dlc);
+
+      // SocketCANに書き込み
+      int bytes_sent = write(can_socket_, &frame, sizeof(struct can_frame));
+      if (bytes_sent < 0) {
+        if (errno == ENOBUFS || errno == EAGAIN || errno == EWOULDBLOCK) {
+          // 送信バッファ一時満杯などの軽微なエラー時は切断せずパケットをスキップ
+          RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, 
+            "CAN送信バッファ満杯 (ENOBUFS/EAGAIN) を検知しました。パケットをスキップします。");
+          return;
+        }
+        RCLCPP_ERROR(this->get_logger(), "CANフレームの送信に失敗しました: %s", strerror(errno));
+        // 致命的な通信エラーのみ切断状態に移行
+        handle_disconnect("CANフレーム送信失敗による通信切断");
+      }
     }
   }
 
@@ -126,6 +161,7 @@ private:
   void rx_thread_loop()
   {
     struct can_frame frame;
+    std::vector<uint8_t> tcp_rx_buf;
 
     while (rx_thread_running_ && rclcpp::ok()) {
       {
@@ -151,8 +187,8 @@ private:
       int ret = select(can_socket_ + 1, &rdfs, NULL, NULL, &tv);
       if (ret < 0) {
         if (errno == EINTR) continue;
-        RCLCPP_ERROR(this->get_logger(), "SocketCANの選択中にエラーが発生しました: %s", strerror(errno));
-        handle_disconnect("SocketCAN選択エラー");
+        RCLCPP_ERROR(this->get_logger(), "ソケットの選択中にエラーが発生しました: %s", strerror(errno));
+        handle_disconnect("ソケット選択エラー");
         continue;
       }
       else if (ret == 0) {
@@ -160,41 +196,153 @@ private:
         continue;
       }
 
-      // CANデータ読み取り
-      int nbytes = read(can_socket_, &frame, sizeof(struct can_frame));
-      if (nbytes < 0) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK) continue;
-        RCLCPP_ERROR(this->get_logger(), "CANフレームの読み取りに失敗しました: %s", strerror(errno));
-        handle_disconnect("CANフレーム読み取りエラー");
-        continue;
+      // 接続モードに応じて受信処理を分岐
+      if (connection_mode_ == "ethernet") {
+        uint8_t temp_buf[256];
+        int nbytes = read(can_socket_, temp_buf, sizeof(temp_buf));
+        if (nbytes < 0) {
+          if (errno == EAGAIN || errno == EWOULDBLOCK) continue;
+          RCLCPP_ERROR(this->get_logger(), "TCPデータの読み取りに失敗しました: %s", strerror(errno));
+          handle_disconnect("TCP読み取りエラー");
+          continue;
+        }
+        else if (nbytes == 0) {
+          RCLCPP_WARN(this->get_logger(), "TCP接続がリモートホストによって切断されました。");
+          handle_disconnect("TCPリモート切断");
+          continue;
+        }
+
+        // 受信バッファに追加
+        tcp_rx_buf.insert(tcp_rx_buf.end(), temp_buf, temp_buf + nbytes);
+
+        // 10バイト（AnalyzerモードのCAN1受信パケット）ごとに処理
+        const size_t packet_size = 10;
+        while (tcp_rx_buf.size() >= packet_size) {
+          auto rx_msg = std::make_shared<can_msgs::msg::Frame>();
+          rx_msg->header.stamp = this->now();
+          rx_msg->header.frame_id = "can0";
+          
+          rx_msg->is_extended = false; // ethernet-canはStandard IDのみ対応
+          rx_msg->id = (tcp_rx_buf[0] << 8) | tcp_rx_buf[1];
+          rx_msg->is_rtr = false;
+          rx_msg->is_error = false;
+          rx_msg->dlc = 8;
+          
+          std::copy(tcp_rx_buf.begin() + 2, tcp_rx_buf.begin() + 10, rx_msg->data.begin());
+
+          // パブリッシュ
+          can_rx_pub_->publish(*rx_msg);
+
+          // 処理した分を削除
+          tcp_rx_buf.erase(tcp_rx_buf.begin(), tcp_rx_buf.begin() + packet_size);
+        }
+      } else {
+        // CANデータ読み取り
+        int nbytes = read(can_socket_, &frame, sizeof(struct can_frame));
+        if (nbytes < 0) {
+          if (errno == EAGAIN || errno == EWOULDBLOCK) continue;
+          RCLCPP_ERROR(this->get_logger(), "CANフレームの読み取りに失敗しました: %s", strerror(errno));
+          handle_disconnect("CANフレーム読み取りエラー");
+          continue;
+        }
+
+        if (nbytes < (int)sizeof(struct can_frame)) {
+          RCLCPP_ERROR(this->get_logger(), "不正なサイズのCANフレームを受信しました。");
+          continue;
+        }
+
+        // ROS2メッセージへ詰め替え
+        auto rx_msg = std::make_shared<can_msgs::msg::Frame>();
+        rx_msg->header.stamp = this->now();
+        rx_msg->header.frame_id = "can0";
+        
+        rx_msg->is_extended = (frame.can_id & CAN_EFF_FLAG) != 0;
+        rx_msg->id = rx_msg->is_extended ? (frame.can_id & CAN_EFF_MASK) : (frame.can_id & CAN_SFF_MASK);
+        rx_msg->is_rtr = (frame.can_id & CAN_RTR_FLAG) != 0;
+        rx_msg->is_error = (frame.can_id & CAN_ERR_FLAG) != 0;
+        rx_msg->dlc = frame.can_dlc;
+        
+        std::copy(frame.data, frame.data + frame.can_dlc, rx_msg->data.begin());
+
+        // パブリッシュ
+        can_rx_pub_->publish(*rx_msg);
       }
-
-      if (nbytes < (int)sizeof(struct can_frame)) {
-        RCLCPP_ERROR(this->get_logger(), "不正なサイズのCANフレームを受信しました。");
-        continue;
-      }
-
-      // ROS2メッセージへ詰め替え
-      auto rx_msg = std::make_shared<can_msgs::msg::Frame>();
-      rx_msg->header.stamp = this->now();
-      rx_msg->header.frame_id = "can0";
-      
-      rx_msg->is_extended = (frame.can_id & CAN_EFF_FLAG) != 0;
-      rx_msg->id = rx_msg->is_extended ? (frame.can_id & CAN_EFF_MASK) : (frame.can_id & CAN_SFF_MASK);
-      rx_msg->is_rtr = (frame.can_id & CAN_RTR_FLAG) != 0;
-      rx_msg->is_error = (frame.can_id & CAN_ERR_FLAG) != 0;
-      rx_msg->dlc = frame.can_dlc;
-      
-      std::copy(frame.data, frame.data + frame.can_dlc, rx_msg->data.begin());
-
-      // パブリッシュ
-      can_rx_pub_->publish(*rx_msg);
     }
+  }
+
+  // --- TCP 接続処理 ---
+  bool connect_ethernet(const std::string& ip, int port)
+  {
+    std::lock_guard<std::mutex> lock(socket_mutex_);
+    close_can_socket_nolock();
+    is_connected_ = false;
+
+    can_socket_ = socket(AF_INET, SOCK_STREAM, 0);
+    if (can_socket_ < 0) {
+      RCLCPP_ERROR(this->get_logger(), "TCPソケットの作成に失敗しました: %s", strerror(errno));
+      last_error_ = "TCPソケット作成失敗: " + std::string(strerror(errno));
+      return false;
+    }
+
+    struct sockaddr_in serv_addr;
+    memset(&serv_addr, 0, sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_port = htons(port);
+
+    if (inet_pton(AF_INET, ip.c_str(), &serv_addr.sin_addr) <= 0) {
+      RCLCPP_ERROR(this->get_logger(), "無効なIPアドレスです: %s", ip.c_str());
+      last_error_ = "無効なIPアドレス: " + ip;
+      close(can_socket_);
+      can_socket_ = -1;
+      return false;
+    }
+
+    if (connect(can_socket_, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+      RCLCPP_ERROR(this->get_logger(), "TCPサーバーへの接続に失敗しました: %s", strerror(errno));
+      last_error_ = "TCP接続失敗: " + std::string(strerror(errno));
+      close(can_socket_);
+      can_socket_ = -1;
+      return false;
+    }
+
+    // ノンブロッキングモードに設定
+    int opts = fcntl(can_socket_, F_GETFL);
+    if (opts >= 0) {
+      fcntl(can_socket_, F_SETFL, opts | O_NONBLOCK);
+    }
+
+    is_connected_ = true;
+    active_port_ = ip + ":" + std::to_string(port);
+    last_error_ = "";
+    RCLCPP_INFO(this->get_logger(), "ethernet-can (%s:%d) へのTCP接続が完了しました！", ip.c_str(), port);
+    return true;
   }
 
   // --- 3. 接続処理コア ---
   bool trigger_connect(const std::string& req_port, bool auto_connect)
   {
+    this->get_parameter("connection_mode", connection_mode_);
+    this->get_parameter("ethernet_ip", ethernet_ip_);
+    this->get_parameter("ethernet_port", ethernet_port_);
+
+    if (connection_mode_ == "ethernet") {
+      std::string ip = ethernet_ip_;
+      int port = ethernet_port_;
+
+      if (!req_port.empty() && req_port != "auto" && req_port != "None" && req_port.find("tty") == std::string::npos) {
+        size_t colon_pos = req_port.find(":");
+        if (colon_pos != std::string::npos) {
+          ip = req_port.substr(0, colon_pos);
+          try {
+            port = std::stoi(req_port.substr(colon_pos + 1));
+          } catch (...) {}
+        } else {
+          ip = req_port;
+        }
+      }
+      return connect_ethernet(ip, port);
+    }
+
     std::string port = req_port;
 
     if (auto_connect) {
@@ -350,9 +498,40 @@ private:
   {
     RCLCPP_INFO(this->get_logger(), "CAN接続サービス要求を受信しました。");
     
+    // 要求されたポートから接続モードを自動判定してパラメータを更新
+    std::string req_port = request->port;
+    if (req_port == "ethernet" || req_port.find(".") != std::string::npos || req_port.find(":") != std::string::npos) {
+      this->set_parameter(rclcpp::Parameter("connection_mode", "ethernet"));
+      if (req_port.find(".") != std::string::npos) {
+        size_t colon_pos = req_port.find(":");
+        if (colon_pos != std::string::npos) {
+          std::string ip = req_port.substr(0, colon_pos);
+          try {
+            int port = std::stoi(req_port.substr(colon_pos + 1));
+            this->set_parameter(rclcpp::Parameter("ethernet_port", port));
+          } catch (...) {}
+          this->set_parameter(rclcpp::Parameter("ethernet_ip", ip));
+        } else {
+          this->set_parameter(rclcpp::Parameter("ethernet_ip", req_port));
+        }
+      }
+      this->get_parameter("connection_mode", connection_mode_);
+      this->get_parameter("ethernet_ip", ethernet_ip_);
+      this->get_parameter("ethernet_port", ethernet_port_);
+    } else if (!request->auto_connect && !req_port.empty()) {
+      this->set_parameter(rclcpp::Parameter("connection_mode", "usb"));
+      this->get_parameter("connection_mode", connection_mode_);
+    }
+
     if (is_connected_) {
       // 既に接続されている場合で、ポート指定が同じまたはauto_connectの場合は無視する
-      if (request->auto_connect || request->port == active_port_) {
+      std::string target_port = req_port;
+      if (connection_mode_ == "ethernet" && target_port.find(".") != std::string::npos) {
+        if (target_port.find(":") == std::string::npos) {
+          target_port = target_port + ":" + std::to_string(ethernet_port_);
+        }
+      }
+      if (request->auto_connect || target_port == active_port_) {
         RCLCPP_INFO(this->get_logger(), "既に接続されています。再接続をスキップします。");
         response->success = true;
         response->message = "既に接続されています。";
@@ -365,7 +544,11 @@ private:
     
     response->success = success;
     if (success) {
-      response->message = "接続成功: can0 が正常に起動しました。";
+      if (connection_mode_ == "ethernet") {
+        response->message = "接続成功: ethernet-can (" + active_port_ + ") に接続しました。";
+      } else {
+        response->message = "接続成功: can0 が正常に起動しました。";
+      }
     } else {
       response->message = "接続失敗: " + last_error_;
     }
@@ -445,23 +628,34 @@ private:
   {
     RCLCPP_INFO(this->get_logger(), "自動接続ループを開始します...");
     while (auto_connect_running_ && rclcpp::ok()) {
+      // 最新のパラメータを取得
+      this->get_parameter("connection_mode", connection_mode_);
+      this->get_parameter("ethernet_ip", ethernet_ip_);
+      this->get_parameter("ethernet_port", ethernet_port_);
+
       if (is_connected_) {
         std::this_thread::sleep_for(1000ms);
         continue;
       }
 
-      // 未接続時はまずslcandをキルしてポートを解放
-      std::system("echo 'altair' | sudo -S killall slcand 2>/dev/null");
-      std::this_thread::sleep_for(200ms);
-
-      std::string port = detect_can_port();
-      if (!port.empty()) {
-        RCLCPP_INFO(this->get_logger(), "自動接続: %s に接続を試みます...", port.c_str());
-        trigger_connect(port, false);
+      if (connection_mode_ == "ethernet") {
+        RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 5000, 
+          "自動接続: ethernet-can (%s:%d) へのTCP接続を試みます...", ethernet_ip_.c_str(), ethernet_port_);
+        trigger_connect("", false);
       } else {
-        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000, "CANデバイスが見つかりません。再スキャンします...");
+        // 未接続時はまずslcandをキルしてポートを解放
+        std::system("echo 'altair' | sudo -S killall slcand 2>/dev/null");
+        std::this_thread::sleep_for(200ms);
+
+        std::string port = detect_can_port();
+        if (!port.empty()) {
+          RCLCPP_INFO(this->get_logger(), "自動接続: %s に接続を試みます...", port.c_str());
+          trigger_connect(port, false);
+        } else {
+          RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000, "CANデバイスが見つかりません。再スキャンします...");
+        }
       }
-      std::this_thread::sleep_for(1000ms);
+      std::this_thread::sleep_for(2000ms);
     }
   }
 
@@ -483,6 +677,12 @@ private:
   std::string last_error_;
   int can_socket_;
   std::mutex socket_mutex_;
+  
+  // Ethernet/TCP 接続設定
+  std::string connection_mode_;
+  std::string ethernet_ip_;
+  int ethernet_port_;
+  int ethernet_tx_size_;
 
   std::thread rx_thread_;
   std::atomic<bool> rx_thread_running_;

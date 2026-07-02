@@ -92,11 +92,20 @@ chmod +x altair_can_bridge/scripts/setup_slcan.sh
 ## 起動と運用コマンド
 
 ### NUCロボット側
-物理接続されているPCで実行します。USB-to-CAN / CANable 2の自動探索 / SocketCAN `can0` インターフェースの1 Mbpsでの自動起動 / ブリッジノードの立ち上げを一括で行います。
-```bash
-./run_nuc.sh
-```
-物理ポート名の固定化や、パスワード不要でのSocketCAN自動起動、ロボット電源起動時の完全自動起動の設定方法は、[docs/setup_guide_nuc.md](docs/setup_guide_nuc.md) を参照してください。
+物理接続されているPCで実行します。
+
+* **USB-to-CAN 接続の場合**
+  USB-to-CAN / CANable 2の自動探索 / SocketCAN `can0` インターフェースの1 Mbpsでの自動起動 / ブリッジノードの立ち上げを一括で行います。
+  ```bash
+  ./run_nuc.sh
+  ```
+  物理ポート名の固定化や、パスワード不要でのSocketCAN自動起動、ロボット電源起動時の完全自動起動の設定方法は、[docs/setup_guide_nuc.md](docs/setup_guide_nuc.md) を参照してください。
+
+* **Ethernet-CAN 接続の場合**
+  TCP経由でイーサネット-CAN変換モジュールと通信します。以下のようにROS2パラメータを指定して起動します。
+  ```bash
+  ros2 run altair_can_bridge can_bridge_node --ros-args -p connection_mode:=ethernet -p ethernet_ip:=192.168.2.123 -p ethernet_port:=5000
+  ```
 
 ### 操縦PC側
 WiFi経由で操作するPCで実行します。モジュールマネージャー / 動作プログラムランナー / WebUIサーバーノードを一括で起動します。Ctrl+Cを押すとバックグラウンドノードも同時に終了します。
@@ -228,11 +237,20 @@ This command removes `build/`, `install/`, and `log/` directories, and then rebu
 ## Execution and Operations
 
 ### NUC Robot Side
-Run on the PC physically connected to the CAN bus. It handles auto-detection of USB-to-CAN adapter, brings up SocketCAN `can0` interface at 1 Mbps, and starts the bridge node.
-```bash
-./run_nuc.sh
-```
-Refer to [docs/setup_guide_nuc.md](docs/setup_guide_nuc.md) for persistent port naming, passwordless SocketCAN setup, and auto-start on boot.
+Run on the PC connected to the CAN bus or Ethernet network.
+
+* **USB-to-CAN Connection**
+  It handles auto-detection of USB-to-CAN adapter, brings up SocketCAN `can0` interface at 1 Mbps, and starts the bridge node.
+  ```bash
+  ./run_nuc.sh
+  ```
+  Refer to [docs/setup_guide_nuc.md](docs/setup_guide_nuc.md) for persistent port naming, passwordless SocketCAN setup, and auto-start on boot.
+
+* **Ethernet-CAN Connection**
+  It communicates with the Ethernet-CAN converter module via TCP. Run the node with ROS2 parameters:
+  ```bash
+  ros2 run altair_can_bridge can_bridge_node --ros-args -p connection_mode:=ethernet -p ethernet_ip:=192.168.2.123 -p ethernet_port:=5000
+  ```
 
 ### Operator PC Side
 Run on the PC operating the robot over WiFi. It launches Module Manager, Behavior Runner, and WebUI Server. Press Ctrl+C to terminate all background nodes safely.
