@@ -39,7 +39,7 @@ class CanBridgeNode : public rclcpp::Node
 {
 public:
   CanBridgeNode()
-  : Node("can_bridge_node"), is_connected_(false), can_socket_(-1)
+  : Node("can_bridge_node"), is_connected_(false), can_socket_(-1), multinode_tx_buffer_(100, 0)
   {
     // パラメータの宣言と取得
     this->declare_parameter<std::string>("connection_mode", "usb");
@@ -109,23 +109,88 @@ private:
     if (connection_mode_ == "ethernet") {
       this->get_parameter("ethernet_tx_size", ethernet_tx_size_);
       
-      std::vector<uint8_t> buf(ethernet_tx_size_, 0);
-      if (ethernet_tx_size_ >= 10) {
+      if (ethernet_tx_size_ == 100) {
+        // MultiNode モード (100バイト)
+        bool is_can2 = (msg->header.frame_id == "can1" || msg->header.frame_id == "can2");
+        int base_offset = 0;
+        
+        // ID に応じてスロット（基本オフセット）を判定
+        uint32_t raw_id = msg->id;
+        if (raw_id >= 0x100 && raw_id <= 0x1FF) {
+          base_offset = 0;
+        } else if (raw_id >= 0x200 && raw_id <= 0x3FF) {
+          base_offset = 10;
+        } else if (raw_id >= 0x400 && raw_id <= 0x4FF) {
+          base_offset = 20;
+        } else if (raw_id >= 0x500 && raw_id <= 0x5FF) {
+          base_offset = 30;
+        } else if (raw_id >= 0x600 && raw_id <= 0x6FF) {
+          base_offset = 40;
+        } else {
+          base_offset = 0;
+        }
+        
+        int offset = base_offset + (is_can2 ? 50 : 0);
+        
+        // 送信キャッシュバッファを更新
+        multinode_tx_buffer_[offset + 0] = (raw_id >> 8) & 0xFF;
+        multinode_tx_buffer_[offset + 1] = raw_id & 0xFF;
+        size_t copy_len = std::min(static_cast<size_t>(msg->dlc), static_cast<size_t>(8));
+        std::copy(msg->data.begin(), msg->data.begin() + copy_len, multinode_tx_buffer_.begin() + offset + 2);
+        // 残りデータ領域を0埋め (DLCが8未満の時のため)
+        std::fill(multinode_tx_buffer_.begin() + offset + 2 + copy_len, multinode_tx_buffer_.begin() + offset + 10, 0);
+
+        int bytes_sent = write(can_socket_, multinode_tx_buffer_.data(), 100);
+        if (bytes_sent < 0) {
+          if (errno == ENOBUFS || errno == EAGAIN || errno == EWOULDBLOCK) {
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, 
+              "TCP送信バッファ満杯 (ENOBUFS/EAGAIN) を検知しました。パケットをスキップします。");
+            return;
+          }
+          RCLCPP_ERROR(this->get_logger(), "TCPでのCANフレーム送信(100B)に失敗しました: %s", strerror(errno));
+          handle_disconnect("TCPでのCANフレーム送信失敗(100B)");
+        }
+      } 
+      else if (ethernet_tx_size_ == 20) {
+        // Analyzer モード (20バイト)
+        std::vector<uint8_t> buf(20, 0);
+        bool is_can2 = (msg->header.frame_id == "can1" || msg->header.frame_id == "can2");
+        int offset = is_can2 ? 10 : 0;
+        
+        buf[offset + 0] = (msg->id >> 8) & 0xFF;
+        buf[offset + 1] = msg->id & 0xFF;
+        size_t copy_len = std::min(static_cast<size_t>(msg->dlc), static_cast<size_t>(8));
+        std::copy(msg->data.begin(), msg->data.begin() + copy_len, buf.begin() + offset + 2);
+        
+        int bytes_sent = write(can_socket_, buf.data(), 20);
+        if (bytes_sent < 0) {
+          if (errno == ENOBUFS || errno == EAGAIN || errno == EWOULDBLOCK) {
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, 
+              "TCP送信バッファ満杯 (ENOBUFS/EAGAIN) を検知しました。パケットをスキップします。");
+            return;
+          }
+          RCLCPP_ERROR(this->get_logger(), "TCPでのCANフレーム送信(20B)に失敗しました: %s", strerror(errno));
+          handle_disconnect("TCPでのCANフレーム送信失敗(20B)");
+        }
+      }
+      else {
+        // 10バイトモード
+        std::vector<uint8_t> buf(10, 0);
         buf[0] = (msg->id >> 8) & 0xFF;
         buf[1] = msg->id & 0xFF;
         size_t copy_len = std::min(static_cast<size_t>(msg->dlc), static_cast<size_t>(8));
         std::copy(msg->data.begin(), msg->data.begin() + copy_len, buf.begin() + 2);
-      }
-      
-      int bytes_sent = write(can_socket_, buf.data(), buf.size());
-      if (bytes_sent < 0) {
-        if (errno == ENOBUFS || errno == EAGAIN || errno == EWOULDBLOCK) {
-          RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, 
-            "TCP送信バッファ満杯 (ENOBUFS/EAGAIN) を検知しました。パケットをスキップします。");
-          return;
+        
+        int bytes_sent = write(can_socket_, buf.data(), buf.size());
+        if (bytes_sent < 0) {
+          if (errno == ENOBUFS || errno == EAGAIN || errno == EWOULDBLOCK) {
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, 
+              "TCP送信バッファ満杯 (ENOBUFS/EAGAIN) を検知しました。パケットをスキップします。");
+            return;
+          }
+          RCLCPP_ERROR(this->get_logger(), "TCPでのCANフレーム送信に失敗しました: %s", strerror(errno));
+          handle_disconnect("TCPでのCANフレーム送信失敗");
         }
-        RCLCPP_ERROR(this->get_logger(), "TCPでのCANフレーム送信に失敗しました: %s", strerror(errno));
-        handle_disconnect("TCPでのCANフレーム送信失敗");
       }
     } else {
       struct can_frame frame;
@@ -215,25 +280,81 @@ private:
         // 受信バッファに追加
         tcp_rx_buf.insert(tcp_rx_buf.end(), temp_buf, temp_buf + nbytes);
 
-        // 10バイト（AnalyzerモードのCAN1受信パケット）ごとに処理
-        const size_t packet_size = 10;
+        this->get_parameter("ethernet_tx_size", ethernet_tx_size_);
+        size_t packet_size = ethernet_tx_size_;
+        if (packet_size < 10) packet_size = 10;
+
         while (tcp_rx_buf.size() >= packet_size) {
-          auto rx_msg = std::make_shared<can_msgs::msg::Frame>();
-          rx_msg->header.stamp = this->now();
-          rx_msg->header.frame_id = "can0";
-          
-          rx_msg->is_extended = false; // ethernet-canはStandard IDのみ対応
-          rx_msg->id = (tcp_rx_buf[0] << 8) | tcp_rx_buf[1];
-          rx_msg->is_rtr = false;
-          rx_msg->is_error = false;
-          rx_msg->dlc = 8;
-          
-          std::copy(tcp_rx_buf.begin() + 2, tcp_rx_buf.begin() + 10, rx_msg->data.begin());
+          if (packet_size == 100) {
+            // MultiNode モード (100バイト)
+            for (int slot = 0; slot < 10; ++slot) {
+              int offset = slot * 10;
+              uint32_t can_id = (tcp_rx_buf[offset + 0] << 8) | tcp_rx_buf[offset + 1];
+              if (can_id != 0) {
+                auto rx_msg = std::make_shared<can_msgs::msg::Frame>();
+                rx_msg->header.stamp = this->now();
+                rx_msg->header.frame_id = (slot < 5) ? "can0" : "can1";
+                
+                rx_msg->is_extended = false;
+                rx_msg->id = can_id;
+                rx_msg->is_rtr = false;
+                rx_msg->is_error = false;
+                rx_msg->dlc = 8;
+                
+                std::copy(tcp_rx_buf.begin() + offset + 2, tcp_rx_buf.begin() + offset + 10, rx_msg->data.begin());
+                can_rx_pub_->publish(*rx_msg);
+              }
+            }
+          }
+          else if (packet_size == 20) {
+            // Analyzer モード (20バイト)
+            // CAN1 (0 - 9B)
+            uint32_t can1_id = (tcp_rx_buf[0] << 8) | tcp_rx_buf[1];
+            if (can1_id != 0) {
+              auto rx_msg = std::make_shared<can_msgs::msg::Frame>();
+              rx_msg->header.stamp = this->now();
+              rx_msg->header.frame_id = "can0";
+              rx_msg->is_extended = false;
+              rx_msg->id = can1_id;
+              rx_msg->is_rtr = false;
+              rx_msg->is_error = false;
+              rx_msg->dlc = 8;
+              std::copy(tcp_rx_buf.begin() + 2, tcp_rx_buf.begin() + 10, rx_msg->data.begin());
+              can_rx_pub_->publish(*rx_msg);
+            }
+            // CAN2 (10 - 19B)
+            uint32_t can2_id = (tcp_rx_buf[10] << 8) | tcp_rx_buf[11];
+            if (can2_id != 0) {
+              auto rx_msg = std::make_shared<can_msgs::msg::Frame>();
+              rx_msg->header.stamp = this->now();
+              rx_msg->header.frame_id = "can1";
+              rx_msg->is_extended = false;
+              rx_msg->id = can2_id;
+              rx_msg->is_rtr = false;
+              rx_msg->is_error = false;
+              rx_msg->dlc = 8;
+              std::copy(tcp_rx_buf.begin() + 12, tcp_rx_buf.begin() + 20, rx_msg->data.begin());
+              can_rx_pub_->publish(*rx_msg);
+            }
+          }
+          else {
+            // 10バイトモード
+            uint32_t can_id = (tcp_rx_buf[0] << 8) | tcp_rx_buf[1];
+            if (can_id != 0) {
+              auto rx_msg = std::make_shared<can_msgs::msg::Frame>();
+              rx_msg->header.stamp = this->now();
+              rx_msg->header.frame_id = "can0";
+              rx_msg->is_extended = false;
+              rx_msg->id = can_id;
+              rx_msg->is_rtr = false;
+              rx_msg->is_error = false;
+              rx_msg->dlc = 8;
+              std::copy(tcp_rx_buf.begin() + 2, tcp_rx_buf.begin() + 10, rx_msg->data.begin());
+              can_rx_pub_->publish(*rx_msg);
+            }
+          }
 
-          // パブリッシュ
-          can_rx_pub_->publish(*rx_msg);
-
-          // 処理した分を削除
+          // 処理分をバッファから削除
           tcp_rx_buf.erase(tcp_rx_buf.begin(), tcp_rx_buf.begin() + packet_size);
         }
       } else {
@@ -683,6 +804,7 @@ private:
   std::string ethernet_ip_;
   int ethernet_port_;
   int ethernet_tx_size_;
+  std::vector<uint8_t> multinode_tx_buffer_;
 
   std::thread rx_thread_;
   std::atomic<bool> rx_thread_running_;

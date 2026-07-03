@@ -33,6 +33,43 @@ fi
 source install/setup.bash
 
 export ROS_DOMAIN_ID=0
-# 2. CANブリッジノードの実行 (内部で setup_slcan.sh が自動的に呼ばれてポートをマッピングします)
-echo "SocketCANブリッジノードを起動します..."
-ros2 run altair_can_bridge can_bridge_node
+
+# 2. 接続モードの解析と起動
+CONNECTION_MODE="usb"
+ETHERNET_IP="192.168.2.123"
+ETHERNET_PORT=5000
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        ethernet|-e|--ethernet)
+            CONNECTION_MODE="ethernet"
+            shift
+            # IPアドレスの簡易的なバリデーションと取得
+            if [[ -n "$1" && "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                ETHERNET_IP="$1"
+                shift
+            fi
+            # ポート番号のバリデーションと取得
+            if [[ -n "$1" && "$1" =~ ^[0-9]+$ ]]; then
+                ETHERNET_PORT="$1"
+                shift
+            fi
+            ;;
+        *)
+            echo "使用方法: $0 [ethernet [IP] [PORT]]"
+            echo "  - ethernet, -e, --ethernet : Ethernet-CAN接続を使用する (デフォルトIP: 192.168.2.123, ポート: 5000)"
+            echo "  例: $0 ethernet 192.168.2.100 5000"
+            exit 1
+            ;;
+    esac
+done
+
+if [ "$CONNECTION_MODE" = "ethernet" ]; then
+    echo "Ethernet-CANブリッジノードを起動します (IP: ${ETHERNET_IP}, ポート: ${ETHERNET_PORT})..."
+    ros2 run altair_can_bridge can_bridge_node --ros-args -p connection_mode:=ethernet -p ethernet_ip:="${ETHERNET_IP}" -p ethernet_port:="${ETHERNET_PORT}"
+else
+    # 内部で setup_slcan.sh が自動的に呼ばれてポートをマッピングします
+    echo "SocketCANブリッジノードを起動します..."
+    ros2 run altair_can_bridge can_bridge_node
+fi
+

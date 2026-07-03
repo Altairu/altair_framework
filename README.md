@@ -102,16 +102,33 @@ chmod +x altair_can_bridge/scripts/setup_slcan.sh
   物理ポート名の固定化や、パスワード不要でのSocketCAN自動起動、ロボット電源起動時の完全自動起動の設定方法は、[docs/setup_guide_nuc.md](docs/setup_guide_nuc.md) を参照してください。
 
 * **Ethernet-CAN 接続の場合**
-  TCP経由でイーサネット-CAN変換モジュールと通信します。以下のようにROS2パラメータを指定して起動します。
+  TCP経由でイーサネット-CAN変換モジュールと通信します。以下のように引数を指定して起動します。
   ```bash
-  ros2 run altair_can_bridge can_bridge_node --ros-args -p connection_mode:=ethernet -p ethernet_ip:=192.168.2.123 -p ethernet_port:=5000
+  # デフォルト設定 (IP: 192.168.2.123, ポート: 5000) で起動
+  ./run_nuc.sh ethernet
+
+  # IPとポートを指定して起動
+  ./run_nuc.sh ethernet 192.168.2.100 5000
   ```
+
 
 ### 操縦PC側
 WiFi経由で操作するPCで実行します。モジュールマネージャー / 動作プログラムランナー / WebUIサーバーノードを一括で起動します。Ctrl+Cを押すとバックグラウンドノードも同時に終了します。
-```bash
-./run_operator.sh
-```
+
+* **USB-to-CAN 接続の場合**
+  ```bash
+  ./run_operator.sh
+  ```
+
+* **Ethernet-CAN 接続の場合**
+  起動時にNUC側へ自動で接続要求を送り、GUI表示をイーサネットモードに変更します。
+  ```bash
+  # デフォルト設定 (IP: 192.168.2.123, ポート: 5000) で起動
+  ./run_operator.sh ethernet
+
+  # IPとポートを指定して起動
+  ./run_operator.sh ethernet 192.168.2.100 5000
+  ```
 
 起動後、同一WiFiネットワーク内のPCやスマートフォンのブラウザから、以下のURLにアクセスします。
 * URL: `http://<NUCのIPアドレス>:8000/`
@@ -247,16 +264,32 @@ Run on the PC connected to the CAN bus or Ethernet network.
   Refer to [docs/setup_guide_nuc.md](docs/setup_guide_nuc.md) for persistent port naming, passwordless SocketCAN setup, and auto-start on boot.
 
 * **Ethernet-CAN Connection**
-  It communicates with the Ethernet-CAN converter module via TCP. Run the node with ROS2 parameters:
+  It communicates with the Ethernet-CAN converter module via TCP. Run the script with arguments:
   ```bash
-  ros2 run altair_can_bridge can_bridge_node --ros-args -p connection_mode:=ethernet -p ethernet_ip:=192.168.2.123 -p ethernet_port:=5000
+  # Run with default settings (IP: 192.168.2.123, Port: 5000)
+  ./run_nuc.sh ethernet
+
+  # Run with custom IP and Port
+  ./run_nuc.sh ethernet 192.168.2.100 5000
   ```
 
 ### Operator PC Side
 Run on the PC operating the robot over WiFi. It launches Module Manager, Behavior Runner, and WebUI Server. Press Ctrl+C to terminate all background nodes safely.
-```bash
-./run_operator.sh
-```
+
+* **USB-to-CAN Connection**
+  ```bash
+  ./run_operator.sh
+  ```
+
+* **Ethernet-CAN Connection**
+  It sends a connection request to the NUC automatically and sets the WebUI to Ethernet mode.
+  ```bash
+  # Run with default settings (IP: 192.168.2.123, Port: 5000)
+  ./run_operator.sh ethernet
+
+  # Run with custom IP and Port
+  ./run_operator.sh ethernet 192.168.2.100 5000
+  ```
 
 After startup, access the following URL from a PC or smartphone browser on the same WiFi network.
 * URL: `http://<NUC_IP_ADDRESS>:8000/`

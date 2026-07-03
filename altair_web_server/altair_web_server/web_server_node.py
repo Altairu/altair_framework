@@ -3,6 +3,7 @@ import json
 import shutil
 import threading
 import asyncio
+import time
 from pathlib import Path
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
@@ -88,8 +89,40 @@ class WebServerROSNode(Node):
         # モジュール構成同期用パブリッシャ (操縦PCからNUCへの同期用)
         self.config_sync_pub = self.create_publisher(String, '/altair/config_sync', 10)
 
+        # パラメータの宣言と取得 (起動設定の反映用)
+        self.declare_parameter('connection_mode', 'usb')
+        self.declare_parameter('ethernet_ip', '192.168.2.123')
+        self.declare_parameter('ethernet_port', 5000)
+
+        self.connection_mode = self.get_parameter('connection_mode').get_parameter_value().string_value
+        self.ethernet_ip = self.get_parameter('ethernet_ip').get_parameter_value().string_value
+        self.ethernet_port = self.get_parameter('ethernet_port').get_parameter_value().integer_value
+
+        # 起動時にEthernet接続指示を自動で送信するスレッド
+        if self.connection_mode == 'ethernet':
+            threading.Thread(target=self.auto_connect_ethernet_on_startup, daemon=True).start()
+
         # 1秒周期でモジュール設定ファイルを監視し、動的にMDDフィードバックサブスクライバを作成
         self.create_timer(2.0, self.sync_mdd_subscriptions, callback_group=self.callback_group)
+
+    def auto_connect_ethernet_on_startup(self):
+        """起動時に自動でNUC側のcan_bridge_nodeへEthernet接続指示を送る"""
+        self.get_logger().info("[WebNode] Ethernetモードでの自動接続指示プロセスを開始します...")
+        # サービスが立ち上がるのを最大10秒間待機
+        for _ in range(20):
+            if self.connect_can_client.wait_for_service(timeout_sec=0.5):
+                break
+            time.sleep(0.5)
+        else:
+            self.get_logger().error("[WebNode] NUCの接続サービスが見つからないため、自動接続指示を中止します。")
+            return
+
+        req = ConnectCan.Request()
+        req.port = f"{self.ethernet_ip}:{self.ethernet_port}"
+        req.auto_connect = False
+        
+        self.get_logger().info(f"[WebNode] NUCへEthernet接続要求を送信します: {req.port}")
+        future = self.connect_can_client.call_async(req)
 
     def sync_mdd_subscriptions(self):
         """
@@ -260,6 +293,15 @@ class SaveBlocklyRequest(BaseModel):
     xml: str = ""
 
 # --- REST API ルーティング ---
+
+@app.get("/api/connection_config")
+async def get_connection_config():
+    """現在の接続モード設定を取得"""
+    return {
+        "connection_mode": ros_node.connection_mode,
+        "ethernet_ip": ros_node.ethernet_ip,
+        "ethernet_port": ros_node.ethernet_port
+    }
 
 @app.get("/api/ports")
 async def get_ports():

@@ -16,6 +16,9 @@ document.addEventListener("DOMContentLoaded", () => {
     controlMode: "SETUP", // SETUP (送信待ち), CONTROL (制御中)
     moduleSendToggles: {}, // 各モジュールへのUI指令値の送信ON/OFFトグル状態
     gamepadMappings: [], // コントローラーのマッピングデータ
+    connectionMode: "usb",
+    ethernetIp: "192.168.2.123",
+    ethernetPort: 5000
   };
 
   // --- 1. DOM要素の取得 ---
@@ -860,7 +863,17 @@ document.addEventListener("DOMContentLoaded", () => {
       state.ports = data.ports;
 
       el.selCanPort.innerHTML = "";
-      if (state.ports.length === 0) {
+      
+      // Ethernetモードの場合は、デフォルトのIP:PORTをリストの先頭に追加
+      if (state.connectionMode === "ethernet") {
+        const defaultEthernetAddr = `${state.ethernetIp}:${state.ethernetPort}`;
+        const opt = document.createElement("option");
+        opt.value = defaultEthernetAddr;
+        opt.textContent = `Ethernet-CAN (${defaultEthernetAddr})`;
+        el.selCanPort.appendChild(opt);
+      }
+
+      if (state.ports.length === 0 && state.connectionMode !== "ethernet") {
         el.selCanPort.innerHTML = '<option value="">ポート未検出</option>';
         return;
       }
@@ -890,7 +903,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const auto = el.chkAutoConnect.checked;
     const port = el.selCanPort.value;
 
-    appendTerminalLog(el.behaviorTerminal, "USB-to-CAN 接続要求を送信中...");
+    const modeText = state.connectionMode === "ethernet" ? "Ethernet-CAN" : "USB-to-CAN";
+    appendTerminalLog(el.behaviorTerminal, `${modeText} 接続要求を送信中...`);
 
     try {
       const res = await fetch("/api/connect", {
@@ -912,7 +926,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // 切断ボタン
   el.btnDisconnectCan.addEventListener("click", async () => {
-    appendTerminalLog(el.behaviorTerminal, "USB-to-CAN 切断要求を送信中...");
+    const modeText = state.connectionMode === "ethernet" ? "Ethernet-CAN" : "USB-to-CAN";
+    appendTerminalLog(el.behaviorTerminal, `${modeText} 切断要求を送信中...`);
     try {
       const res = await fetch("/api/connect", {
         method: "POST",
@@ -1242,10 +1257,44 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  async function loadConnectionConfig() {
+    try {
+      const res = await fetch("/api/connection_config");
+      const data = await res.json();
+      state.connectionMode = data.connection_mode;
+      state.ethernetIp = data.ethernet_ip;
+      state.ethernetPort = data.ethernet_port;
+
+      if (state.connectionMode === "ethernet") {
+        // UIをEthernet用に更新
+        if (el.groupConnectionSlcan) {
+          const h3 = el.groupConnectionSlcan.querySelector("h3");
+          if (h3) h3.innerHTML = '<i class="fa-solid fa-network-wired"></i> Connection (Ethernet)';
+        }
+        if (el.btnConnectCan) {
+          el.btnConnectCan.textContent = "Connect Ethernet";
+        }
+        if (el.slcanConnectionStatus) {
+          el.slcanConnectionStatus.innerHTML = '状態: <span class="badge badge-danger" style="padding: 4px 8px; font-size: 11px;">未接続 (Ethernet)</span>';
+        }
+        if (el.chkAutoConnect) {
+          // 自動探索はオフにして、手動設定に誘導
+          el.chkAutoConnect.checked = false;
+          el.selCanPort.disabled = false;
+          el.btnRefreshPorts.disabled = false;
+        }
+      }
+    } catch (err) {
+      console.error("接続構成の取得に失敗しました:", err);
+    }
+  }
+
   // --- 13. 初期化処理の実行 ---
   connectWebSocket();
   loadConfigAndRender();
-  refreshPorts();
+  loadConnectionConfig().then(() => {
+    refreshPorts();
+  });
   refreshProfiles();
 
   // 全画面表示の切り替え
