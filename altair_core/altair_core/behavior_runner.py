@@ -112,19 +112,28 @@ class BehaviorRunner(Node):
     def get_script_path(self, name):
         """
         動作スクリプトファイルの絶対パスを決定する
+        優先: user_behaviors/ > altair_core/user_behaviors/
         """
         paths = [
+            # 0. user_behaviors/ ディレクトリを最優先
+            f"user_behaviors/{name}",
+            f"./user_behaviors/{name}",
             # 1. ワークスペースのローカルソースパス
-            f"c:/Users/106no/Documents/GitHub/altair_framework/altair_core/user_behaviors/{name}",
+            f"c:/Users/106no/Documents/GitHub/altair_framework/user_behaviors/{name}",
             # 2. ROS2シェアディレクトリ
-            os.path.join(os.path.expanduser('~'), f"ros2_ws/src/altair_framework/altair_core/user_behaviors/{name}"),
+            os.path.join(os.path.expanduser('~'), f"ros2_ws/src/altair_framework/user_behaviors/{name}"),
             # 3. 相対パスフォールバック
+            f"./src/altair_framework/user_behaviors/{name}",
+            # 4. 旧パス (後方互換性)
+            f"c:/Users/106no/Documents/GitHub/altair_framework/altair_core/user_behaviors/{name}",
+            os.path.join(os.path.expanduser('~'), f"ros2_ws/src/altair_framework/altair_core/user_behaviors/{name}"),
             f"./src/altair_framework/altair_core/user_behaviors/{name}"
         ]
         for p in paths:
             if os.path.exists(p):
                 return p
-        return f"user_behaviors/{name}"  # フォールバック
+        # すべてのパス探索失敗時は、user_behaviors/ を返す
+        return f"user_behaviors/{name}"
 
     # --- 動作スクリプトの停止 ---
     def handle_stop_behavior_service(self, request, response):

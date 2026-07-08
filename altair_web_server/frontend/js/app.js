@@ -978,6 +978,38 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // --- 動作プログラムファイル一覧の動的取得と表示 ---
+  async function refreshBehaviors() {
+    try {
+      const res = await fetch("/api/behavior/list");
+      const data = await res.json();
+
+      if (!data.success || !data.behaviors) {
+        console.error("プログラムファイル取得失敗:", data.error || "不明なエラー");
+        el.selBehaviorScript.innerHTML = '<option value="">ファイルが見つかりません</option>';
+        return;
+      }
+
+      // ドロップダウンをクリア
+      el.selBehaviorScript.innerHTML = '';
+
+      // 取得したファイル一覧をオプションとして追加
+      if (data.behaviors.length === 0) {
+        el.selBehaviorScript.innerHTML = '<option value="">プログラムファイルがありません</option>';
+      } else {
+        data.behaviors.forEach(filename => {
+          const option = document.createElement("option");
+          option.value = filename;
+          option.textContent = filename;
+          el.selBehaviorScript.appendChild(option);
+        });
+      }
+    } catch (err) {
+      console.error("プログラムファイル取得失敗:", err);
+      el.selBehaviorScript.innerHTML = '<option value="">通信エラー</option>';
+    }
+  }
+
   // プロファイルのロード（グローバル関数化）
   window.loadProfile = async (name) => {
     appendTerminalLog(el.behaviorTerminal, `プロファイル '${name}' をロード中...`);
@@ -1247,6 +1279,7 @@ document.addEventListener("DOMContentLoaded", () => {
   loadConfigAndRender();
   refreshPorts();
   refreshProfiles();
+  refreshBehaviors();
 
   // 全画面表示の切り替え
   const btnFullscreen = document.getElementById("btn-fullscreen-toggle");

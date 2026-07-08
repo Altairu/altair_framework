@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,17 +8,20 @@
   <!-- Google Fonts & FontAwesome -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  
+
   <!-- CSS -->
   <link rel="stylesheet" href="/css/styles.css">
-  
+
   <!-- Google Blockly CDN (最新の安定動作バージョン) -->
   <script src="https://unpkg.com/blockly/blockly.min.js"></script>
   <script src="https://unpkg.com/blockly/python_compressed.js"></script>
   <script src="https://unpkg.com/blockly/msg/ja.js"></script>
 </head>
+
 <body>
 
   <!-- Googleスタイルのクリーン背景デコレーション（柔らかい薄色の変化） -->
@@ -25,14 +29,14 @@
   <div class="bg-glow bg-glow-2"></div>
 
   <div class="app-container">
-    
+
     <!-- 1. サイドバー / ナビゲーション -->
     <aside class="sidebar">
       <div class="sidebar-logo">
         <i class="fa-solid fa-compass logo-icon"></i>
         <span>ALTAIR</span>
       </div>
-      
+
       <nav class="sidebar-menu">
         <a href="#" class="menu-item active" data-target="view-dashboard">
           <i class="fa-solid fa-gauge-high"></i> Dashboard
@@ -61,7 +65,7 @@
 
     <!-- 2. メインコンテンツエリア -->
     <main class="main-content">
-      
+
       <!-- ヘッダー -->
       <header class="main-header">
         <div class="header-title">
@@ -80,7 +84,7 @@
             <span class="status-dot disconnected"></span>
             <span class="status-text">CAN: Disconnected</span>
           </div>
-          
+
           <button class="btn btn-danger btn-emergency" id="btn-emergency-stop">
             <i class="fa-solid fa-circle-stop"></i> EMERGENCY STOP
           </button>
@@ -94,7 +98,8 @@
           <!-- 接続ポート設定 -->
           <div class="control-group" id="group-connection-slcan">
             <h3><i class="fa-solid fa-network-wired"></i> Connection (slcan)</h3>
-            <div class="control-status" id="slcan-connection-status" style="margin-top: 4px; margin-bottom: 12px; font-size: 13px; font-weight: 600;">
+            <div class="control-status" id="slcan-connection-status"
+              style="margin-top: 4px; margin-bottom: 12px; font-size: 13px; font-weight: 600;">
               状態: <span class="badge badge-danger" style="padding: 4px 8px; font-size: 11px;">未接続</span>
             </div>
             <div class="connection-controls">
@@ -103,7 +108,7 @@
                 <span class="toggle-switch"></span>
                 <span class="toggle-label">Auto Connect</span>
               </label>
-              
+
               <div class="port-select-row">
                 <select id="sel-can-port" class="form-input" disabled>
                   <option value="">ポートを検出中...</option>
@@ -112,7 +117,7 @@
                   <i class="fa-solid fa-arrows-rotate"></i>
                 </button>
               </div>
-              
+
               <div class="btn-row">
                 <button class="btn btn-primary" id="btn-connect-can">Connect USB</button>
                 <button class="btn btn-secondary" id="btn-disconnect-can" disabled>Disconnect</button>
@@ -149,34 +154,50 @@
           <div class="control-group" id="dashboard-gamepad-group">
             <h3><i class="fa-solid fa-gamepad"></i> Gamepad Monitor</h3>
             <div id="dashboard-gamepad-disconnected" class="group-desc" style="text-align: center; padding: 10px 0;">
-              <i class="fa-solid fa-gamepad" style="font-size: 24px; color: var(--text-muted); margin-bottom: 6px; display: block;"></i>
+              <i class="fa-solid fa-gamepad"
+                style="font-size: 24px; color: var(--text-muted); margin-bottom: 6px; display: block;"></i>
               コントローラー未接続
             </div>
             <div id="dashboard-gamepad-connected" style="display: none; flex-direction: column; gap: 8px;">
-              <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; margin-top: 4px;">
+              <div
+                style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; margin-top: 4px;">
                 <span>L-Stick</span>
                 <span id="lbl-dash-lstick">X: 0.00 | Y: 0.00</span>
               </div>
-              <div class="progress-bar-container" style="background: #e8eaed; border-radius: 4px; height: 8px; width: 100%; overflow: hidden; position: relative;">
-                <div id="bar-dash-lx" style="background: var(--color-primary); height: 100%; width: 50%; transition: width 0.05s ease;"></div>
+              <div class="progress-bar-container"
+                style="background: #e8eaed; border-radius: 4px; height: 8px; width: 100%; overflow: hidden; position: relative;">
+                <div id="bar-dash-lx"
+                  style="background: var(--color-primary); height: 100%; width: 50%; transition: width 0.05s ease;">
+                </div>
               </div>
-              <div class="progress-bar-container" style="background: #e8eaed; border-radius: 4px; height: 8px; width: 100%; overflow: hidden; position: relative; margin-top: 2px;">
-                <div id="bar-dash-ly" style="background: var(--color-primary); height: 100%; width: 50%; transition: width 0.05s ease;"></div>
+              <div class="progress-bar-container"
+                style="background: #e8eaed; border-radius: 4px; height: 8px; width: 100%; overflow: hidden; position: relative; margin-top: 2px;">
+                <div id="bar-dash-ly"
+                  style="background: var(--color-primary); height: 100%; width: 50%; transition: width 0.05s ease;">
+                </div>
               </div>
 
-              <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; margin-top: 6px;">
+              <div
+                style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; margin-top: 6px;">
                 <span>R-Stick</span>
                 <span id="lbl-dash-rstick">X: 0.00 | Y: 0.00</span>
               </div>
-              <div class="progress-bar-container" style="background: #e8eaed; border-radius: 4px; height: 8px; width: 100%; overflow: hidden; position: relative;">
-                <div id="bar-dash-rx" style="background: var(--color-primary); height: 100%; width: 50%; transition: width 0.05s ease;"></div>
+              <div class="progress-bar-container"
+                style="background: #e8eaed; border-radius: 4px; height: 8px; width: 100%; overflow: hidden; position: relative;">
+                <div id="bar-dash-rx"
+                  style="background: var(--color-primary); height: 100%; width: 50%; transition: width 0.05s ease;">
+                </div>
               </div>
-              <div class="progress-bar-container" style="background: #e8eaed; border-radius: 4px; height: 8px; width: 100%; overflow: hidden; position: relative; margin-top: 2px;">
-                <div id="bar-dash-ry" style="background: var(--color-primary); height: 100%; width: 50%; transition: width 0.05s ease;"></div>
+              <div class="progress-bar-container"
+                style="background: #e8eaed; border-radius: 4px; height: 8px; width: 100%; overflow: hidden; position: relative; margin-top: 2px;">
+                <div id="bar-dash-ry"
+                  style="background: var(--color-primary); height: 100%; width: 50%; transition: width 0.05s ease;">
+                </div>
               </div>
 
               <!-- 主要ボタンインジケータ -->
-              <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; margin-top: 8px;">
+              <div
+                style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; margin-top: 8px;">
                 <span>Buttons</span>
               </div>
               <div style="display: flex; flex-wrap: wrap; gap: 4px;" id="dashboard-buttons-container">
@@ -188,22 +209,29 @@
                 <span id="btn-dash-5" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;">R1</span>
                 <span id="btn-dash-6" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;">L2</span>
                 <span id="btn-dash-7" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;">R2</span>
-                <span id="btn-dash-8" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;">Share</span>
-                <span id="btn-dash-9" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;">Start</span>
+                <span id="btn-dash-8" class="badge badge-secondary"
+                  style="font-size: 9px; padding: 2px 6px;">Share</span>
+                <span id="btn-dash-9" class="badge badge-secondary"
+                  style="font-size: 9px; padding: 2px 6px;">Start</span>
                 <span id="btn-dash-10" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;">L3</span>
                 <span id="btn-dash-11" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;">R3</span>
               </div>
               <!-- 十字キーインジケータ -->
-              <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; margin-top: 6px;">
+              <div
+                style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; margin-top: 6px;">
                 <span>D-Pad</span>
               </div>
               <div style="display: flex; gap: 4px; align-items: center;">
-                <span id="btn-dash-14" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;"><i class="fa-solid fa-arrow-left"></i></span>
+                <span id="btn-dash-14" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;"><i
+                    class="fa-solid fa-arrow-left"></i></span>
                 <div style="display: flex; flex-direction: column; gap: 2px;">
-                  <span id="btn-dash-12" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;"><i class="fa-solid fa-arrow-up"></i></span>
-                  <span id="btn-dash-13" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;"><i class="fa-solid fa-arrow-down"></i></span>
+                  <span id="btn-dash-12" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;"><i
+                      class="fa-solid fa-arrow-up"></i></span>
+                  <span id="btn-dash-13" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;"><i
+                      class="fa-solid fa-arrow-down"></i></span>
                 </div>
-                <span id="btn-dash-15" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;"><i class="fa-solid fa-arrow-right"></i></span>
+                <span id="btn-dash-15" class="badge badge-secondary" style="font-size: 9px; padding: 2px 6px;"><i
+                    class="fa-solid fa-arrow-right"></i></span>
               </div>
             </div>
           </div>
@@ -220,7 +248,7 @@
         <div class="glass-card page-card">
           <h2><i class="fa-solid fa-folder-open"></i> プロファイル管理</h2>
           <p>「アームテスト用」「足回りのみ」「本番フル構成」など、用途に応じたモジュール設定プロファイルを瞬時に切り替えます。</p>
-          
+
           <div class="profile-manager-row">
             <!-- 保存プロファイルリスト -->
             <div class="profile-list-panel">
@@ -245,7 +273,8 @@
                 <h4>外部からインポート (JSON)</h4>
                 <div class="file-upload-row">
                   <input type="file" id="file-import-profile" accept=".json" style="display: none;">
-                  <button class="btn btn-primary btn-block" onclick="document.getElementById('file-import-profile').click()">
+                  <button class="btn btn-primary btn-block"
+                    onclick="document.getElementById('file-import-profile').click()">
                     <i class="fa-solid fa-file-import"></i> JSONファイルを読み込む
                   </button>
                 </div>
@@ -267,7 +296,7 @@
         <div class="glass-card page-card">
           <h2><i class="fa-solid fa-gamepad"></i> ゲームコントローラー (PS5対応)</h2>
           <p>PCやスマホに接続されたコントローラーを検出し、スティックやボタンに各モジュール出力を割り当てます。</p>
-          
+
           <div class="controller-status-card">
             <div class="ctrl-indicator" id="gamepad-status-indicator">
               <i class="fa-solid fa-gamepad gamepad-icon disconnected"></i>
@@ -283,7 +312,7 @@
                 <i class="fa-solid fa-plus"></i> 新規割り当てを追加
               </button>
             </div>
-            
+
             <div class="mapping-table-wrapper">
               <table class="mapping-table">
                 <thead>
@@ -338,10 +367,12 @@
             </div>
             <div class="code-drawer-body">
               <p class="group-desc" style="margin-bottom: 10px;">ブロックの配置に応じて、自律制御Pythonコードがリアルタイム生成されます。</p>
-              <div class="terminal-view code-preview-view" id="blockly-code-terminal" style="height: calc(100% - 100px); overflow-y: auto;">
+              <div class="terminal-view code-preview-view" id="blockly-code-terminal"
+                style="height: calc(100% - 100px); overflow-y: auto;">
                 <pre><code id="blockly-code-area"># ブロックを配置するとここにコードが生成されます...</code></pre>
               </div>
-              <button class="btn btn-secondary btn-block" id="btn-export-blockly-code" style="margin-top: 12px; border-radius: 20px;">
+              <button class="btn btn-secondary btn-block" id="btn-export-blockly-code"
+                style="margin-top: 12px; border-radius: 20px;">
                 <i class="fa-solid fa-file-arrow-down"></i> スクリプトをローカル保存
               </button>
             </div>
@@ -360,9 +391,7 @@
             <div class="behavior-selector">
               <h3>プログラムファイル選択</h3>
               <select id="sel-behavior-script" class="form-input">
-                <option value="example_behavior.py">example_behavior.py (ピック＆プレース)</option>
-                <option value="template_behavior.py">template_behavior.py (動作雛形ファイル)</option>
-                <option value="blockly_behavior.py">blockly_behavior.py (Blockly生成マクロ)</option>
+                <option value="">読み込み中...</option>
               </select>
             </div>
 
@@ -453,4 +482,5 @@
   <script src="/js/app.js?v=20260527_1500"></script>
   <script src="/js/gamepad.js?v=20260527_1500"></script>
 </body>
+
 </html>

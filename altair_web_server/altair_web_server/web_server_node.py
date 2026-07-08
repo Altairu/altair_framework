@@ -371,14 +371,44 @@ async def save_blockly(req_data: SaveBlocklyRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"保存に失敗しました: {str(e)}")
 
+@app.get("/api/behavior/list")
+async def list_behaviors():
+    """user_behaviors/ ディレクトリ内の実行可能なPythonファイル一覧を取得"""
+    user_behaviors_dir = None
+    paths = [
+        "user_behaviors",
+        "./user_behaviors",
+        "./altair_core/user_behaviors",
+        os.path.join(os.path.expanduser('~'), "ros2_ws/src/altair_framework/user_behaviors"),
+        "c:/Users/106no/Documents/GitHub/altair_framework/user_behaviors"
+    ]
+    for p in paths:
+        if os.path.isdir(p):
+            user_behaviors_dir = p
+            break
+    
+    if not user_behaviors_dir:
+        return {"success": False, "behaviors": []}
+    
+    try:
+        behaviors = []
+        for f in os.listdir(user_behaviors_dir):
+            if f.endswith('.py') and not f.startswith('_'):
+                behaviors.append(f)
+        behaviors.sort()
+        return {"success": True, "behaviors": behaviors}
+    except Exception as e:
+        return {"success": False, "behaviors": [], "error": str(e)}
+
 @app.get("/api/behavior/get_blockly_workspace")
 async def get_blockly_workspace():
     """保存されているBlocklyのブロックレイアウト(XML文字列)を取得"""
     paths = [
+        "user_behaviors",
+        "./user_behaviors",
         "c:/Users/106no/Documents/GitHub/altair_framework/altair_core/user_behaviors",
         os.path.join(os.path.expanduser('~'), "ros2_ws/src/altair_framework/altair_core/user_behaviors"),
-        "./src/altair_framework/altair_core/user_behaviors",
-        "user_behaviors"
+        "./src/altair_framework/altair_core/user_behaviors"
     ]
     dest_dir = None
     for p in paths:

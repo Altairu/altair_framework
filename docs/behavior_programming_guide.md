@@ -152,3 +152,45 @@ AIへプログラムの記述を指示する際は、このファイルの内容
 
 動作プログラム記述仕様書に従い、プログラムを作成してください。
 ```
+
+---
+
+## ファイル配置と実行方法
+
+### ファイル保存場所
+
+すべての動作プログラムは、リポジトリルートの **`user_behaviors/`** ディレクトリに `.py` ファイルとして保存してください。
+
+```text
+altair_framework/
+├── user_behaviors/              ← ユーザー動作プログラムの配置先
+│   ├── blockly_behavior.py      (Blocklyで生成)
+│   ├── template_behavior.py     (雛形ファイル)
+│   ├── my_custom_behavior.py    ← 新規作成したファイル
+│   └── another_program.py       ← さらに追加可能
+│
+├── altair_core/user_behaviors/  (古いパス - 後方互換性のみ)
+└── ...
+```
+
+### WebUI から実行
+
+1. Web UI の **「Python Program」** タブを開く
+2. **「プログラムファイル選択」** のドロップダウンを確認
+3. 新規作成したファイル名が自動的に表示される
+4. ファイルを選択して **「起動 (Start Program)」** ボタンをクリック
+
+**重要：** サーバーを再起動する必要はありません。`user_behaviors/` に `.py` ファイルを追加・削除すると、次にタブにアクセスした時点で自動検出されます。
+
+### 優先順位
+
+実行時のファイル探索順序は以下の通りです：
+
+1. **`./user_behaviors/{filename}.py`** ← 優先
+2. `./altair_core/user_behaviors/{filename}.py` (後方互換性)
+3. ROS2 install path
+4. その他の登録パス
+
+つまり、**`user_behaviors/` ディレクトリが最優先**されるため、このディレクトリをメインの配置場所として使用してください。
+
+---
