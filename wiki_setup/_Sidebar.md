@@ -14,4 +14,4 @@
 
 ---
 
-**GitHub**: [altair-team/altair_framework](https://github.com/altair-team/altair_framework)
+**GitHub**: [Altairu/altair_framework](https://github.com/Altairu/altair_framework)
