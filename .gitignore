@@ -17,3 +17,4 @@ altair_core/user_behaviors/blockly_behavior.py
 # OS generated files
 .DS_Store
 Thumbs.db
+wiki_setup/
