@@ -324,12 +324,12 @@ document.addEventListener("DOMContentLoaded", () => {
     for (let i = 1; i <= 4; i++) {
       const motorParam = mod.parameters?.[`m${i}`] ?? { mode: 0, p: 10.0, i: 0.0, d: 0.0, diameter: 100.0, direction: 1 };
       const mode = motorParam.mode ?? 0;
-      
+
       let min = -10;
       let max = 10;
       let step = 0.1;
       let unit = "rps";
-      
+
       if (mode === 1) {
         min = -360;
         max = 360;
@@ -503,7 +503,7 @@ document.addEventListener("DOMContentLoaded", () => {
           appendTerminalLog(el.behaviorTerminal, `[SYSTEM] ${mod.name} へのリアルタイムUI操作送信を有効にしました。`, "system-msg");
         } else {
           appendTerminalLog(el.behaviorTerminal, `[SYSTEM] ${mod.name} へのリアルタイムUI操作送信を無効にしました（目標値をゼロに安全停止します）。`, "system-msg");
-          
+
           // トグルOFF時は安全のために目標値を0に戻す
           if (mod.type === "mdd") {
             for (let i = 1; i <= 4; i++) {
@@ -581,12 +581,12 @@ document.addEventListener("DOMContentLoaded", () => {
             // スライダーおよび単位の動的更新
             const valEl = document.getElementById(`val-${mod.name}-m${motorIdx}`);
             const slider = document.getElementById(`range-${mod.name}-m${motorIdx}`);
-            
+
             let min = -10;
             let max = 10;
             let step = 0.1;
             let unit = "rps";
-            
+
             if (modeVal === 1) {
               min = -360;
               max = 360;
@@ -598,7 +598,7 @@ document.addEventListener("DOMContentLoaded", () => {
               step = 1;
               unit = "mm";
             }
-            
+
             if (slider) {
               slider.min = min;
               slider.max = max;
@@ -619,29 +619,29 @@ document.addEventListener("DOMContentLoaded", () => {
         btn.addEventListener("click", (e) => {
           const motorIdx = btn.getAttribute("data-motor");
           const action = btn.getAttribute("data-action");
-          
+
           const slider = document.getElementById(`range-${mod.name}-m${motorIdx}`);
           const valEl = document.getElementById(`val-${mod.name}-m${motorIdx}`);
           if (!slider) return;
-          
+
           let curVal = parseFloat(slider.value) || 0.0;
           let step = parseFloat(slider.step) || 0.1;
-          
+
           if (action === "plus") {
             curVal = Math.min(parseFloat(slider.max), curVal + step);
           } else {
             curVal = Math.max(parseFloat(slider.min), curVal - step);
           }
-          
+
           slider.value = curVal;
-          
+
           // モード表示の読み込み
           const mode = mod.parameters?.[`m${motorIdx}`]?.mode ?? 0;
           const unit = mode === 0 ? "rps" : mode === 1 ? "deg" : "mm";
           if (valEl) {
             valEl.textContent = `${curVal.toFixed(mode === 0 ? 1 : 0)} ${unit}`;
           }
-          
+
           // WebSocket経由で指令送信 (送信トグルがONのときのみ)
           if (state.moduleSendToggles[mod.name]) {
             sendMddTargetCommand(mod.name);
@@ -1269,8 +1269,8 @@ document.addEventListener("DOMContentLoaded", () => {
   // ==========================================================================
 
   // 登録済みモジュールの一覧を動的に取得するドロップダウン生成ヘルパー
-  const getModuleOptionsDropdown = function(type) {
-    return function() {
+  const getModuleOptionsDropdown = function (type) {
+    return function () {
       if (!state.config || !state.config.modules) {
         return [["未選択", "none"]];
       }
@@ -1403,11 +1403,11 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   Blockly.Blocks['event_macro'] = {
-    init: function() {
+    init: function () {
       this.appendDummyInput()
-          .appendField("🏁 マクロ実行時 (エントリポイント)");
+        .appendField("🏁 マクロ実行時 (エントリポイント)");
       this.appendStatementInput("DO")
-          .setCheck(null);
+        .setCheck(null);
       this.setColour('#f59e0b');
       this.setTooltip("「マクロを実行」ボタンを押した時に、この中に接続されたブロックが上から順に実行されます。");
     }
@@ -1580,7 +1580,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ジェネレーター登録ヘルパー（最新・旧バージョン両対応）
-  const registerGenerator = function(blockName, generatorFunc) {
+  const registerGenerator = function (blockName, generatorFunc) {
     if (!pyGen) return;
     if (pyGen.forBlock) {
       pyGen.forBlock[blockName] = generatorFunc;
@@ -1590,7 +1590,7 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   // アトミックオーダー取得ヘルパー
-  const getAtomicOrder = function() {
+  const getAtomicOrder = function () {
     if (pyGen && pyGen.Order) return pyGen.Order.ATOMIC;
     if (Blockly.Python && typeof Blockly.Python.ORDER_ATOMIC !== 'undefined') return Blockly.Python.ORDER_ATOMIC;
     return 99; // fallback
@@ -1713,11 +1713,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!root || root.type !== 'event_macro') return '';
     const gen = generator || pyGen;
     const order = getAtomicOrder();
-    
+
     const type = block.getFieldValue('TYPE');
     const mddName = block.getFieldValue('MDD');
     const tread = block.getFieldValue('L') || '300.0';
-    
+
     const mLf = block.getFieldValue('M_LF');
     const mRf = block.getFieldValue('M_RF');
     const mLr = block.getFieldValue('M_LR');
@@ -1727,11 +1727,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const invRf = block.getFieldValue('INV_RF') === 'TRUE' ? '-1.0' : '1.0';
     const invLr = block.getFieldValue('INV_LR') === 'TRUE' ? '-1.0' : '1.0';
     const invRr = block.getFieldValue('INV_RR') === 'TRUE' ? '-1.0' : '1.0';
-    
+
     const vx = gen.valueToCode(block, 'VX', order) || '0.0';
     const vy = gen.valueToCode(block, 'VY', order) || '0.0';
     const omega = gen.valueToCode(block, 'OMEGA', order) || '0.0';
-    
+
     return `
 # 運動学計算実行
 def _calc_kinematics():
@@ -1772,8 +1772,8 @@ def _calc_kinematics():
                 target_speeds[idx] = val
                 
     elif "${type}" == "4_OMNI":
-        v_lf = (-0.707107 * vx_val + 0.707107 * vy_val + r_t * omega_val) * ${invLf}
-        v_rf = (0.707107 * vx_val + 0.707107 * vy_val - r_t * omega_val) * ${invRf}
+        v_lf = (-0.707107 * vx_val + 0.707107 * vy_val - r_t * omega_val) * ${invLf}
+        v_rf = (0.707107 * vx_val + 0.707107 * vy_val + r_t * omega_val) * ${invRf}
         v_lr = (-0.707107 * vx_val - 0.707107 * vy_val + r_t * omega_val) * ${invLr}
         v_rr = (0.707107 * vx_val - 0.707107 * vy_val - r_t * omega_val) * ${invRr}
         
@@ -2046,10 +2046,10 @@ if __name__ == '__main__':
         appendTerminalLog(el.behaviorTerminal, "[ERROR] Blocklyワークスペースが初期化されていません。", "error-msg");
         return;
       }
-      
+
       const rawCode = Blockly.Python.workspaceToCode(workspace);
       const fullPython = generatePythonCode(rawCode);
-      
+
       let xmlText = "";
       try {
         const dom = Blockly.Xml.workspaceToDom(workspace);
