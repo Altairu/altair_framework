@@ -23,6 +23,7 @@ set(srv_files
   "srv/TriggerControl.srv"
   "srv/GetAvailablePorts.srv"
   "srv/ConnectCan.srv"
+  "srv/ConnectEthCan.srv"
   "srv/StartBehavior.srv"
 )
 

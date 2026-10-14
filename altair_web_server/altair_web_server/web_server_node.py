@@ -19,7 +19,7 @@ from ament_index_python.packages import PackageNotFoundError, get_package_share_
 from std_msgs.msg import String
 from can_msgs.msg import Frame
 from altair_interfaces.msg import CanStatus, MddFeedback, MddCommand, ServoCommand, SolenoidCommand
-from altair_interfaces.srv import ConnectCan, GetAvailablePorts, TriggerControl, StartBehavior
+from altair_interfaces.srv import ConnectCan, ConnectEthCan, GetAvailablePorts, TriggerControl, StartBehavior
 from std_srvs.srv import Trigger
 
 app = FastAPI()
@@ -75,6 +75,7 @@ class WebServerROSNode(Node):
         # サービスクライアントの作成
         self.get_ports_client = self.create_client(GetAvailablePorts, '/altair/can/get_ports')
         self.connect_can_client = self.create_client(ConnectCan, '/altair/can/connect')
+        self.connect_eth_can_client = self.create_client(ConnectEthCan, '/altair/eth_can/connect')
         self.start_control_client = self.create_client(TriggerControl, '/altair/start_control')
         self.start_behavior_client = self.create_client(StartBehavior, '/altair/behavior/start')
         self.stop_behavior_client = self.create_client(Trigger, '/altair/behavior/stop')
@@ -235,10 +236,13 @@ class WebServerROSNode(Node):
 # --- グローバルなROSノードインスタンスの初期化 ---
 ros_node: WebServerROSNode = None
 
-# --- REST API リクエストモデル ---
 class ConnectRequest(BaseModel):
     port: str
     auto_connect: bool
+
+class ConnectEthRequest(BaseModel):
+    target_ip: str
+    target_port: int = 5000
 
 class StartBehaviorRequest(BaseModel):
     behavior_name: str
@@ -291,6 +295,54 @@ async def connect_can(req_data: ConnectRequest):
     while not future.done():
         await asyncio.sleep(0.05)
         
+    res = future.result()
+    return {"success": res.success, "message": res.message}
+
+@app.get("/api/eth_can/config")
+async def get_eth_can_config():
+    """Ethernet-CAN の設定を取得"""
+    config_file = "network_config.json"
+    if os.path.exists(config_file):
+        try:
+            with open(config_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"target_ip": "192.168.2.123", "target_port": 5000, "can_channel": "can1"}
+
+@app.post("/api/eth_can/connect")
+async def connect_eth_can(req_data: ConnectEthRequest):
+    """Ethernet-CAN 基板への接続・再接続指示"""
+    # 設定ファイルに保存
+    config_file = "network_config.json"
+    cfg = {"target_ip": req_data.target_ip, "target_port": req_data.target_port, "can_channel": "can1"}
+    try:
+        with open(config_file, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"network_config.json の保存に失敗しました: {e}")
+
+    if not ros_node.connect_eth_can_client.wait_for_service(timeout_sec=1.0):
+        # 従来の /altair/can/connect もフォールバックで試行
+        if ros_node.connect_can_client.wait_for_service(timeout_sec=0.5):
+            req = ConnectCan.Request()
+            req.port = f"{req_data.target_ip}:{req_data.target_port}"
+            req.auto_connect = False
+            fut = ros_node.connect_can_client.call_async(req)
+            while not fut.done():
+                await asyncio.sleep(0.05)
+            r = fut.result()
+            return {"success": r.success, "message": r.message}
+        raise HTTPException(status_code=503, detail="Ethernet-CAN ブリッジサービスが利用できません。")
+
+    req = ConnectEthCan.Request()
+    req.target_ip = req_data.target_ip
+    req.target_port = req_data.target_port
+
+    future = ros_node.connect_eth_can_client.call_async(req)
+    while not future.done():
+        await asyncio.sleep(0.05)
+
     res = future.result()
     return {"success": res.success, "message": res.message}
 

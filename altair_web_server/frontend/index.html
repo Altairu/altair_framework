@@ -95,21 +95,45 @@
       <section id="view-dashboard" class="content-view active">
         <!-- 上部コントロールボード -->
         <div class="control-board glass-card">
-          <!-- 接続ポート設定 -->
+          <!-- 接続ポート設定 (Ethernet-CAN & USB-to-CAN) -->
           <div class="control-group" id="group-connection-slcan">
-            <h3><i class="fa-solid fa-network-wired"></i> Connection (slcan)</h3>
+            <h3><i class="fa-solid fa-network-wired"></i> CAN Connection</h3>
             <div class="control-status" id="slcan-connection-status"
               style="margin-top: 4px; margin-bottom: 12px; font-size: 13px; font-weight: 600;">
               状態: <span class="badge badge-danger" style="padding: 4px 8px; font-size: 11px;">未接続</span>
             </div>
-            <div class="connection-controls">
-              <label class="toggle-checkbox">
+
+            <!-- 接続モード切り替えタブ -->
+            <div class="connection-tabs" style="display: flex; gap: 8px; margin-bottom: 10px;">
+              <button class="btn btn-sm btn-primary" id="tab-mode-eth" style="flex: 1; padding: 4px 8px; font-size: 12px;">
+                <i class="fa-solid fa-ethernet"></i> Ethernet (推奨)
+              </button>
+              <button class="btn btn-sm btn-secondary" id="tab-mode-usb" style="flex: 1; padding: 4px 8px; font-size: 12px;">
+                <i class="fa-brands fa-usb"></i> USB (非推奨)
+              </button>
+            </div>
+
+            <!-- Ethernet-CAN 接続フォーム -->
+            <div id="panel-conn-eth" class="connection-controls">
+              <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+                <input type="text" id="txt-eth-ip" class="form-input" style="flex: 2; font-size: 13px;" placeholder="192.168.2.123" value="192.168.2.123">
+                <input type="number" id="txt-eth-port" class="form-input" style="flex: 1; font-size: 13px;" placeholder="5000" value="5000">
+              </div>
+              <div class="btn-row">
+                <button class="btn btn-primary" id="btn-connect-eth"><i class="fa-solid fa-plug"></i> Connect ETH</button>
+                <button class="btn btn-secondary" id="btn-disconnect-eth" disabled>Disconnect</button>
+              </div>
+            </div>
+
+            <!-- USB-to-CAN 接続フォーム (非推奨) -->
+            <div id="panel-conn-usb" class="connection-controls" style="display: none;">
+              <label class="toggle-checkbox" style="margin-bottom: 6px;">
                 <input type="checkbox" id="chk-auto-connect" checked>
                 <span class="toggle-switch"></span>
                 <span class="toggle-label">Auto Connect</span>
               </label>
 
-              <div class="port-select-row">
+              <div class="port-select-row" style="margin-bottom: 8px;">
                 <select id="sel-can-port" class="form-input" disabled>
                   <option value="">ポートを検出中...</option>
                 </select>

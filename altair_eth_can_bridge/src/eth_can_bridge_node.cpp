@@ -1,0 +1,403 @@
+// C++ 標準ヘッダー
+#include <chrono>
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
+#include <thread>
+#include <atomic>
+#include <mutex>
+#include <iostream>
+#include <cstring>
+#include <cerrno>
+
+// POSIX ネットワークヘッダー
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+// ROS2 ヘッダー
+#include "rclcpp/rclcpp.hpp"
+#include "can_msgs/msg/frame.hpp"
+#include "altair_interfaces/msg/can_status.hpp"
+#include "altair_interfaces/srv/connect_can.hpp"
+#include "altair_interfaces/srv/connect_eth_can.hpp"
+
+using namespace std::chrono_literals;
+
+class EthCanBridgeNode : public rclcpp::Node
+{
+public:
+  EthCanBridgeNode()
+  : Node("eth_can_bridge_node"), is_connected_(false), sock_(-1)
+  {
+    // ROS2パラメータの宣言と取得
+    this->declare_parameter<std::string>("target_ip", "192.168.2.123");
+    this->declare_parameter<int>("target_port", 5000);
+    this->declare_parameter<std::string>("can_channel", "can1");
+
+    target_ip_ = this->get_parameter("target_ip").as_string();
+    target_port_ = this->get_parameter("target_port").as_int();
+    can_channel_ = this->get_parameter("can_channel").as_string();
+
+    RCLCPP_INFO(this->get_logger(), "Altair Ethernet-CAN Bridge ノードを初期化しています...");
+    RCLCPP_INFO(this->get_logger(), "接続先: %s:%d, 対象チャンネル: %s",
+      target_ip_.c_str(), target_port_, can_channel_.c_str());
+
+    // ROS2パブリッシャとサブスクライバの初期化
+    can_rx_pub_ = this->create_publisher<can_msgs::msg::Frame>("/altair/can/rx", 100);
+    can_status_pub_ = this->create_publisher<altair_interfaces::msg::CanStatus>("/altair/can/status", 10);
+
+    can_tx_sub_ = this->create_subscription<can_msgs::msg::Frame>(
+      "/altair/can/tx", 100,
+      std::bind(&EthCanBridgeNode::handle_can_tx_callback, this, std::placeholders::_1));
+
+    // ROS2サービスサーバーの初期化
+    connect_can_srv_ = this->create_service<altair_interfaces::srv::ConnectCan>(
+      "/altair/can/connect",
+      std::bind(&EthCanBridgeNode::handle_connect_can_service, this, std::placeholders::_1, std::placeholders::_2));
+
+    connect_eth_can_srv_ = this->create_service<altair_interfaces::srv::ConnectEthCan>(
+      "/altair/eth_can/connect",
+      std::bind(&EthCanBridgeNode::handle_connect_eth_can_service, this, std::placeholders::_1, std::placeholders::_2));
+
+    // 接続ステータス配信用のタイマー (1Hz)
+    status_timer_ = this->create_wall_timer(
+      1000ms, std::bind(&EthCanBridgeNode::publish_status, this));
+
+    // 受信スレッドの開始
+    rx_thread_running_ = true;
+    rx_thread_ = std::thread(&EthCanBridgeNode::rx_thread_loop, this);
+
+    // 自動接続・再接続スレッドの開始
+    auto_connect_running_ = true;
+    auto_connect_thread_ = std::thread(&EthCanBridgeNode::auto_connect_loop, this);
+
+    RCLCPP_INFO(this->get_logger(), "Ethernet-CAN Bridge ノードが起動しました。");
+  }
+
+  ~EthCanBridgeNode()
+  {
+    auto_connect_running_ = false;
+    if (auto_connect_thread_.joinable()) {
+      auto_connect_thread_.join();
+    }
+
+    rx_thread_running_ = false;
+    if (rx_thread_.joinable()) {
+      rx_thread_.join();
+    }
+
+    close_socket();
+  }
+
+private:
+  // --- 1. ROS2トピック ➔ Ethernet-CAN (TX) ---
+  void handle_can_tx_callback(const can_msgs::msg::Frame::SharedPtr msg)
+  {
+    std::lock_guard<std::mutex> lock(socket_mutex_);
+    if (!is_connected_ || sock_ < 0) {
+      return;
+    }
+
+    // Analyzer Mode 送信パケット構造 (20バイト)
+    // 0..1:   CAN1 ID
+    // 2..9:   CAN1 Data (8バイト)
+    // 10..11: CAN2 ID
+    // 12..19: CAN2 Data (8バイト)
+    uint8_t payload[20];
+    std::memset(payload, 0, sizeof(payload));
+
+    uint16_t standard_id = static_cast<uint16_t>(msg->id & 0x7FF);
+    uint8_t dlc = msg->dlc > 8 ? 8 : msg->dlc;
+
+    bool send_to_can2 = false;
+    if (can_channel_ == "can2") {
+      send_to_can2 = true;
+    } else if (can_channel_ == "both" && msg->header.frame_id == "can2") {
+      send_to_can2 = true;
+    }
+
+    size_t base_offset = send_to_can2 ? 10 : 0;
+    payload[base_offset]     = (standard_id >> 8) & 0xFF;
+    payload[base_offset + 1] = standard_id & 0xFF;
+    for (size_t i = 0; i < dlc; ++i) {
+      payload[base_offset + 2 + i] = msg->data[i];
+    }
+
+    // ソケットへ即時送信
+    ssize_t bytes_sent = send(sock_, payload, sizeof(payload), MSG_NOSIGNAL);
+    if (bytes_sent < 0) {
+      if (errno == EAGAIN || errno == EWOULDBLOCK) {
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+          "TCP送信バッファ満杯のためパケットをスキップしました。");
+        return;
+      }
+      RCLCPP_ERROR(this->get_logger(), "TCPパケットの送信に失敗しました: %s", strerror(errno));
+      handle_disconnect("TCP送信エラー");
+    }
+  }
+
+  // --- 2. Ethernet-CAN ➔ ROS2トピック (RXスレッド) ---
+  void rx_thread_loop()
+  {
+    constexpr size_t ANALYZER_RX_SIZE = 60;
+    uint8_t rx_buffer[ANALYZER_RX_SIZE];
+    size_t buffer_filled = 0;
+
+    while (rx_thread_running_ && rclcpp::ok()) {
+      int current_sock = -1;
+      {
+        std::lock_guard<std::mutex> lock(socket_mutex_);
+        if (is_connected_ && sock_ >= 0) {
+          current_sock = sock_;
+        }
+      }
+
+      if (current_sock < 0) {
+        buffer_filled = 0;
+        std::this_thread::sleep_for(100ms);
+        continue;
+      }
+
+      // タイムアウト付きポーリング
+      fd_set read_fds;
+      FD_ZERO(&read_fds);
+      FD_SET(current_sock, &read_fds);
+
+      struct timeval tv;
+      tv.tv_sec = 0;
+      tv.tv_usec = 100000; // 100ms
+
+      int ret = select(current_sock + 1, &read_fds, nullptr, nullptr, &tv);
+      if (ret < 0) {
+        if (errno == EINTR) continue;
+        RCLCPP_ERROR(this->get_logger(), "select エラー: %s", strerror(errno));
+        handle_disconnect("selectエラー");
+        continue;
+      } else if (ret == 0) {
+        // タイムアウト
+        continue;
+      }
+
+      // データ読み取り (60バイトたまるまで受信用)
+      ssize_t bytes_read = recv(current_sock, rx_buffer + buffer_filled, ANALYZER_RX_SIZE - buffer_filled, 0);
+      if (bytes_read <= 0) {
+        if (bytes_read < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+          continue;
+        }
+        RCLCPP_WARN(this->get_logger(), "TCP接続がリモートによって切断されました。");
+        handle_disconnect("相手先による切断検知");
+        continue;
+      }
+
+      buffer_filled += bytes_read;
+
+      // 60バイトに達したらパースしてパブリッシュ
+      if (buffer_filled >= ANALYZER_RX_SIZE) {
+        buffer_filled = 0;
+
+        // 1. CAN1 受信フレームの復元 (オフセット 0..9)
+        uint16_t can1_id = (static_cast<uint16_t>(rx_buffer[0]) << 8) | rx_buffer[1];
+        if (can1_id != 0) {
+          auto frame_msg = std::make_shared<can_msgs::msg::Frame>();
+          frame_msg->header.stamp = this->now();
+          frame_msg->header.frame_id = "can1";
+          frame_msg->id = can1_id;
+          frame_msg->is_extended = false;
+          frame_msg->is_rtr = false;
+          frame_msg->is_error = false;
+          frame_msg->dlc = 8;
+          std::copy(rx_buffer + 2, rx_buffer + 10, frame_msg->data.begin());
+
+          can_rx_pub_->publish(*frame_msg);
+        }
+
+        // 2. CAN2 受信フレームの復元 (オフセット 10..19)
+        uint16_t can2_id = (static_cast<uint16_t>(rx_buffer[10]) << 8) | rx_buffer[11];
+        if (can2_id != 0) {
+          auto frame_msg = std::make_shared<can_msgs::msg::Frame>();
+          frame_msg->header.stamp = this->now();
+          frame_msg->header.frame_id = "can2";
+          frame_msg->id = can2_id;
+          frame_msg->is_extended = false;
+          frame_msg->is_rtr = false;
+          frame_msg->is_error = false;
+          frame_msg->dlc = 8;
+          std::copy(rx_buffer + 12, rx_buffer + 20, frame_msg->data.begin());
+
+          can_rx_pub_->publish(*frame_msg);
+        }
+      }
+    }
+  }
+
+  // --- 3. ソケット接続処理 ---
+  bool trigger_connect(const std::string& ip, int port)
+  {
+    std::lock_guard<std::mutex> lock(socket_mutex_);
+    close_socket_nolock();
+
+    RCLCPP_INFO(this->get_logger(), "Ethernet-CAN 基板へ接続を試みています... (%s:%d)", ip.c_str(), port);
+
+    int s = socket(AF_INET, SOCK_STREAM, 0);
+    if (s < 0) {
+      last_error_ = "ソケット生成に失敗しました: " + std::string(strerror(errno));
+      RCLCPP_ERROR(this->get_logger(), "%s", last_error_.c_str());
+      return false;
+    }
+
+    // TCP_NODELAY (Nagleアルゴリズム無効化) の設定
+    int flag = 1;
+    setsockopt(s, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<char*>(&flag), sizeof(int));
+
+    // 送受信タイムアウトの設定 (1秒)
+    struct timeval timeout;
+    timeout.tv_sec = 1;
+    timeout.tv_usec = 0;
+    setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<char*>(&timeout), sizeof(timeout));
+    setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<char*>(&timeout), sizeof(timeout));
+
+    struct sockaddr_in serv_addr;
+    std::memset(&serv_addr, 0, sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_port = htons(port);
+
+    if (inet_pton(AF_INET, ip.c_str(), &serv_addr.sin_addr) <= 0) {
+      last_error_ = "不正なIPアドレス形式です: " + ip;
+      RCLCPP_ERROR(this->get_logger(), "%s", last_error_.c_str());
+      close(s);
+      return false;
+    }
+
+    if (connect(s, reinterpret_cast<struct sockaddr*>(&serv_addr), sizeof(serv_addr)) < 0) {
+      last_error_ = "接続に失敗しました: " + std::string(strerror(errno));
+      RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000, "%s", last_error_.c_str());
+      close(s);
+      return false;
+    }
+
+    sock_ = s;
+    is_connected_ = true;
+    target_ip_ = ip;
+    target_port_ = port;
+    last_error_ = "";
+
+    RCLCPP_INFO(this->get_logger(), "Ethernet-CAN 基板 (%s:%d) へのTCP接続が完了しました！", ip.c_str(), port);
+    return true;
+  }
+
+  void handle_disconnect(const std::string& error_msg)
+  {
+    std::lock_guard<std::mutex> lock(socket_mutex_);
+    close_socket_nolock();
+    last_error_ = error_msg;
+    RCLCPP_WARN(this->get_logger(), "CAN接続が切断されました: %s", error_msg.c_str());
+  }
+
+  void close_socket()
+  {
+    std::lock_guard<std::mutex> lock(socket_mutex_);
+    close_socket_nolock();
+  }
+
+  void close_socket_nolock()
+  {
+    if (sock_ >= 0) {
+      close(sock_);
+      sock_ = -1;
+    }
+    is_connected_ = false;
+  }
+
+  // --- 4. 自動接続ループ ---
+  void auto_connect_loop()
+  {
+    while (auto_connect_running_ && rclcpp::ok()) {
+      bool need_connect = false;
+      {
+        std::lock_guard<std::mutex> lock(socket_mutex_);
+        need_connect = (!is_connected_ || sock_ < 0);
+      }
+
+      if (need_connect) {
+        trigger_connect(target_ip_, target_port_);
+      }
+
+      std::this_thread::sleep_for(1500ms);
+    }
+  }
+
+  // --- 5. ステータス配信 ---
+  void publish_status()
+  {
+    auto status_msg = altair_interfaces::msg::CanStatus();
+    {
+      std::lock_guard<std::mutex> lock(socket_mutex_);
+      status_msg.is_connected = is_connected_;
+      status_msg.active_port = target_ip_ + ":" + std::to_string(target_port_);
+      status_msg.bitrate = 1000000;
+      status_msg.error_message = last_error_;
+    }
+    can_status_pub_->publish(status_msg);
+  }
+
+  // --- 6. サービスハンドラ ---
+  void handle_connect_can_service(
+    const std::shared_ptr<altair_interfaces::srv::ConnectCan::Request> request,
+    std::shared_ptr<altair_interfaces::srv::ConnectCan::Response> response)
+  {
+    (void)request;
+    RCLCPP_INFO(this->get_logger(), "手動再接続リクエストを受信しました。");
+    bool ok = trigger_connect(target_ip_, target_port_);
+    response->success = ok;
+    response->message = ok ? "接続成功" : last_error_;
+  }
+
+  void handle_connect_eth_can_service(
+    const std::shared_ptr<altair_interfaces::srv::ConnectEthCan::Request> request,
+    std::shared_ptr<altair_interfaces::srv::ConnectEthCan::Response> response)
+  {
+    RCLCPP_INFO(this->get_logger(), "設定変更リクエストを受信しました: %s:%d",
+      request->target_ip.c_str(), request->target_port);
+    bool ok = trigger_connect(request->target_ip, request->target_port);
+    response->success = ok;
+    response->message = ok ? "接続成功" : last_error_;
+  }
+
+  // 内部変数
+  std::atomic<bool> is_connected_;
+  int sock_;
+  std::mutex socket_mutex_;
+  std::string target_ip_;
+  int target_port_;
+  std::string can_channel_;
+  std::string last_error_;
+
+  // スレッド制御
+  std::atomic<bool> rx_thread_running_;
+  std::thread rx_thread_;
+  std::atomic<bool> auto_connect_running_;
+  std::thread auto_connect_thread_;
+
+  // ROS2 インターフェース
+  rclcpp::Publisher<can_msgs::msg::Frame>::SharedPtr can_rx_pub_;
+  rclcpp::Publisher<altair_interfaces::msg::CanStatus>::SharedPtr can_status_pub_;
+  rclcpp::Subscription<can_msgs::msg::Frame>::SharedPtr can_tx_sub_;
+  rclcpp::Service<altair_interfaces::srv::ConnectCan>::SharedPtr connect_can_srv_;
+  rclcpp::Service<altair_interfaces::srv::ConnectEthCan>::SharedPtr connect_eth_can_srv_;
+  rclcpp::TimerBase::SharedPtr status_timer_;
+};
+
+int main(int argc, char** argv)
+{
+  rclcpp::init(argc, argv);
+  auto node = std::make_shared<EthCanBridgeNode>();
+  rclcpp::spin(node);
+  rclcpp::shutdown();
+  return 0;
+}

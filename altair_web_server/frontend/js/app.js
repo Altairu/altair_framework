@@ -28,6 +28,14 @@ document.addEventListener("DOMContentLoaded", () => {
     canStatusIndicator: document.getElementById("can-status-indicator"),
     groupConnectionSlcan: document.getElementById("group-connection-slcan"),
     slcanConnectionStatus: document.getElementById("slcan-connection-status"),
+    tabModeEth: document.getElementById("tab-mode-eth"),
+    tabModeUsb: document.getElementById("tab-mode-usb"),
+    panelConnEth: document.getElementById("panel-conn-eth"),
+    panelConnUsb: document.getElementById("panel-conn-usb"),
+    txtEthIp: document.getElementById("txt-eth-ip"),
+    txtEthPort: document.getElementById("txt-eth-port"),
+    btnConnectEth: document.getElementById("btn-connect-eth"),
+    btnDisconnectEth: document.getElementById("btn-disconnect-eth"),
     chkAutoConnect: document.getElementById("chk-auto-connect"),
     selCanPort: document.getElementById("sel-can-port"),
     btnRefreshPorts: document.getElementById("btn-refresh-ports"),
@@ -171,8 +179,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (data.is_connected) {
       dot.className = "status-dot connected";
       text.textContent = `CAN: Connected (${data.active_port})`;
-      el.btnConnectCan.disabled = true;
-      el.btnDisconnectCan.disabled = false;
+      if (el.btnConnectCan) el.btnConnectCan.disabled = true;
+      if (el.btnDisconnectCan) el.btnDisconnectCan.disabled = false;
+      if (el.btnConnectEth) el.btnConnectEth.disabled = true;
+      if (el.btnDisconnectEth) el.btnDisconnectEth.disabled = false;
 
       // slcan接続グループのUI更新
       if (el.slcanConnectionStatus) {
@@ -185,8 +195,10 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
       dot.className = "status-dot disconnected";
       text.textContent = "CAN: Disconnected";
-      el.btnConnectCan.disabled = false;
-      el.btnDisconnectCan.disabled = true;
+      if (el.btnConnectCan) el.btnConnectCan.disabled = false;
+      if (el.btnDisconnectCan) el.btnDisconnectCan.disabled = true;
+      if (el.btnConnectEth) el.btnConnectEth.disabled = false;
+      if (el.btnDisconnectEth) el.btnDisconnectEth.disabled = true;
 
       // slcan接続グループのUI更新
       if (el.slcanConnectionStatus) {
@@ -877,6 +889,62 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   el.btnRefreshPorts.addEventListener("click", refreshPorts);
+
+  // Ethernet / USB 接続モードタブ切り替え
+  if (el.tabModeEth && el.tabModeUsb) {
+    el.tabModeEth.addEventListener("click", () => {
+      el.tabModeEth.className = "btn btn-sm btn-primary";
+      el.tabModeUsb.className = "btn btn-sm btn-secondary";
+      el.panelConnEth.style.display = "block";
+      el.panelConnUsb.style.display = "none";
+    });
+
+    el.tabModeUsb.addEventListener("click", () => {
+      el.tabModeUsb.className = "btn btn-sm btn-primary";
+      el.tabModeEth.className = "btn btn-sm btn-secondary";
+      el.panelConnUsb.style.display = "block";
+      el.panelConnEth.style.display = "none";
+    });
+  }
+
+  // Ethernet-CAN 設定の初期ロード
+  async function loadEthCanConfig() {
+    try {
+      const res = await fetch("/api/eth_can/config");
+      const cfg = await res.json();
+      if (cfg.target_ip && el.txtEthIp) el.txtEthIp.value = cfg.target_ip;
+      if (cfg.target_port && el.txtEthPort) el.txtEthPort.value = cfg.target_port;
+    } catch (e) {
+      // 読み込み失敗時は初期値を維持
+    }
+  }
+  loadEthCanConfig();
+
+  // Ethernet-CAN 接続ボタン
+  if (el.btnConnectEth) {
+    el.btnConnectEth.addEventListener("click", async () => {
+      const ip = el.txtEthIp.value.trim();
+      const port = parseInt(el.txtEthPort.value.trim(), 10) || 5000;
+
+      appendTerminalLog(el.behaviorTerminal, `Ethernet-CAN (${ip}:${port}) への接続要求を送信中...`);
+
+      try {
+        const res = await fetch("/api/eth_can/connect", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ target_ip: ip, target_port: port })
+        });
+        const data = await res.json();
+        if (data.success) {
+          appendTerminalLog(el.behaviorTerminal, `[SYSTEM] ${data.message}`, "system-msg");
+        } else {
+          appendTerminalLog(el.behaviorTerminal, `[ERROR] ${data.message}`, "error-msg");
+        }
+      } catch (err) {
+        appendTerminalLog(el.behaviorTerminal, `[ERROR] 通信に失敗しました: ${err}`, "error-msg");
+      }
+    });
+  }
 
   // 自動探索チェックボックスの挙動
   el.chkAutoConnect.addEventListener("change", (e) => {

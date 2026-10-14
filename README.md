@@ -1,31 +1,61 @@
-[English](#english-version) / [日本語](#japanese-version)
-
-<a name="japanese-version"></a>
 # Altair Framework (altair_framework)
 
 CANバス（1 Mbps）で統一されたアクチュエータ制御モジュール群「Altair Module System」を、ROS2およびブラウザ（PC/スマホ）からシームレスに一括制御・管理するための統合ROS2パッケージです。
 
 ロボット側のプログラムを完全に固定したまま、操縦者PC側でモジュール構成の動的変更やプロファイルの瞬時切り替え、PS5コントローラー連携、およびPython/Blocklyによる自律動作プログラムの動的起動とリアルタイムデバッグをサポートします。
 
+```mermaid
+flowchart TD
+    subgraph UI ["操作端末 (スマホ / PC)"]
+        Browser["ブラウザ / WebUI"]
+    end
+
+    subgraph RobotPC ["ロボット搭載 PC (NUC等)"]
+        WebServer["altair_web_server (FastAPI / WS)"]
+        Mgr["module_manager (altair_core)"]
+        Runner["behavior_runner (altair_core)"]
+        EthBridge["altair_eth_can_bridge (TCP Client)"]
+        UsbBridge["altair_can_bridge (SocketCAN / 非推奨)"]
+    end
+
+    subgraph Hardware ["ハードウェア"]
+        EthBoard["Ethernet-CAN 変換基板 (W5500)"]
+        UsbDongle["USB-to-CAN アダプタ"]
+        Modules["CAN モジュール群 (MDD / サーボ / 電磁弁)"]
+    end
+
+    Browser <-->|"WiFi"| WebServer
+    WebServer <-->|"ROS2 トピック / サービス"| Mgr
+    WebServer <-->|"ROS2 サービス"| Runner
+    Mgr <-->|"/altair/can/tx, rx"| EthBridge
+    Mgr -.->|"/altair/can/tx, rx"| UsbBridge
+    EthBridge <-->|"有線LAN (TCP)"| EthBoard
+    UsbBridge -.->|"SocketCAN can0"| UsbDongle
+    EthBoard <-->|"1Mbps CANバス"| Modules
+    UsbDongle -.->|"1Mbps CANバス"| Modules
+```
+
 ---
 
 ## ディレクトリとドキュメントの配置
 
-本リポジトリは、以下のマルチパッケージ構造で構成されています。詳細なドキュメントは **[GitHub Wiki](https://github.com/Altairu/altair_framework/wiki)** をご参照ください。
+本リポジトリは、以下のマルチパッケージ構造で構成されています。詳細なドキュメントは docs/ ディレクトリをご参照ください。
 
 ```text
 altair_framework/
 ├── README.md
 ├── build.sh / colconビルド用スクリプト
-├── run_nuc.sh / NUCロボット側の起動スクリプト
-├── run_operator.sh / 操縦PC側の起動スクリプト
+├── run_standalone.sh / 単一PC運用 (スタンドアロン) の一括起動スクリプト (推奨)
+├── run_nuc.sh / NUCロボット側の起動スクリプト (2台PC運用時)
+├── run_operator.sh / 操縦PC側の起動スクリプト (2台PC運用時)
 │
 ├── altair_interfaces/ / カスタムメッセージとサービス定義
-├── altair_can_bridge/ / NUC側SocketCANブリッジ
-├── altair_core/ / 操縦PC側システム制御とプログラムランナー
+├── altair_eth_can_bridge/ / Ethernet-CAN (TCP / Analyzer Mode) ブリッジ (推奨)
+├── altair_can_bridge/ / SocketCAN (USB slcan) ブリッジ (非推奨)
+├── altair_core/ / システム制御と自律動作プログラムランナー
 ├── altair_web_server/ / FastAPIサーバーとWebUI
 ├── user_behaviors/ / 自律動作プログラムの配置場所
-└── docs/ / ローカルドキュメント（Wiki の事前ステージング用）
+└── docs/ / 詳細ドキュメント群
 ```
 
 ---
@@ -35,7 +65,7 @@ altair_framework/
 本パッケージは、Ubuntu 22.04 + ROS2 Humble 環境での動作を確認しています。
 
 ### 依存パッケージのインストール
-物理CANフレームをROS2上で扱うための標準パッケージ `can_msgs` / ビルドツールをインストールします。
+物理CANフレームをROS2上で扱うための標準パッケージ can_msgs / ビルドツールをインストールします。
 ```bash
 sudo apt update
 sudo apt install ros-humble-can-msgs python3-colcon-common-extensions
@@ -51,7 +81,7 @@ pip install fastapi uvicorn websockets
 ワークスペースのトップでビルドスクリプトを実行します。
 ```bash
 # 実行権限の付与
-chmod +x build.sh run_nuc.sh run_operator.sh
+chmod +x build.sh run_standalone.sh run_nuc.sh run_operator.sh
 chmod +x altair_can_bridge/scripts/setup_slcan.sh
 
 # ビルドの実行
@@ -61,46 +91,56 @@ chmod +x altair_can_bridge/scripts/setup_slcan.sh
 ./build.sh --clean
 ```
 
-別PCやUbuntu間でワークスペースを移動した直後は、古いCMakeキャッシュとの不整合を避けるため `./build.sh --clean` を推奨します。
-
----
-
-## トラブルシュート
-
-### CMakeCache.txt のパス不一致エラーが出る場合
-
-エラー内容：
-* `CMake Error: The current CMakeCache.txt directory ... is different than the directory ... where CMakeCache.txt was created`
-* `CMake Error: The source "..." does not match the source "..." used to generate cache`
-
-原因：
-以前の別パスで生成された `build/` キャッシュが残っていることが原因です。たとえばWindows側の `/mnt/c/...` などでビルドした場合に発生します。
-
-対処：
-```bash
-./build.sh --clean
-```
-上記を実行すると `build/` / `install/` / `log/` を削除してから再ビルドするため、パス不一致を解消できます。
+別PCやUbuntu間でワークスペースを移動した直後は、古いCMakeキャッシュとの不整合を避けるため ./build.sh --clean を推奨します。
 
 ---
 
 ## 起動と運用コマンド
 
-### NUCロボット側
-物理接続されているPCで実行します。USB-to-CAN / CANable 2の自動探索 / SocketCAN `can0` インターフェースの1 Mbpsでの自動起動 / ブリッジノードの立ち上げを一括で行います。
-```bash
-./run_nuc.sh
-```
-詳細な設定方法は **[Wiki: NUCセットアップガイド](https://github.com/Altairu/altair_framework/wiki/NUC-Setup-Guide)** を参照してください。
+ロボットの運用形態（PC 1台運用または 2台運用）および通信ハードウェア（Ethernet-CAN または USB-to-CAN）に応じて起動方法を選択できます。
 
-### 操縦PC側
-WiFi経由で操作するPCで実行します。モジュールマネージャー / 動作プログラムランナー / WebUIサーバーノードを一括で起動します。Ctrl+Cを押すとバックグラウンドノードも同時に終了します。
-```bash
-./run_operator.sh
+### PC 1台運用（推奨：ロボット搭載PCのみで全ノードを実行）
+制御ループと通信をロボット内部で完結させるため、ロボコン会場での無線トラブルに最も強い構成です。
+
+```mermaid
+flowchart LR
+    Browser["ブラウザ (スマホ / ノートPC)"] <-->|"WiFi"| RobotPC["ロボット搭載PC (全ノード起動)"]
+    RobotPC <-->|"有線LAN (TCP)"| Board["Ethernet-CAN 基板"]
+    Board <-->|"CANバス"| CAN["CAN モジュール群"]
 ```
 
+```bash
+# Ethernet-CAN を使用する場合 (推奨 / デフォルト: 192.168.2.123:5000)
+./run_standalone.sh
+
+# 従来の USB-to-CAN を使用する場合 (非推奨)
+./run_standalone.sh --usb
+```
 起動後、同一WiFiネットワーク内のPCやスマートフォンのブラウザから、以下のURLにアクセスします。
-* URL: `http://<NUCのIPアドレス>:8000/`
+* URL: `http://<ロボットPCのIPアドレス>:8000/`
+
+### PC 2台運用（ロボット側 NUC + 操縦者 PC）
+
+```mermaid
+flowchart LR
+    OperatorPC["操縦者PC (WebUI / Coreノード)"] <-->|"WiFi (ROS2 DDS)"| NUC["ロボット側NUC (CANブリッジノード)"]
+    NUC <-->|"有線LAN (TCP)"| Board["Ethernet-CAN 基板"]
+    Board <-->|"CANバス"| CAN["CAN モジュール群"]
+```
+
+* ロボット側 NUC
+  ```bash
+  # Ethernet-CAN (推奨 / デフォルト)
+  ./run_nuc.sh
+
+  # 従来の USB-to-CAN (非推奨)
+  ./run_nuc.sh --usb
+  ```
+* 操縦者 PC
+  ```bash
+  ./run_operator.sh
+  ```
+  起動後、ブラウザから `http://localhost:8000/` または `http://<NUCのIPアドレス>:8000/` にアクセスします。
 
 ---
 
@@ -130,132 +170,3 @@ WiFi経由で操作するPCで実行します。モジュールマネージャ�
 本プロジェクトは MIT License の元で公開されています。詳細は [LICENSE](LICENSE) ファイルを参照してください。
 
 ---
-
-<a name="english-version"></a>
-# Altair Framework (altair_framework)
-
-An integrated ROS2 package designed to seamlessly control and manage the actuator control module group "Altair Module System" unified by CAN bus (1 Mbps) from ROS2 and web browsers (PC / smartphone).
-
-While keeping the robot side program completely fixed, it supports dynamic configuration changes, instant profile switching, PS5 controller integration, and dynamic launching and real-time debugging of autonomous behavior programs written in Python / Blockly.
-
----
-
-## Directory and Document Layout
-
-This repository consists of the following multi-package structure. For detailed documentation, refer to the **[GitHub Wiki](https://github.com/Altairu/altair_framework/wiki)**.
-
-```text
-altair_framework/
-├── README.md
-├── build.sh / Simple script for colcon build
-├── run_nuc.sh / Startup script for the NUC robot side
-├── run_operator.sh / Startup script for the operator PC side
-│
-├── altair_interfaces/ / Custom messages and services package
-├── altair_can_bridge/ / NUC side SocketCAN bridge with auto-detection
-├── altair_core/ / Operator PC side system control and behavior runner
-├── altair_web_server/ / Operator PC side FastAPI web/websocket server and dashboard UI
-├── user_behaviors/ / Directory for autonomous behavior scripts
-└── docs/ / Local documentation (for Wiki staging)
-```
-
----
-
-## Prerequisites and Setup Guide
-
-Tested environment: Ubuntu 22.04 + ROS2 Humble.
-
-### Install Dependency Packages
-Install `can_msgs` package and colcon build tools.
-```bash
-sudo apt update
-sudo apt install ros-humble-can-msgs python3-colcon-common-extensions
-```
-
-### Install Python Libraries
-Install libraries required for FastAPI web server.
-```bash
-pip install fastapi uvicorn websockets
-```
-
-### Build Repository
-Run the build script at the workspace root.
-```bash
-# Grant execution permissions
-chmod +x build.sh run_nuc.sh run_operator.sh
-chmod +x altair_can_bridge/scripts/setup_slcan.sh
-
-# Run build
-./build.sh
-
-# Clean build
-./build.sh --clean
-```
-
-When moving the workspace between PCs or WSL, `./build.sh --clean` is recommended to avoid CMake cache conflicts.
-
----
-
-## Troubleshooting
-
-### Path Mismatch in CMakeCache.txt
-
-Error message:
-* `CMake Error: The current CMakeCache.txt directory ... is different than the directory ... where CMakeCache.txt was created`
-* `CMake Error: The source "..." does not match the source "..." used to generate cache`
-
-Cause:
-Remaining build cache from a different path (such as Windows `/mnt/c/...` path).
-
-Solution:
-```bash
-./build.sh --clean
-```
-This command removes `build/`, `install/`, and `log/` directories, and then rebuilds the workspace to resolve path conflicts.
-
----
-
-## Execution and Operations
-
-### NUC Robot Side
-Run on the PC physically connected to the CAN bus. It handles auto-detection of USB-to-CAN adapter, brings up SocketCAN `can0` interface at 1 Mbps, and starts the bridge node.
-```bash
-./run_nuc.sh
-```
-Refer to **[Wiki: NUC Setup Guide](https://github.com/Altairu/altair_framework/wiki/NUC-Setup-Guide)** for persistent port naming, passwordless SocketCAN setup, and auto-start on boot.
-
-### Operator PC Side
-Run on the PC operating the robot over WiFi. It launches Module Manager, Behavior Runner, and WebUI Server. Press Ctrl+C to terminate all background nodes safely.
-```bash
-./run_operator.sh
-```
-
-After startup, access the following URL from a PC or smartphone browser on the same WiFi network.
-* URL: `http://<NUC_IP_ADDRESS>:8000/`
-
----
-
-## WebUI Features
-
-* Dashboard: Module cards for drive_mdd, arm_servo, and valve_controller are dynamically generated, enabling low-latency operation via sliders and toggles. Limit switch status and encoder data are displayed in real-time.
-* Profiles: Switch module configurations using profiles like `profiles/hoge.json` with a single click. Support local JSON export and import.
-* Controller: Auto-detects Bluetooth connected PS5 controllers to map analog sticks and buttons.
-* **Programs**: Dynamically select, launch, and stop any Python script in the `user_behaviors/` directory from the WebUI. New program files are automatically detected and displayed in the dropdown menu without restarting. Script output and error logs are streamed in real-time.
-* Automation: Build automation macros using Google Blockly. Supports robot kinematics control for differential drive, mecanum, and omni systems.
-
----
-
-## Autonomous Programming with AI
-
-This package provides a prompt template to help AI generate behavior scripts without bugs.
-
-* Copy the contents of **[Wiki: Behavior Programming Guide](https://github.com/Altairu/altair_framework/wiki/Behavior-Programming-Guide)**.
-* Paste it into your AI chat interface.
-* Append your target scenario to the prompt template at the bottom of the guide and send it.
-* Save the generated Python code to the `user_behaviors/` directory with any filename (`*.py`). The file will be automatically detected in the WebUI Programs dropdown menu.
-
----
-
-## License
-
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.

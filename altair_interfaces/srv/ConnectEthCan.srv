@@ -1,0 +1,9 @@
+# Ethernet-CAN 基板への接続・再接続を指示するサービス定義
+
+# Request
+string target_ip         # 接続先IPアドレス (例: "192.168.2.123")
+int32 target_port        # 接続先ポート番号 (例: 5000)
+---
+# Response
+bool success             # 接続が成功したか
+string message           # 結果ステータスメッセージやエラー内容
