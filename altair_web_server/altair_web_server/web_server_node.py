@@ -702,6 +702,35 @@ def main(args=None):
     ros_thread.daemon = True
     ros_thread.start()
 
+    # サーバーのアクセス先IPアドレスを自動検出して表示
+    import socket
+    local_ips = []
+    try:
+        # 外部接続可能なインターフェースから実IPを取得
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        primary_ip = s.getsockname()[0]
+        s.close()
+        local_ips.append(primary_ip)
+    except Exception:
+        pass
+
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            ip = info[4][0]
+            if not ip.startswith("127.") and ip not in local_ips:
+                local_ips.append(ip)
+    except Exception:
+        pass
+
+    print("\n=======================================================")
+    print(" Altair Web Controller が起動しました！")
+    print(" ブラウザから以下のURLでアクセスできます:")
+    print("   ローカル:   http://localhost:8000/")
+    for ip in local_ips:
+        print(f"   WiFi / LAN: http://{ip}:8000/")
+    print("=======================================================\n")
+
     # Uvicorn サーバーの設定と明示的ループでの起動
     config = uvicorn.Config(
         app,

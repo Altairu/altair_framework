@@ -54,8 +54,17 @@ sleep 1
 
 # 5. Web Server / Dashboard UI をフォアグラウンドで起動
 echo "3. Web Server & Dashboard をポート8000で起動中..."
+
+HOST_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+if [ -z "$HOST_IP" ]; then
+    HOST_IP=$(ip -4 addr show scope global 2>/dev/null | grep inet | awk '{print $2}' | cut -d/ -f1 | head -n 1)
+fi
+if [ -z "$HOST_IP" ]; then
+    HOST_IP="localhost"
+fi
+
 echo "同じWiFi上のPCやスマホから、以下のURLでアクセスできます:"
-echo "👉 http://<NUC_IP_ADDRESS>:8000/"
+echo "👉 http://${HOST_IP}:8000/ (ローカルからは http://localhost:8000/)"
 echo "====================================================="
 
 ros2 run altair_web_server web_server_node
