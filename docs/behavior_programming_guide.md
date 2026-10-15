@@ -31,14 +31,14 @@ class MyCustomBehavior(AltairBehavior):
         self.valve = self.get_module("valve_controller")
 
     def loop(self):
-        """デフォルトで10ミリ秒ごとに周期実行する処理です。"""
+        """デフォルトで2ミリ秒ごとに周期実行する処理です。"""
         # 制御ロジックを記述します
         pass
 
 def main(args=None):
     rclpy.init(args=args)
     behavior = MyCustomBehavior("my_behavior_node")
-    behavior.run(rate_hz=100.0)
+    behavior.run(rate_hz=500.0)
 
 if __name__ == '__main__':
     main()

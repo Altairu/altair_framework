@@ -111,7 +111,7 @@ class PickAndPlaceBehavior(AltairBehavior):
 def main(args=None):
     rclpy.init(args=args)
     behavior = PickAndPlaceBehavior("example_behavior_node")
-    behavior.run(rate_hz=100.0)
+    behavior.run(rate_hz=500.0)
 
 if __name__ == '__main__':
     main()

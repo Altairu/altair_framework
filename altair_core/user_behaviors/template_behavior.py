@@ -62,7 +62,7 @@ def main(args=None):
     behavior = TemplateBehavior("my_custom_behavior")
     
     # 周期ループを開始します。周波数は100 Hzで、10ミリ秒周期です。
-    behavior.run(rate_hz=100.0)
+    behavior.run(rate_hz=500.0)
     
     # 終了処理は自動で行われます
 

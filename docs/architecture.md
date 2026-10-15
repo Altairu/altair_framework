@@ -36,7 +36,7 @@ flowchart TD
     WebServer <-->|ROS2 サービス| Runner
     Runner <-->|サブプロセス監視| Behavior
     Behavior <-->|ROS2 トピック| Mgr
-    Mgr <-->|/altair/can/tx, rx (100Hz)| EthBridge
+    Mgr <-->|/altair/can/tx, rx (500Hz)| EthBridge
     EthBridge <-->|有線LAN (TCP Port 5000)| EthBoard
     EthBoard <-->|1Mbps CANバス| Modules
 ```
@@ -50,7 +50,7 @@ altair_framework は、ロボットの重量や競技要件に応じて2通り�
 * 単一 PC 運用 (スタンドアロン運用 / 推奨)
   * ロボット搭載 PC（NUC など）で全ノード（web_server_node, module_manager, behavior_runner, altair_eth_can_bridge）を一括起動します。
   * 操縦者は手元のスマートフォンやノート PC から、ロボットの WiFi アクセスポイントへ接続してブラウザ上で操作します。
-  * 100Hz のモータ制御ループと Ethernet-CAN 通信がすべて有線 LAN および PC 内部で完結するため、会場の電波環境に左右されず最も安全です。
+  * 500Hz のモータ制御ループと Ethernet-CAN 通信がすべて有線 LAN および PC 内部で完結するため、会場の電波環境に左右されず最も安全です。
 * 2台 PC 運用 (ロボット側 NUC + 操縦 PC)
   * ロボット側 PC では通信ブリッジノード（altair_eth_can_bridge または altair_can_bridge）のみを起動します。
   * 操縦 PC 側で module_manager や Web サーバーを実行し、2台の PC 間を WiFi（ROS2 DDS）で接続します。
@@ -133,7 +133,7 @@ flowchart LR
 
 ## 制御開始シーケンス
 
-安全仕様として、MDD モータドライバは起動直後にパラメータ設定モード（Setup Mode）で待機します。WebUI からパラメータ送信ボタンを押すことで、全パラメータが一括送出され、安全に 100Hz の制御ループへ移行します。
+安全仕様として、MDD モータドライバは起動直後にパラメータ設定モード（Setup Mode）で待機します。WebUI からパラメータ送信ボタンを押すことで、全パラメータが一括送出され、安全に 500Hz の制御ループへ移行します。
 
 ```mermaid
 sequenceDiagram

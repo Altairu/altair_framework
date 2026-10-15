@@ -210,10 +210,10 @@ class AltairBehavior(Node):
         """
         pass
 
-    def run(self, rate_hz=100.0):
+    def run(self, rate_hz=500.0):
         """
         動作プログラムの周期実行ループを開始します。
-        rate_hz: 周期の周波数で、デフォルトは100 Hzです。
+        rate_hz: 周期の周波数で、デフォルトは500 Hzです。
         """
         self.timer = self.create_timer(
             1.0 / rate_hz, self.loop,

@@ -64,9 +64,9 @@ class ModuleManager(Node):
         # 設定ファイルのロードと動的初期化
         self.load_config_and_initialize()
 
-        # 10ms周期のCANコマンド送信タイマー (100Hz)
+        # 2ms周期のCANコマンド送信タイマー (500Hz)
         self.control_timer = self.create_timer(
-            0.01, self.publish_all_control_commands,
+            0.002, self.publish_all_control_commands,
             callback_group=self.callback_group
         )
 
@@ -210,10 +210,10 @@ class ModuleManager(Node):
             self.solenoid_valves[name] = [bool(v) for v in msg.valves]
         return callback
 
-    # --- 2. 10ms周期 CANコマンド一括送信タイマー (100Hz) ---
+    # --- 2. 2ms周期 CANコマンド一括送信タイマー (500Hz) ---
     def publish_all_control_commands(self):
         """
-        登録されているすべてのモジュールに対して、最新の指令値を10ms（100Hz）周期で常にCANバスへ送信する
+        登録されているすべてのモジュールに対して、最新の指令値を2ms（500Hz）周期で常にCANバスへ送信する
         """
         for module in self.config.get('modules', []):
             name = module['name']
