@@ -65,6 +65,8 @@ echo "====== Altair Framework: Starting NUC CAN Bridge Node ======"
 SHOULD_BUILD=0
 if [ ! -f "install/setup.bash" ]; then
     SHOULD_BUILD=1
+elif [ "altair_interfaces/srv/ConnectEthCan.srv" -nt "install/setup.bash" ]; then
+    SHOULD_BUILD=1
 elif [ "$USE_USB" -eq 1 ] && [ ! -f "install/altair_can_bridge/lib/altair_can_bridge/can_bridge_node" ]; then
     SHOULD_BUILD=1
 elif [ "$USE_USB" -eq 0 ] && [ ! -f "install/altair_eth_can_bridge/lib/altair_eth_can_bridge/eth_can_bridge_node" ]; then

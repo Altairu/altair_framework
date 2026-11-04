@@ -7,14 +7,16 @@ document.addEventListener("DOMContentLoaded", () => {
   // アプリケーションの状態管理
   const state = {
     ws: null,
-    wsUrl: `ws://${window.location.hostname}:8000/ws`,
+    wsUrl: `ws://${window.location.host || (window.location.hostname + ":8000")}/ws`,
     config: { modules: [] },
     ports: [],
     profiles: [],
     canConnected: false,
+    lastCanError: "",
     behaviorStatus: "IDLE",
-    controlMode: "SETUP", // SETUP (送信待ち), CONTROL (制御中)
-    controlStartTimeMs: 0, // パラメータ送信直後の古いテレメトリによる誤リセット防止用タイムスタンプ
+    controlMode: "SETUP", // SETUP (送信待ち), SENDING (送信・応答待機中), CONTROL (制御中)
+    isSendingParams: false,
+    mddStatuses: {}, // 各MDDモジュールのマイコン側システム状態 (0=待機中, 1=制御実行中)
     moduleSendToggles: {}, // 各モジュールへのUI指令値の送信ON/OFFトグル状態
     gamepadMappings: [], // コントローラーのマッピングデータ
   };
@@ -35,6 +37,7 @@ document.addEventListener("DOMContentLoaded", () => {
     panelConnUsb: document.getElementById("panel-conn-usb"),
     txtEthIp: document.getElementById("txt-eth-ip"),
     txtEthPort: document.getElementById("txt-eth-port"),
+    selEthCanChannel: document.getElementById("sel-eth-can-channel"),
     btnConnectEth: document.getElementById("btn-connect-eth"),
     btnDisconnectEth: document.getElementById("btn-disconnect-eth"),
     chkAutoConnect: document.getElementById("chk-auto-connect"),
@@ -67,7 +70,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // システムログ関連
     canLogsTerminal: document.getElementById("can-logs-terminal"),
+    canLogsTxTerminal: document.getElementById("can-logs-tx-terminal"),
+    canLogsRxTerminal: document.getElementById("can-logs-rx-terminal"),
+    canStreamContainer: document.getElementById("can-stream-container"),
+    canStreamPanelTx: document.getElementById("can-stream-panel-tx"),
+    canStreamPanelRx: document.getElementById("can-stream-panel-rx"),
+    canStreamPanelAll: document.getElementById("can-stream-panel-all"),
+    canSummaryTbody: document.getElementById("can-summary-tbody"),
+    canStatTxCount: document.getElementById("can-stat-tx-count"),
+    canStatRxCount: document.getElementById("can-stat-rx-count"),
+    canStatIdCount: document.getElementById("can-stat-id-count"),
+    canFilterDirGroup: document.getElementById("can-filter-dir-group"),
+    canFilterIdSelect: document.getElementById("can-filter-id-select"),
+    canFilterSearch: document.getElementById("can-filter-search"),
+    canViewModeGroup: document.getElementById("can-view-mode-group"),
+    btnPauseCanLogs: document.getElementById("btn-pause-can-logs"),
     btnClearCanLogs: document.getElementById("btn-clear-can-logs"),
+    btnResetIdFilter: document.getElementById("btn-reset-id-filter"),
 
     // モジュール追加モーダル
     modal: document.getElementById("add-module-modal"),
@@ -110,6 +129,16 @@ document.addEventListener("DOMContentLoaded", () => {
             Blockly.svgResize(blocklyWorkspace);
           });
         });
+      }
+
+      // CANログ画面を開いた際に最新の履歴・集計を即座に描画する
+      if (targetId === "view-logs") {
+        canLogState.pendingStreamEntries = [];
+        if (el.canStatTxCount) el.canStatTxCount.textContent = canLogState.txTotal;
+        if (el.canStatRxCount) el.canStatRxCount.textContent = canLogState.rxTotal;
+        if (el.canStatIdCount) el.canStatIdCount.textContent = canLogState.knownIds.size;
+        renderCanSummaryTable();
+        rebuildCanStreamTerminals();
       }
     });
   });
@@ -178,7 +207,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const text = el.canStatusIndicator.querySelector(".status-text");
 
     if (data.is_connected) {
-      dot.className = "status-dot connected";
+      dot.className = data.error_message ? "status-dot warning" : "status-dot connected";
       text.textContent = `CAN: Connected (${data.active_port})`;
       if (el.btnConnectCan) el.btnConnectCan.disabled = true;
       if (el.btnDisconnectCan) el.btnDisconnectCan.disabled = false;
@@ -187,11 +216,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // slcan接続グループのUI更新
       if (el.slcanConnectionStatus) {
-        el.slcanConnectionStatus.innerHTML = `状態: <span class="badge badge-success" style="padding: 4px 8px; font-size: 11px;">接続完了 (${data.active_port})</span>`;
+        if (data.error_message) {
+          el.slcanConnectionStatus.innerHTML = `状態: <span class="badge badge-warning" style="padding: 4px 8px; font-size: 11px;">${data.error_message}</span>`;
+        } else {
+          el.slcanConnectionStatus.innerHTML = `状態: <span class="badge badge-success" style="padding: 4px 8px; font-size: 11px;">接続完了 (${data.active_port})</span>`;
+        }
       }
       if (el.groupConnectionSlcan) {
-        el.groupConnectionSlcan.style.borderColor = "var(--success-color)";
+        el.groupConnectionSlcan.style.borderColor = data.error_message ? "var(--color-warning)" : "var(--color-success)";
         el.groupConnectionSlcan.style.boxShadow = "0 0 10px rgba(19, 115, 51, 0.1)";
+      }
+      if (data.error_message && data.error_message !== state.lastCanError) {
+        state.lastCanError = data.error_message;
+        appendTerminalLog(el.behaviorTerminal, `[CAN WARNING] ${data.error_message}`, "error-msg");
+      } else if (!data.error_message) {
+        state.lastCanError = "";
       }
     } else {
       dot.className = "status-dot disconnected";
@@ -210,8 +249,11 @@ document.addEventListener("DOMContentLoaded", () => {
         el.groupConnectionSlcan.style.boxShadow = "none";
       }
 
-      if (data.error_message) {
+      if (data.error_message && data.error_message !== state.lastCanError) {
+        state.lastCanError = data.error_message;
         appendTerminalLog(el.behaviorTerminal, `[CAN ERROR] ${data.error_message}`, "error-msg");
+      } else if (!data.error_message) {
+        state.lastCanError = "";
       }
     }
   }
@@ -237,7 +279,504 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // --- 6. コンソールロギングヘルパー ---
+  // --- 6. コンソール ＆ CANアナライザ ロギングヘルパー ---
+  const canLogState = {
+    paused: false,
+    filterDir: "ALL",     // ALL | TX | RX
+    filterId: "ALL",      // ALL | 0x200 等 | モジュール名
+    searchQuery: "",
+    viewMode: "split",    // split | combined | table-only
+    txTotal: 0,
+    rxTotal: 0,
+    summaryMap: new Map(), // key: `${dir}_${idHex}`
+    knownIds: new Set(),
+    knownIdsDirty: false,
+    history: [],           // 直近フレーム履歴 (最大400件)
+    pendingStreamEntries: [], // 次回描画フレームで追加する行キュー
+    rafScheduled: false,
+  };
+
+  function formatTimeWithMs(now) {
+    const hh = String(now.getHours()).padStart(2, "0");
+    const mm = String(now.getMinutes()).padStart(2, "0");
+    const ss = String(now.getSeconds()).padStart(2, "0");
+    const ms = String(now.getMilliseconds()).padStart(3, "0");
+    return `${hh}:${mm}:${ss}.${ms}`;
+  }
+
+  function readInt16LE(bytes, offset) {
+    if (bytes.length < offset + 2) return 0;
+    const val = (bytes[offset] & 0xFF) | ((bytes[offset + 1] & 0xFF) << 8);
+    return val >= 0x8000 ? val - 0x10000 : val;
+  }
+
+  function resolveCanFrameInfo(idNum, bytes) {
+    const modules = state.config?.modules || [];
+    for (const m of modules) {
+      const baseId = parseInt(m.base_id, 16);
+      if (isNaN(baseId)) continue;
+
+      if (m.type === "mdd") {
+        if (idNum >= baseId && idNum <= baseId + 3) {
+          const ch = idNum - baseId + 1;
+          let decoded = "";
+          if (bytes.length >= 8) {
+            const p = (readInt16LE(bytes, 0) / 1000).toFixed(2);
+            const i = (readInt16LE(bytes, 2) / 1000).toFixed(2);
+            const d = (readInt16LE(bytes, 4) / 1000).toFixed(2);
+            const diaRaw = readInt16LE(bytes, 6);
+            const dirStr = diaRaw < 0 ? "Rev(-)" : "Fwd(+)";
+            decoded = `P:${p} I:${i} D:${d} 径:${Math.abs(diaRaw)}mm ${dirStr}`;
+          }
+          return { moduleName: m.name, label: `${m.name} / PID設定(M${ch})`, decoded };
+        }
+        if (idNum === baseId + 0x10) {
+          const modeNames = ["Speed", "Angle", "Pos"];
+          const modes = bytes.slice(0, 4).map((b, idx) => `M${idx + 1}:${modeNames[b] || b}`).join(" ");
+          return { moduleName: m.name, label: `${m.name} / モード・起動`, decoded: modes };
+        }
+        if (idNum === baseId + 0x20) {
+          let decoded = "";
+          if (bytes.length >= 8) {
+            const vals = [0, 1, 2, 3].map(idx => `M${idx + 1}:${(readInt16LE(bytes, idx * 2) / 10).toFixed(1)}`);
+            decoded = vals.join(" ");
+          }
+          return { moduleName: m.name, label: `${m.name} / 目標値指令`, decoded };
+        }
+        if (idNum === baseId + 0x30) {
+          let decoded = "";
+          if (bytes.length >= 6) {
+            const st = bytes[5] === 1 ? "制御中(1)" : "待機中(0)";
+            const err = `0x${bytes[4].toString(16).padStart(2, "0").toUpperCase()}`;
+            const sw = `${bytes[0] ? 1 : 0}${bytes[1] ? 1 : 0}${bytes[2] ? 1 : 0}${bytes[3] ? 1 : 0}`;
+            decoded = `状態:${st} Err:${err} SW:${sw}`;
+          }
+          return { moduleName: m.name, label: `${m.name} / ステータス返信`, decoded };
+        }
+        if (idNum === baseId + 0x40) {
+          let decoded = "";
+          if (bytes.length >= 8) {
+            const angs = [0, 1, 2, 3].map(idx => `M${idx + 1}:${(readInt16LE(bytes, idx * 2) / 10).toFixed(1)}°`);
+            decoded = angs.join(" ");
+          }
+          return { moduleName: m.name, label: `${m.name} / 現在角度FB`, decoded };
+        }
+        if (idNum === baseId + 0x50) {
+          let decoded = "";
+          if (bytes.length >= 8) {
+            const spds = [0, 1, 2, 3].map(idx => `M${idx + 1}:${(readInt16LE(bytes, idx * 2) / 100).toFixed(2)}`);
+            decoded = `${spds.join(" ")} rps`;
+          }
+          return { moduleName: m.name, label: `${m.name} / 現在速度FB`, decoded };
+        }
+      } else if (m.type === "servo" && idNum === baseId) {
+        const angs = bytes.slice(0, 6).map((b, idx) => `S${idx + 1}:${b}°`).join(" ");
+        return { moduleName: m.name, label: `${m.name} / サーボ指令`, decoded: angs };
+      } else if (m.type === "solenoid" && idNum === baseId) {
+        const bits = (bytes[0] || 0) | ((bytes[1] || 0) << 8);
+        const onList = [];
+        for (let i = 0; i < 12; i++) {
+          if (bits & (1 << i)) onList.push(`V${i + 1}`);
+        }
+        return {
+          moduleName: m.name,
+          label: `${m.name} / 電磁弁指令`,
+          decoded: onList.length > 0 ? `ON: ${onList.join(",")}` : "すべてOFF",
+        };
+      }
+    }
+
+    return { moduleName: "", label: "未登録ID", decoded: "" };
+  }
+
+  function parseRawCanLogLine(text) {
+    const m = text.match(/^\[(TX|RX)\]\s*\(([^)]+)\)\s*ID:\s*(0x[0-9A-Fa-f]+)\s*\[(\d+)\]\s*(.*)$/);
+    if (!m) return null;
+    const dir = m[1];
+    const channel = m[2];
+    const idNum = parseInt(m[3], 16);
+    const idHex = `0x${idNum.toString(16).toUpperCase().padStart(3, "0")}`;
+    const dlc = parseInt(m[4], 10);
+    const hexTokens = m[5].trim() ? m[5].trim().split(/\s+/) : [];
+    const bytes = hexTokens.map(h => parseInt(h, 16) || 0);
+    const timeStr = formatTimeWithMs(new Date());
+    const info = resolveCanFrameInfo(idNum, bytes);
+
+    return {
+      dir,
+      channel,
+      idHex,
+      idNum,
+      dlc,
+      hexTokens,
+      bytes,
+      timeStr,
+      moduleName: info.moduleName,
+      label: info.label,
+      decoded: info.decoded,
+    };
+  }
+
+  function matchesCanFilter(entry) {
+    if (canLogState.filterDir !== "ALL" && entry.dir !== canLogState.filterDir) {
+      return false;
+    }
+    if (canLogState.filterId !== "ALL") {
+      if (canLogState.filterId.startsWith("MOD:")) {
+        const targetMod = canLogState.filterId.slice(4);
+        if (entry.moduleName !== targetMod) return false;
+      } else if (entry.idHex !== canLogState.filterId) {
+        return false;
+      }
+    }
+    if (canLogState.searchQuery) {
+      const q = canLogState.searchQuery.toLowerCase();
+      const hay = `${entry.idHex} ${entry.label} ${entry.decoded} ${entry.hexTokens.join(" ")}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  }
+
+  function updateCanFilterSelectOptions() {
+    if (!el.canFilterIdSelect) return;
+    const currentVal = el.canFilterIdSelect.value;
+    const modules = state.config?.modules || [];
+
+    let html = '<option value="ALL">すべてのID / モジュール</option>';
+    if (modules.length > 0) {
+      html += '<optgroup label="モジュール別">';
+      modules.forEach(m => {
+        html += `<option value="MOD:${m.name}">${m.name} (${m.base_id})</option>`;
+      });
+      html += "</optgroup>";
+    }
+
+    const sortedIds = Array.from(canLogState.knownIds).sort((a, b) => parseInt(a, 16) - parseInt(b, 16));
+    if (sortedIds.length > 0) {
+      html += '<optgroup label="CAN ID別">';
+      sortedIds.forEach(idHex => {
+        const info = resolveCanFrameInfo(parseInt(idHex, 16), []);
+        const suffix = info.label && info.label !== "未登録ID" ? ` - ${info.label}` : "";
+        html += `<option value="${idHex}">${idHex}${suffix}</option>`;
+      });
+      html += "</optgroup>";
+    }
+
+    el.canFilterIdSelect.innerHTML = html;
+    if ([...el.canFilterIdSelect.options].some(o => o.value === currentVal)) {
+      el.canFilterIdSelect.value = currentVal;
+    } else {
+      el.canFilterIdSelect.value = "ALL";
+    }
+  }
+
+  function renderCanStreamRow(entry) {
+    const div = document.createElement("div");
+    div.className = "can-log-row";
+    const dirClass = entry.dir === "TX" ? "can-log-dir-tx" : "can-log-dir-rx";
+    const hexStr = entry.hexTokens.join(" ");
+    const decStr = entry.decoded ? ` | ${entry.decoded}` : "";
+    div.innerHTML = `
+      <span class="can-log-time">[${entry.timeStr}]</span>
+      <span class="${dirClass}">${entry.dir}</span>
+      <span class="can-log-id">${entry.idHex}</span>
+      <span class="can-log-label" title="${entry.label}">${entry.label}</span>
+      <span class="can-log-data">[${entry.dlc}] ${hexStr}${decStr}</span>
+    `;
+    return div;
+  }
+
+  function appendStreamBatchToTerminal(terminal, entries) {
+    if (!terminal || entries.length === 0) return;
+    const frag = document.createDocumentFragment();
+    const slice = entries.length > 200 ? entries.slice(-200) : entries;
+    for (const entry of slice) {
+      frag.appendChild(renderCanStreamRow(entry));
+    }
+    terminal.appendChild(frag);
+    while (terminal.childElementCount > 200) {
+      terminal.removeChild(terminal.firstChild);
+    }
+    terminal.scrollTop = terminal.scrollHeight;
+  }
+
+  function rebuildCanStreamTerminals() {
+    if (el.canLogsTerminal) el.canLogsTerminal.innerHTML = "";
+    if (el.canLogsTxTerminal) el.canLogsTxTerminal.innerHTML = "";
+    if (el.canLogsRxTerminal) el.canLogsRxTerminal.innerHTML = "";
+
+    const filtered = canLogState.history.filter(matchesCanFilter);
+    if (canLogState.viewMode === "combined") {
+      appendStreamBatchToTerminal(el.canLogsTerminal, filtered);
+    } else if (canLogState.viewMode === "split") {
+      appendStreamBatchToTerminal(el.canLogsTxTerminal, filtered.filter(e => e.dir === "TX"));
+      appendStreamBatchToTerminal(el.canLogsRxTerminal, filtered.filter(e => e.dir === "RX"));
+    }
+  }
+
+  function renderCanSummaryTable() {
+    if (!el.canSummaryTbody) return;
+    const items = Array.from(canLogState.summaryMap.values())
+      .filter(matchesCanFilter)
+      .sort((a, b) => {
+        if (a.idNum !== b.idNum) return a.idNum - b.idNum;
+        return a.dir.localeCompare(b.dir);
+      });
+
+    if (items.length === 0) {
+      el.canSummaryTbody.innerHTML = `
+        <tr class="can-empty-row">
+          <td colspan="7">条件に一致するCANフレームはまだありません。</td>
+        </tr>`;
+      return;
+    }
+
+    el.canSummaryTbody.innerHTML = items.map(item => {
+      const dirBadge = item.dir === "TX"
+        ? '<span class="can-dir-badge can-dir-tx">TX</span>'
+        : '<span class="can-dir-badge can-dir-rx">RX</span>';
+      const isSelected = canLogState.filterId === item.idHex ? "selected-id-row" : "";
+      const bytesHtml = item.hexTokens.map((hx, idx) => {
+        const changed = item.prevHexTokens && item.prevHexTokens[idx] !== undefined && item.prevHexTokens[idx] !== hx;
+        return `<span class="can-hex-byte ${changed ? "changed" : ""}">${hx}</span>`;
+      }).join("");
+
+      return `
+        <tr class="${isSelected}" data-can-id="${item.idHex}" title="クリックでこのCAN ID (${item.idHex}) を絞り込み">
+          <td>${dirBadge}</td>
+          <td><span class="can-id-badge">${item.idHex}</span></td>
+          <td style="font-weight: 500;">${item.label}</td>
+          <td style="text-align: center; font-family: 'Consolas', monospace;">${item.dlc}</td>
+          <td><div class="can-hex-bytes">${bytesHtml}</div></td>
+          <td><span class="can-decoded-text">${item.decoded || "-"}</span></td>
+          <td style="text-align: right; font-family: 'Consolas', monospace; font-size: 11px; color: var(--text-muted);">
+            <strong>${item.count}</strong>回<br>${item.timeStr}
+          </td>
+        </tr>`;
+    }).join("");
+  }
+
+  function updateCanViewLayout() {
+    if (!el.canStreamContainer) return;
+    if (canLogState.viewMode === "table-only") {
+      el.canStreamContainer.style.display = "none";
+    } else if (canLogState.viewMode === "combined") {
+      el.canStreamContainer.style.display = "block";
+      el.canStreamContainer.className = "can-stream-combined mt-3";
+      if (el.canStreamPanelTx) el.canStreamPanelTx.style.display = "none";
+      if (el.canStreamPanelRx) el.canStreamPanelRx.style.display = "none";
+      if (el.canStreamPanelAll) el.canStreamPanelAll.style.display = "block";
+    } else {
+      el.canStreamContainer.style.display = "grid";
+      el.canStreamContainer.className = "can-stream-split mt-3";
+      if (el.canStreamPanelTx) el.canStreamPanelTx.style.display = canLogState.filterDir === "RX" ? "none" : "block";
+      if (el.canStreamPanelRx) el.canStreamPanelRx.style.display = canLogState.filterDir === "TX" ? "none" : "block";
+      if (el.canStreamPanelAll) el.canStreamPanelAll.style.display = "none";
+    }
+  }
+
+  function flushCanLogUI() {
+    canLogState.rafScheduled = false;
+
+    if (canLogState.knownIdsDirty) {
+      canLogState.knownIdsDirty = false;
+      updateCanFilterSelectOptions();
+    }
+
+    const viewLogsEl = document.getElementById("view-logs");
+    const isLogsActive = viewLogsEl && viewLogsEl.classList.contains("active");
+
+    if (!isLogsActive) {
+      canLogState.pendingStreamEntries = [];
+      return;
+    }
+
+    if (el.canStatTxCount) el.canStatTxCount.textContent = canLogState.txTotal;
+    if (el.canStatRxCount) el.canStatRxCount.textContent = canLogState.rxTotal;
+    if (el.canStatIdCount) el.canStatIdCount.textContent = canLogState.knownIds.size;
+
+    renderCanSummaryTable();
+
+    if (canLogState.pendingStreamEntries.length > 0) {
+      const batch = canLogState.pendingStreamEntries;
+      canLogState.pendingStreamEntries = [];
+
+      if (canLogState.viewMode === "combined") {
+        appendStreamBatchToTerminal(el.canLogsTerminal, batch);
+      } else if (canLogState.viewMode === "split") {
+        const txBatch = [];
+        const rxBatch = [];
+        for (const entry of batch) {
+          if (entry.dir === "TX") txBatch.push(entry);
+          else rxBatch.push(entry);
+        }
+        if (txBatch.length > 0 && canLogState.filterDir !== "RX") {
+          appendStreamBatchToTerminal(el.canLogsTxTerminal, txBatch);
+        }
+        if (rxBatch.length > 0 && canLogState.filterDir !== "TX") {
+          appendStreamBatchToTerminal(el.canLogsRxTerminal, rxBatch);
+        }
+      }
+    }
+  }
+
+  function appendCanLog(text) {
+    if (canLogState.paused) return;
+
+    const entry = parseRawCanLogLine(text);
+    if (!entry) {
+      if (el.canLogsTerminal) appendTerminalLog(el.canLogsTerminal, text);
+      return;
+    }
+
+    if (entry.dir === "TX") {
+      canLogState.txTotal++;
+    } else {
+      canLogState.rxTotal++;
+    }
+
+    if (!canLogState.knownIds.has(entry.idHex)) {
+      canLogState.knownIds.add(entry.idHex);
+      canLogState.knownIdsDirty = true;
+    }
+
+    const key = `${entry.dir}_${entry.idHex}`;
+    const prev = canLogState.summaryMap.get(key);
+    canLogState.summaryMap.set(key, {
+      ...entry,
+      prevHexTokens: prev ? prev.hexTokens : null,
+      count: prev ? prev.count + 1 : 1,
+    });
+
+    canLogState.history.push(entry);
+    if (canLogState.history.length > 400) {
+      canLogState.history.shift();
+    }
+
+    if (matchesCanFilter(entry)) {
+      canLogState.pendingStreamEntries.push(entry);
+      if (canLogState.pendingStreamEntries.length > 200) {
+        canLogState.pendingStreamEntries.shift();
+      }
+    }
+
+    if (!canLogState.rafScheduled) {
+      canLogState.rafScheduled = true;
+      requestAnimationFrame(flushCanLogUI);
+    }
+  }
+
+  // 送受信フィルタ切替イベント
+  if (el.canFilterDirGroup) {
+    el.canFilterDirGroup.addEventListener("click", (e) => {
+      const btn = e.target.closest(".can-seg-btn");
+      if (!btn) return;
+      el.canFilterDirGroup.querySelectorAll(".can-seg-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      canLogState.filterDir = btn.getAttribute("data-dir") || "ALL";
+      canLogState.pendingStreamEntries = [];
+      updateCanViewLayout();
+      renderCanSummaryTable();
+      rebuildCanStreamTerminals();
+    });
+  }
+
+  // 表示モード切替イベント (送受信2分割 / 統合ストリーム / ID表のみ)
+  if (el.canViewModeGroup) {
+    el.canViewModeGroup.addEventListener("click", (e) => {
+      const btn = e.target.closest(".can-seg-btn");
+      if (!btn) return;
+      el.canViewModeGroup.querySelectorAll(".can-seg-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      canLogState.viewMode = btn.getAttribute("data-mode") || "split";
+      canLogState.pendingStreamEntries = [];
+      updateCanViewLayout();
+      rebuildCanStreamTerminals();
+    });
+  }
+
+  // IDセレクト絞り込みイベント
+  if (el.canFilterIdSelect) {
+    el.canFilterIdSelect.addEventListener("change", () => {
+      canLogState.filterId = el.canFilterIdSelect.value;
+      if (el.btnResetIdFilter) {
+        el.btnResetIdFilter.style.display = canLogState.filterId === "ALL" ? "none" : "inline";
+      }
+      renderCanSummaryTable();
+      rebuildCanStreamTerminals();
+    });
+  }
+
+  // テキスト検索絞り込みイベント
+  if (el.canFilterSearch) {
+    el.canFilterSearch.addEventListener("input", () => {
+      canLogState.searchQuery = el.canFilterSearch.value.trim();
+      renderCanSummaryTable();
+      rebuildCanStreamTerminals();
+    });
+  }
+
+  // ID別モニター表の行クリックで特定CAN IDの絞り込みトグル
+  if (el.canSummaryTbody) {
+    el.canSummaryTbody.addEventListener("click", (e) => {
+      const tr = e.target.closest("tr[data-can-id]");
+      if (!tr) return;
+      const clickedId = tr.getAttribute("data-can-id");
+      canLogState.filterId = canLogState.filterId === clickedId ? "ALL" : clickedId;
+      if (el.canFilterIdSelect) el.canFilterIdSelect.value = canLogState.filterId;
+      if (el.btnResetIdFilter) {
+        el.btnResetIdFilter.style.display = canLogState.filterId === "ALL" ? "none" : "inline";
+      }
+      renderCanSummaryTable();
+      rebuildCanStreamTerminals();
+    });
+  }
+
+  if (el.btnResetIdFilter) {
+    el.btnResetIdFilter.addEventListener("click", () => {
+      canLogState.filterId = "ALL";
+      if (el.canFilterIdSelect) el.canFilterIdSelect.value = "ALL";
+      el.btnResetIdFilter.style.display = "none";
+      renderCanSummaryTable();
+      rebuildCanStreamTerminals();
+    });
+  }
+
+  // 一時停止 / 再開ボタン
+  if (el.btnPauseCanLogs) {
+    el.btnPauseCanLogs.addEventListener("click", () => {
+      canLogState.paused = !canLogState.paused;
+      if (canLogState.paused) {
+        el.btnPauseCanLogs.innerHTML = '<i class="fa-solid fa-play"></i> 再開';
+        el.btnPauseCanLogs.classList.add("btn-primary");
+        el.btnPauseCanLogs.classList.remove("btn-secondary");
+      } else {
+        el.btnPauseCanLogs.innerHTML = '<i class="fa-solid fa-pause"></i> 一時停止';
+        el.btnPauseCanLogs.classList.remove("btn-primary");
+        el.btnPauseCanLogs.classList.add("btn-secondary");
+      }
+    });
+  }
+
+  // クリアボタン
+  if (el.btnClearCanLogs) {
+    el.btnClearCanLogs.addEventListener("click", () => {
+      canLogState.txTotal = 0;
+      canLogState.rxTotal = 0;
+      canLogState.summaryMap.clear();
+      canLogState.knownIds.clear();
+      canLogState.knownIdsDirty = false;
+      canLogState.history = [];
+      canLogState.pendingStreamEntries = [];
+      if (el.canStatTxCount) el.canStatTxCount.textContent = "0";
+      if (el.canStatRxCount) el.canStatRxCount.textContent = "0";
+      if (el.canStatIdCount) el.canStatIdCount.textContent = "0";
+      updateCanFilterSelectOptions();
+      renderCanSummaryTable();
+      rebuildCanStreamTerminals();
+    });
+  }
+
   function appendTerminalLog(terminal, text, className = "") {
     const line = document.createElement("div");
     line.className = `terminal-line ${className}`;
@@ -260,6 +799,7 @@ document.addEventListener("DOMContentLoaded", () => {
       state.config = await res.json();
 
       renderModuleCards();
+      updateCanFilterSelectOptions();
     } catch (err) {
       console.error("モジュール設定のロードに失敗しました:", err);
     }
@@ -370,72 +910,72 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>`;
     }
 
-    // M1〜M4のパラメータ（モード, P, I, D, diameter, direction）編集テーブル
-    let paramsRowsHtml = "";
+    // M1〜M4のパラメータ（モード, P, I, D, diameter, direction）設定リスト
+    let paramsCardsHtml = "";
     for (let i = 1; i <= 4; i++) {
       const motorParam = mod.parameters?.[`m${i}`] ?? { mode: 0, p: 10.0, i: 0.0, d: 0.0, diameter: 100.0, direction: 1 };
-      paramsRowsHtml += `
-        <tr style="border-bottom: 1px solid var(--border-light);">
-          <td style="padding: 4px 0; font-weight: 500;">M${i}</td>
-          <td style="padding: 4px 0;">
-            <select class="form-input form-input-sm select-mdd-mode" data-module="${mod.name}" data-motor="${i}" style="padding: 2px 4px; font-size: 11px; height: 22px; width: 62px;">
-              <option value="0" ${motorParam.mode === 0 ? "selected" : ""}>Speed</option>
-              <option value="1" ${motorParam.mode === 1 ? "selected" : ""}>Angle</option>
-              <option value="2" ${motorParam.mode === 2 ? "selected" : ""}>Pos</option>
-            </select>
-          </td>
-          <td style="padding: 4px 0; text-align: center;">
-            <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
-              <button class="btn btn-secondary btn-xs btn-pid-adjust" data-module="${mod.name}" data-motor="${i}" data-param="p" data-action="minus" style="padding: 0; width: 12px; height: 18px; font-size: 9px; line-height: 1;">-</button>
-              <input type="number" class="form-input form-input-sm input-mdd-p" data-module="${mod.name}" data-motor="${i}" step="0.1" value="${motorParam.p}" style="padding: 2px 0; font-size: 11px; height: 22px; width: 30px; text-align: center; display: inline-block; margin: 0;">
-              <button class="btn btn-secondary btn-xs btn-pid-adjust" data-module="${mod.name}" data-motor="${i}" data-param="p" data-action="plus" style="padding: 0; width: 12px; height: 18px; font-size: 9px; line-height: 1;">+</button>
+      paramsCardsHtml += `
+        <div class="mdd-motor-card">
+          <!-- 上段: チャンネル, モード, 車輪径, 回転方向 -->
+          <div class="mdd-motor-header">
+            <span class="mdd-ch-badge">M${i}</span>
+            <div class="mdd-header-field mdd-mode-field">
+              <select class="form-input form-input-sm select-mdd-mode" data-module="${mod.name}" data-motor="${i}" title="制御モード">
+                <option value="0" ${motorParam.mode === 0 ? "selected" : ""}>Speed</option>
+                <option value="1" ${motorParam.mode === 1 ? "selected" : ""}>Angle</option>
+                <option value="2" ${motorParam.mode === 2 ? "selected" : ""}>Pos</option>
+              </select>
             </div>
-          </td>
-          <td style="padding: 4px 0; text-align: center;">
-            <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
-              <button class="btn btn-secondary btn-xs btn-pid-adjust" data-module="${mod.name}" data-motor="${i}" data-param="i" data-action="minus" style="padding: 0; width: 12px; height: 18px; font-size: 9px; line-height: 1;">-</button>
-              <input type="number" class="form-input form-input-sm input-mdd-i" data-module="${mod.name}" data-motor="${i}" step="0.01" value="${motorParam.i}" style="padding: 2px 0; font-size: 11px; height: 22px; width: 30px; text-align: center; display: inline-block; margin: 0;">
-              <button class="btn btn-secondary btn-xs btn-pid-adjust" data-module="${mod.name}" data-motor="${i}" data-param="i" data-action="plus" style="padding: 0; width: 12px; height: 18px; font-size: 9px; line-height: 1;">+</button>
+            <div class="mdd-header-field mdd-wheel-field">
+              <span class="mdd-field-label">径</span>
+              <input type="number" class="form-input form-input-sm input-mdd-wheel" data-module="${mod.name}" data-motor="${i}" step="1" value="${motorParam.diameter ?? 100.0}" title="車輪直径(mm)">
+              <span class="mdd-field-unit">mm</span>
             </div>
-          </td>
-          <td style="padding: 4px 0; text-align: center;">
-            <div style="display: flex; align-items: center; justify-content: center; gap: 2px;">
-              <button class="btn btn-secondary btn-xs btn-pid-adjust" data-module="${mod.name}" data-motor="${i}" data-param="d" data-action="minus" style="padding: 0; width: 12px; height: 18px; font-size: 9px; line-height: 1;">-</button>
-              <input type="number" class="form-input form-input-sm input-mdd-d" data-module="${mod.name}" data-motor="${i}" step="0.01" value="${motorParam.d}" style="padding: 2px 0; font-size: 11px; height: 22px; width: 30px; text-align: center; display: inline-block; margin: 0;">
-              <button class="btn btn-secondary btn-xs btn-pid-adjust" data-module="${mod.name}" data-motor="${i}" data-param="d" data-action="plus" style="padding: 0; width: 12px; height: 18px; font-size: 9px; line-height: 1;">+</button>
+            <div class="mdd-header-field mdd-dir-field">
+              <span class="mdd-field-label">Dir</span>
+              <select class="form-input form-input-sm select-mdd-dir" data-module="${mod.name}" data-motor="${i}" title="回転方向">
+                <option value="1" ${(motorParam.direction ?? 1) >= 0 ? "selected" : ""}>+</option>
+                <option value="-1" ${(motorParam.direction ?? 1) < 0 ? "selected" : ""}>-</option>
+              </select>
             </div>
-          </td>
-          <td style="padding: 4px 0; text-align: center;">
-            <input type="number" class="form-input form-input-sm input-mdd-wheel" data-module="${mod.name}" data-motor="${i}" step="1" value="${motorParam.diameter ?? 100.0}" style="padding: 2px 4px; font-size: 11px; height: 22px; width: 36px; text-align: center; display: inline-block; margin: 0;">
-          </td>
-          <td style="padding: 4px 0; text-align: center;">
-            <select class="form-input form-input-sm select-mdd-dir" data-module="${mod.name}" data-motor="${i}" style="padding: 2px 4px; font-size: 11px; height: 22px; width: 34px; text-align: center; display: inline-block; font-weight: bold;">
-              <option value="1" ${(motorParam.direction ?? 1) >= 0 ? "selected" : ""}>+</option>
-              <option value="-1" ${(motorParam.direction ?? 1) < 0 ? "selected" : ""}>-</option>
-            </select>
-          </td>
-        </tr>`;
+          </div>
+
+          <!-- 下段: PID設定ステッパー (P, I, D) -->
+          <div class="mdd-motor-pid-row">
+            <div class="mdd-pid-group">
+              <span class="mdd-pid-tag">P</span>
+              <div class="mdd-stepper">
+                <button type="button" class="btn-stepper btn-pid-adjust" data-module="${mod.name}" data-motor="${i}" data-param="p" data-action="minus" title="P減少">-</button>
+                <input type="number" class="stepper-input input-mdd-p" data-module="${mod.name}" data-motor="${i}" step="0.1" value="${motorParam.p}" title="Pゲイン">
+                <button type="button" class="btn-stepper btn-pid-adjust" data-module="${mod.name}" data-motor="${i}" data-param="p" data-action="plus" title="P増加">+</button>
+              </div>
+            </div>
+            <div class="mdd-pid-group">
+              <span class="mdd-pid-tag">I</span>
+              <div class="mdd-stepper">
+                <button type="button" class="btn-stepper btn-pid-adjust" data-module="${mod.name}" data-motor="${i}" data-param="i" data-action="minus" title="I減少">-</button>
+                <input type="number" class="stepper-input input-mdd-i" data-module="${mod.name}" data-motor="${i}" step="0.01" value="${motorParam.i}" title="Iゲイン">
+                <button type="button" class="btn-stepper btn-pid-adjust" data-module="${mod.name}" data-motor="${i}" data-param="i" data-action="plus" title="I増加">+</button>
+              </div>
+            </div>
+            <div class="mdd-pid-group">
+              <span class="mdd-pid-tag">D</span>
+              <div class="mdd-stepper">
+                <button type="button" class="btn-stepper btn-pid-adjust" data-module="${mod.name}" data-motor="${i}" data-param="d" data-action="minus" title="D減少">-</button>
+                <input type="number" class="stepper-input input-mdd-d" data-module="${mod.name}" data-motor="${i}" step="0.01" value="${motorParam.d}" title="Dゲイン">
+                <button type="button" class="btn-stepper btn-pid-adjust" data-module="${mod.name}" data-motor="${i}" data-param="d" data-action="plus" title="D増加">+</button>
+              </div>
+            </div>
+          </div>
+        </div>`;
     }
 
     const paramTableHtml = `
       <div class="mdd-params-table-wrapper mt-3">
-        <h4 style="font-size: 12px; margin-bottom: 6px; font-weight: 600;"><i class="fa-solid fa-gears"></i> PID & Mode Settings</h4>
-        <table class="mdd-params-table" style="width: 100%; border-collapse: collapse; font-size: 11px;">
-          <thead>
-            <tr style="border-bottom: 1px solid var(--border-light); text-align: left; color: var(--text-muted);">
-              <th style="padding-bottom: 4px; width: 8%;">Ch</th>
-              <th style="padding-bottom: 4px; width: 22%;">Mode</th>
-              <th style="padding-bottom: 4px; text-align: center; width: 14%;">P</th>
-              <th style="padding-bottom: 4px; text-align: center; width: 14%;">I</th>
-              <th style="padding-bottom: 4px; text-align: center; width: 14%;">D</th>
-              <th style="padding-bottom: 4px; text-align: center; width: 16%;">Wheel</th>
-              <th style="padding-bottom: 4px; text-align: center; width: 12%;">Dir</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${paramsRowsHtml}
-          </tbody>
-        </table>
+        <h4 style="font-size: 12px; margin-bottom: 8px; font-weight: 600;"><i class="fa-solid fa-gears"></i> PID & Mode Settings</h4>
+        <div class="mdd-motors-list">
+          ${paramsCardsHtml}
+        </div>
       </div>`;
 
     return `
@@ -731,6 +1271,33 @@ document.addEventListener("DOMContentLoaded", () => {
         });
       });
 
+      // PIDゲインの微調整ボタン (+ / -) イベントリスナーの追加
+      const pidAdjustBtns = document.querySelectorAll(`.btn-pid-adjust[data-module="${mod.name}"]`);
+      pidAdjustBtns.forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const motorIdx = btn.getAttribute("data-motor");
+          const param = btn.getAttribute("data-param");
+          const action = btn.getAttribute("data-action");
+          const inputEl = document.querySelector(`.input-mdd-${param}[data-module="${mod.name}"][data-motor="${motorIdx}"]`);
+          if (!inputEl) return;
+
+          const step = parseFloat(inputEl.step) || (param === "p" ? 0.1 : 0.01);
+          const curVal = parseFloat(inputEl.value) || 0.0;
+          const nextVal = Math.max(0, parseFloat((curVal + (action === "plus" ? step : -step)).toFixed(3)));
+          inputEl.value = nextVal;
+
+          const moduleObj = state.config.modules.find(m => m.name === mod.name);
+          if (moduleObj) {
+            if (!moduleObj.parameters) moduleObj.parameters = {};
+            if (!moduleObj.parameters[`m${motorIdx}`]) {
+              moduleObj.parameters[`m${motorIdx}`] = { p: 10.0, i: 0.0, d: 0.0, diameter: 100.0, direction: 1, mode: 0 };
+            }
+            moduleObj.parameters[`m${motorIdx}`][param] = nextVal;
+            await saveConfigToServer();
+          }
+        });
+      });
+
     } else if (mod.type === "servo") {
       // サーボスライダーのドラッグイベント
       const sliders = document.querySelectorAll(`.range-servo[data-module="${mod.name}"]`);
@@ -821,52 +1388,71 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // --- 8. WebSocket テレメトリ（フィードバック）のカード反映 ---
+  const pendingMddFeedback = new Map();
+  let mddFeedbackRafScheduled = false;
+
+  function flushMddCardFeedbackDOM() {
+    mddFeedbackRafScheduled = false;
+    for (const [name, data] of pendingMddFeedback.entries()) {
+      // Limitスイッチ
+      for (let i = 0; i < 4; i++) {
+        const swEl = document.getElementById(`sw-${name}-${i + 1}`);
+        if (swEl) {
+          if (data.limit_switches[i]) {
+            swEl.classList.add("active");
+          } else {
+            swEl.classList.remove("active");
+          }
+        }
+      }
+
+      // エンコーダフィードバック (角度 ＆ 速度)
+      for (let i = 0; i < 4; i++) {
+        const fbEl = document.getElementById(`lbl-${name}-m${i + 1}-fb`);
+        if (fbEl) {
+          const ang = data.angles[i].toFixed(1);
+          const spd = data.speeds[i].toFixed(2);
+          fbEl.textContent = `${ang}° / ${spd} rps`;
+        }
+      }
+
+      // エラー状態のチェック
+      const card = document.getElementById(`module-card-${name}`);
+      if (card) {
+        card.style.borderColor = data.error_code > 0 ? "var(--color-danger)" : "var(--border-light)";
+      }
+    }
+    pendingMddFeedback.clear();
+  }
+
   function updateMddCardFeedback(name, data) {
-    // Limitスイッチ
-    for (let i = 0; i < 4; i++) {
-      const swEl = document.getElementById(`sw-${name}-${i + 1}`);
-      if (swEl) {
-        if (data.limit_switches[i]) {
-          swEl.classList.add("active");
-        } else {
-          swEl.classList.remove("active");
-        }
-      }
+    pendingMddFeedback.set(name, data);
+    if (!mddFeedbackRafScheduled) {
+      mddFeedbackRafScheduled = true;
+      requestAnimationFrame(flushMddCardFeedbackDOM);
     }
 
-    // エンコーダフィードバック (角度 ＆ 速度)
-    for (let i = 0; i < 4; i++) {
-      const fbEl = document.getElementById(`lbl-${name}-m${i + 1}-fb`);
-      if (fbEl) {
-        const ang = data.angles[i].toFixed(1);
-        const spd = data.speeds[i].toFixed(2);
-        fbEl.textContent = `${ang}° / ${spd} rps`;
-      }
-    }
-
-    // エラー状態のチェック
-    if (data.error_code > 0) {
-      const card = document.getElementById(`module-card-${name}`);
-      card.style.borderColor = "var(--color-danger)";
-    } else {
-      const card = document.getElementById(`module-card-${name}`);
-      if (card) card.style.borderColor = "var(--border-light)";
-    }
-
-    // マイコン側のモード判定による自動リセット検知
+    // マイコン側のモード判定による自動リセット検知（全MDDの状態を個別に管理しピンポン発振を防止）
     if (typeof data.system_status !== 'undefined') {
-      const inGracePeriod = (Date.now() - (state.controlStartTimeMs || 0)) < 1500;
-      if (data.system_status === 1 && state.controlMode !== "CONTROL") {
-        state.controlMode = "CONTROL";
-        if (el.lblControlModeStatus) {
-          el.lblControlModeStatus.innerHTML = 'ステータス: <span class="badge badge-success">制御実行中 (Control Mode)</span>';
+      const prevStatus = state.mddStatuses[name];
+      state.mddStatuses[name] = data.system_status;
+
+      if (!state.isSendingParams) {
+        const mddModules = (state.config?.modules || []).filter(m => m.type === "mdd");
+        const allRunning = mddModules.length > 0 && mddModules.every(m => state.mddStatuses[m.name] === 1);
+
+        if (allRunning && state.controlMode !== "CONTROL") {
+          state.controlMode = "CONTROL";
+          if (el.lblControlModeStatus) {
+            el.lblControlModeStatus.innerHTML = 'ステータス: <span class="badge badge-success">制御実行中 (Control Mode)</span>';
+          }
+        } else if (data.system_status === 0 && (state.controlMode === "CONTROL" || prevStatus === 1)) {
+          state.controlMode = "SETUP";
+          if (el.lblControlModeStatus) {
+            el.lblControlModeStatus.innerHTML = 'ステータス: <span class="badge badge-warning">パラメータ未送信 (待機中)</span>';
+          }
+          appendTerminalLog(el.behaviorTerminal, `[SYSTEM] マイコン '${name}' の待機状態（パラメータ設定モード）へのリセットを検知しました。パラメータを再送信してください。`, "system-msg");
         }
-      } else if (data.system_status === 0 && state.controlMode === "CONTROL" && !inGracePeriod) {
-        state.controlMode = "SETUP";
-        if (el.lblControlModeStatus) {
-          el.lblControlModeStatus.innerHTML = 'ステータス: <span class="badge badge-warning">パラメータ未送信 (待機中)</span>';
-        }
-        appendTerminalLog(el.behaviorTerminal, `[SYSTEM] マイコン '${name}' の待機状態（パラメータ設定モード）へのリセットを検知しました。パラメータを再送信してください。`, "system-msg");
       }
     }
   }
@@ -921,25 +1507,47 @@ document.addEventListener("DOMContentLoaded", () => {
       const cfg = await res.json();
       if (cfg.target_ip && el.txtEthIp) el.txtEthIp.value = cfg.target_ip;
       if (cfg.target_port && el.txtEthPort) el.txtEthPort.value = cfg.target_port;
+      if (cfg.can_channel && el.selEthCanChannel) el.selEthCanChannel.value = cfg.can_channel;
     } catch (e) {
       // 読み込み失敗時は初期値を維持
     }
   }
   loadEthCanConfig();
 
+  // Ethernet-CAN チャンネル切り替え (接続中も即座に反映)
+  if (el.selEthCanChannel) {
+    el.selEthCanChannel.addEventListener("change", async () => {
+      const ch = el.selEthCanChannel.value;
+      try {
+        const res = await fetch("/api/eth_can/channel", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ can_channel: ch })
+        });
+        const data = await res.json();
+        if (data.success) {
+          appendTerminalLog(el.behaviorTerminal, `[SYSTEM] ${data.message}`, "system-msg");
+        }
+      } catch (err) {
+        appendTerminalLog(el.behaviorTerminal, `[ERROR] チャンネル切替に失敗しました: ${err}`, "error-msg");
+      }
+    });
+  }
+
   // Ethernet-CAN 接続ボタン
   if (el.btnConnectEth) {
     el.btnConnectEth.addEventListener("click", async () => {
       const ip = el.txtEthIp.value.trim();
       const port = parseInt(el.txtEthPort.value.trim(), 10) || 5000;
+      const canChannel = el.selEthCanChannel ? el.selEthCanChannel.value : "can1";
 
-      appendTerminalLog(el.behaviorTerminal, `Ethernet-CAN (${ip}:${port}) への接続要求を送信中...`);
+      appendTerminalLog(el.behaviorTerminal, `Ethernet-CAN (${ip}:${port} / ${canChannel.toUpperCase()}) への接続要求を送信中...`);
 
       try {
         const res = await fetch("/api/eth_can/connect", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ target_ip: ip, target_port: port })
+          body: JSON.stringify({ target_ip: ip, target_port: port, can_channel: canChannel })
         });
         const data = await res.json();
         if (data.success) {
@@ -953,12 +1561,30 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Ethernet-CAN 切断ボタン
+  if (el.btnDisconnectEth) {
+    el.btnDisconnectEth.addEventListener("click", async () => {
+      appendTerminalLog(el.behaviorTerminal, "Ethernet-CAN 切断要求を送信中...");
+      try {
+        const res = await fetch("/api/eth_can/disconnect", { method: "POST" });
+        const data = await res.json();
+        appendTerminalLog(el.behaviorTerminal, `[SYSTEM] ${data.message}`, "system-msg");
+      } catch (err) {
+        appendTerminalLog(el.behaviorTerminal, `[ERROR] 通信失敗: ${err}`, "error-msg");
+      }
+    });
+  }
+
   // 自動探索チェックボックスの挙動
-  el.chkAutoConnect.addEventListener("change", (e) => {
-    const isAuto = e.target.checked;
-    el.selCanPort.disabled = isAuto;
-    el.btnRefreshPorts.disabled = isAuto;
-  });
+  if (el.chkAutoConnect) {
+    const syncAutoConnectUI = () => {
+      const isAuto = el.chkAutoConnect.checked;
+      if (el.selCanPort) el.selCanPort.disabled = isAuto;
+      if (el.btnRefreshPorts) el.btnRefreshPorts.disabled = isAuto;
+    };
+    el.chkAutoConnect.addEventListener("change", syncAutoConnectUI);
+    syncAutoConnectUI();
+  }
 
   // 接続ボタン
   el.btnConnectCan.addEventListener("click", async () => {
@@ -1001,22 +1627,41 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // パラメータ送信 ＆ 制御開始
+  // パラメータ送信 ＆ 全マイコン応答待機 ＆ 制御開始
   el.btnSendParams.addEventListener("click", async () => {
-    appendTerminalLog(el.behaviorTerminal, "制御パラメータ送信中...");
+    state.isSendingParams = true;
+    state.controlMode = "SENDING";
+    if (el.lblControlModeStatus) {
+      el.lblControlModeStatus.innerHTML = 'ステータス: <span class="badge badge-warning">パラメータ送信・応答待機中...</span>';
+    }
+    appendTerminalLog(el.behaviorTerminal, "制御パラメータを送信し、全マイコンからの設定完了応答を待機しています...");
     try {
       const res = await fetch("/api/start_control", { method: "POST" });
       const data = await res.json();
+      state.isSendingParams = false;
 
       if (data.success) {
-        state.controlStartTimeMs = Date.now();
-        appendTerminalLog(el.behaviorTerminal, "[SYSTEM] パラメータ送信成功。制御実行状態になりました！", "system-msg");
-        el.lblControlModeStatus.innerHTML = 'ステータス: <span class="badge badge-success">制御実行中 (Control Mode)</span>';
+        (state.config?.modules || []).forEach(m => {
+          if (m.type === "mdd") state.mddStatuses[m.name] = 1;
+        });
+        appendTerminalLog(el.behaviorTerminal, `[SYSTEM] ${data.message}`, "system-msg");
+        if (el.lblControlModeStatus) {
+          el.lblControlModeStatus.innerHTML = 'ステータス: <span class="badge badge-success">制御実行中 (Control Mode)</span>';
+        }
         state.controlMode = "CONTROL";
       } else {
+        state.controlMode = "SETUP";
+        if (el.lblControlModeStatus) {
+          el.lblControlModeStatus.innerHTML = 'ステータス: <span class="badge badge-warning">パラメータ未送信 (待機中)</span>';
+        }
         appendTerminalLog(el.behaviorTerminal, `[ERROR] 送信失敗: ${data.message}`, "error-msg");
       }
     } catch (err) {
+      state.isSendingParams = false;
+      state.controlMode = "SETUP";
+      if (el.lblControlModeStatus) {
+        el.lblControlModeStatus.innerHTML = 'ステータス: <span class="badge badge-warning">パラメータ未送信 (待機中)</span>';
+      }
       appendTerminalLog(el.behaviorTerminal, `[ERROR] 通信失敗: ${err}`, "error-msg");
     }
   });
@@ -1054,9 +1699,32 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // --- 動作プログラムファイル一覧の動的取得と表示 ---
-  async function refreshBehaviors() {
+  // --- 動作プログラムファイル一覧の動的取得とフォルダー連携 ---
+  const btnRefreshBehaviorList = document.getElementById("btn-refresh-behavior-list");
+  const btnDeleteBehavior = document.getElementById("btn-delete-behavior");
+  const txtNewBehaviorName = document.getElementById("txt-new-behavior-name");
+  const btnCreateBehavior = document.getElementById("btn-create-behavior");
+  const btnOpenBehaviorFolder = document.getElementById("btn-open-behavior-folder");
+
+  if (btnOpenBehaviorFolder) {
+    btnOpenBehaviorFolder.addEventListener("click", async () => {
+      try {
+        const res = await fetch("/api/behavior/open_folder", { method: "POST" });
+        const data = await res.json();
+        if (data.success) {
+          appendTerminalLog(el.behaviorTerminal, `[SYSTEM] ${data.message}`, "system-msg");
+        } else {
+          appendTerminalLog(el.behaviorTerminal, `[ERROR] ${data.message}`, "error-msg");
+        }
+      } catch (err) {
+        appendTerminalLog(el.behaviorTerminal, `[ERROR] フォルダーを開けませんでした: ${err}`, "error-msg");
+      }
+    });
+  }
+
+  async function refreshBehaviors(preferredSelect = "") {
     try {
+      const prevSelect = preferredSelect || el.selBehaviorScript.value;
       const res = await fetch("/api/behavior/list");
       const data = await res.json();
 
@@ -1079,11 +1747,71 @@ document.addEventListener("DOMContentLoaded", () => {
           option.textContent = filename;
           el.selBehaviorScript.appendChild(option);
         });
+        if (prevSelect && data.behaviors.includes(prevSelect)) {
+          el.selBehaviorScript.value = prevSelect;
+        }
       }
     } catch (err) {
       console.error("プログラムファイル取得失敗:", err);
       el.selBehaviorScript.innerHTML = '<option value="">通信エラー</option>';
     }
+  }
+
+  if (btnRefreshBehaviorList) {
+    btnRefreshBehaviorList.addEventListener("click", () => refreshBehaviors());
+  }
+
+  if (btnCreateBehavior && txtNewBehaviorName) {
+    btnCreateBehavior.addEventListener("click", async () => {
+      const name = txtNewBehaviorName.value.trim();
+      if (!name) {
+        alert("新しいスクリプトのファイル名を入力してください (例: my_robot.py)");
+        return;
+      }
+      try {
+        const res = await fetch("/api/behavior/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name })
+        });
+        const data = await res.json();
+        if (data.success) {
+          txtNewBehaviorName.value = "";
+          appendTerminalLog(el.behaviorTerminal, `[SYSTEM] ${data.message}`, "system-msg");
+          await refreshBehaviors(data.name);
+        } else {
+          appendTerminalLog(el.behaviorTerminal, `[ERROR] ${data.message}`, "error-msg");
+          alert(data.message);
+        }
+      } catch (err) {
+        appendTerminalLog(el.behaviorTerminal, `[ERROR] 作成エラー: ${err}`, "error-msg");
+      }
+    });
+  }
+
+  if (btnDeleteBehavior) {
+    btnDeleteBehavior.addEventListener("click", async () => {
+      const target = el.selBehaviorScript.value;
+      if (!target) return;
+      if (!confirm(`スクリプト '${target}' を本当に削除しますか？`)) return;
+      try {
+        const res = await fetch("/api/behavior/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: target })
+        });
+        const data = await res.json();
+        if (data.success) {
+          appendTerminalLog(el.behaviorTerminal, `[SYSTEM] ${data.message}`, "system-msg");
+          await refreshBehaviors();
+        } else {
+          appendTerminalLog(el.behaviorTerminal, `[ERROR] ${data.message}`, "error-msg");
+          alert(data.message);
+        }
+      } catch (err) {
+        appendTerminalLog(el.behaviorTerminal, `[ERROR] 削除エラー: ${err}`, "error-msg");
+      }
+    });
   }
 
   // プロファイルのロード（グローバル関数化）
@@ -1190,6 +1918,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // --- 11. 動作プログラム(Behavior)の起動 ＆ 停止制御 ---
   el.btnStartBehavior.addEventListener("click", async () => {
     const script = el.selBehaviorScript.value;
+    if (!script) {
+      alert("実行するスクリプトを選択してください。");
+      return;
+    }
     appendTerminalLog(el.behaviorTerminal, `プログラム '${script}' の起動要求を送信...`);
     try {
       const res = await fetch("/api/behavior/start", {
@@ -1248,8 +1980,25 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
+  let editingModuleOriginalName = null;
+
+  window.editModule = (name) => {
+    const mod = state.config.modules.find(m => m.name === name);
+    if (!mod) return;
+    editingModuleOriginalName = mod.name;
+    el.modalModuleType.value = mod.type;
+    el.modalModuleName.value = mod.name;
+    el.modalModuleId.value = mod.base_id;
+    el.modalModuleDesc.value = mod.description || "";
+    el.modal.classList.add("active");
+  };
+
   // モーダル制御
   el.btnAddModuleModal.addEventListener("click", () => {
+    editingModuleOriginalName = null;
+    el.modalModuleName.value = "";
+    el.modalModuleId.value = "";
+    el.modalModuleDesc.value = "";
     el.modal.classList.add("active");
   });
 
@@ -1258,6 +2007,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function closeModal() {
     el.modal.classList.remove("active");
+    editingModuleOriginalName = null;
     // フォームクリア
     el.modalModuleName.value = "";
     el.modalModuleId.value = "";
@@ -1275,31 +2025,53 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // 重複チェック
-    if (state.config.modules.some(m => m.name === name)) {
-      alert("すでに同じ名前のモジュールが存在します。");
-      return;
-    }
+    if (editingModuleOriginalName) {
+      if (name !== editingModuleOriginalName && state.config.modules.some(m => m.name === name)) {
+        alert("すでに同じ名前のモジュールが存在します。");
+        return;
+      }
+      const mod = state.config.modules.find(m => m.name === editingModuleOriginalName);
+      if (mod) {
+        mod.name = name;
+        mod.type = type;
+        mod.base_id = id;
+        mod.description = desc;
+        if (type === "mdd" && !mod.parameters) {
+          mod.parameters = {
+            m1: { p: 10.0, i: 0.0, d: 0.0, diameter: 100.0, direction: 1, mode: 0 },
+            m2: { p: 10.0, i: 0.0, d: 0.0, diameter: 100.0, direction: 1, mode: 0 },
+            m3: { p: 10.0, i: 0.0, d: 0.0, diameter: 100.0, direction: 1, mode: 0 },
+            m4: { p: 10.0, i: 0.0, d: 0.0, diameter: 100.0, direction: 1, mode: 0 }
+          };
+        }
+      }
+    } else {
+      // 重複チェック
+      if (state.config.modules.some(m => m.name === name)) {
+        alert("すでに同じ名前のモジュールが存在します。");
+        return;
+      }
 
-    // 新規モジュールオブジェクト
-    const newMod = {
-      name: name,
-      type: type,
-      base_id: id,
-      description: desc
-    };
-
-    // MDD特有の初期パラメータ構造を追加
-    if (type === "mdd") {
-      newMod.parameters = {
-        m1: { p: 10.0, i: 0.0, d: 0.0, diameter: 100.0, direction: 1, mode: 0 },
-        m2: { p: 10.0, i: 0.0, d: 0.0, diameter: 100.0, direction: 1, mode: 0 },
-        m3: { p: 10.0, i: 0.0, d: 0.0, diameter: 100.0, direction: 1, mode: 0 },
-        m4: { p: 10.0, i: 0.0, d: 0.0, diameter: 100.0, direction: 1, mode: 0 }
+      // 新規モジュールオブジェクト
+      const newMod = {
+        name: name,
+        type: type,
+        base_id: id,
+        description: desc
       };
-    }
 
-    state.config.modules.push(newMod);
+      // MDD特有の初期パラメータ構造を追加
+      if (type === "mdd") {
+        newMod.parameters = {
+          m1: { p: 10.0, i: 0.0, d: 0.0, diameter: 100.0, direction: 1, mode: 0 },
+          m2: { p: 10.0, i: 0.0, d: 0.0, diameter: 100.0, direction: 1, mode: 0 },
+          m3: { p: 10.0, i: 0.0, d: 0.0, diameter: 100.0, direction: 1, mode: 0 },
+          m4: { p: 10.0, i: 0.0, d: 0.0, diameter: 100.0, direction: 1, mode: 0 }
+        };
+      }
+
+      state.config.modules.push(newMod);
+    }
 
     try {
       const res = await fetch("/api/config/update", {
@@ -1308,7 +2080,7 @@ document.addEventListener("DOMContentLoaded", () => {
         body: JSON.stringify(state.config)
       });
       const data = await res.json();
-      appendTerminalLog(el.behaviorTerminal, `モジュールを追加しました: ${data.message}`);
+      appendTerminalLog(el.behaviorTerminal, `モジュール設定を保存しました: ${data.message}`);
 
       closeModal();
       await loadConfigAndRender();
@@ -1328,7 +2100,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       } else if (mod.type === "solenoid") {
         if (state.ws && state.ws.readyState === WebSocket.OPEN) {
-          state.ws.send(JSON.stringify({ type: "solenoid_cmd", name: mod.name, valves: [false] * 12 }));
+          state.ws.send(JSON.stringify({ type: "solenoid_cmd", name: mod.name, valves: new Array(12).fill(false) }));
         }
       }
     });
@@ -1976,7 +2748,7 @@ if __name__ == '__main__':
 `;
   }
 
-  // ツールボックスの定義 XML (Logic, Math, Loops, Gamepad, 変数, テキスト, アクチュエータ, センサーの統合)
+  // ツールボックスの定義 XML
   const toolboxXml = `
     <xml id="toolbox" style="display: none">
       <category name="イベント" colour="#f59e0b">

@@ -23,6 +23,9 @@ class ModuleManager(Node):
         # パブリッシャ: CAN送信用のトピック
         self.can_tx_pub = self.create_publisher(Frame, '/altair/can/tx', 100)
 
+        # パブリッシャ: Web UIコンソールへのシステムログ通知用
+        self.behavior_log_pub = self.create_publisher(String, '/altair/behavior/log', 50)
+
         # サブスクライバ: NUCからのCAN受信用のトピック
         self.can_rx_sub = self.create_subscription(
             Frame, '/altair/can/rx', self.handle_can_rx_callback, 100,
@@ -53,6 +56,10 @@ class ModuleManager(Node):
         
         # モータごとの最新フィードバックデータをキャッシュする（角度と速度を1つのトピックに統合するため）
         self.mdd_feedback_cache = {}
+        # 各MDD (base_id) がパラメータ設定完了 (system_status == 1) を返したかの追跡辞書
+        self.mdd_param_confirmed = {}
+        # 各MDD (base_id) へ最後にパラメータを送った時刻 (monotonic秒)
+        self.mdd_param_sent_at = {}
 
         # 指令値キャッシュ（10msの周期送信タイマーで使用する最新の目標値）
         self.mdd_targets = {}
@@ -77,6 +84,11 @@ class ModuleManager(Node):
 
         self.get_logger().info("Module Manager ノードが起動しました。初期設定ロード完了。")
 
+    def publish_ui_log(self, text: str):
+        msg = String()
+        msg.data = text
+        self.behavior_log_pub.publish(msg)
+
     def load_config_and_initialize(self):
         """
         config/modules_config.json をロードし、動的トピックを構築する
@@ -90,6 +102,8 @@ class ModuleManager(Node):
         self.publishers_dict.clear()
         self.subscriptions_dict.clear()
         self.mdd_feedback_cache.clear()
+        self.mdd_param_confirmed.clear()
+        self.mdd_param_sent_at.clear()
 
         # パッケージのシェアディレクトリまたはローカルパスからロード
         config_path = self.get_config_path()
@@ -136,6 +150,8 @@ class ModuleManager(Node):
                     'angles': [0.0, 0.0, 0.0, 0.0],
                     'speeds': [0.0, 0.0, 0.0, 0.0]
                 }
+                self.mdd_param_confirmed[base_id] = False
+                self.mdd_param_sent_at[base_id] = 0.0
 
             elif mtype == 'servo':
                 # 指令キャッシュ初期化
@@ -172,25 +188,23 @@ class ModuleManager(Node):
         if env_path:
             candidates.append(Path(env_path).expanduser())
 
+        # 開発時の代表的な相対パス・ソースツリー優先 (Webサーバー側での保存先と一致させる)
+        cwd = Path.cwd()
+        candidates.append(cwd / 'altair_core' / 'config' / 'modules_config.json')
+        candidates.append(cwd / 'config' / 'modules_config.json')
+
+        this_file = Path(__file__).resolve()
+        candidates.append(this_file.parent.parent / 'config' / 'modules_config.json')
+
+        if len(this_file.parents) >= 5:
+            candidates.append(this_file.parents[4] / 'altair_core' / 'config' / 'modules_config.json')
+
         # ROS2インストール先 (share/altair_core/config)
         try:
             share_dir = Path(get_package_share_directory('altair_core'))
             candidates.append(share_dir / 'config' / 'modules_config.json')
         except PackageNotFoundError:
             pass
-
-        # 開発時の代表的な相対パス
-        cwd = Path.cwd()
-        candidates.append(cwd / 'altair_core' / 'config' / 'modules_config.json')
-        candidates.append(cwd / 'config' / 'modules_config.json')
-
-        # モジュールファイル基準の相対パス
-        this_file = Path(__file__).resolve()
-        candidates.append(this_file.parent.parent / 'config' / 'modules_config.json')
-
-        # build/配下のモジュールから実行された場合のフォールバック
-        if len(this_file.parents) >= 5:
-            candidates.append(this_file.parents[4] / 'altair_core' / 'config' / 'modules_config.json')
 
         for path in candidates:
             if path.exists():
@@ -293,7 +307,6 @@ class ModuleManager(Node):
     # --- 3. CAN ➔ ROS2 フィードバック変換処理 (NUC ➔ PC) ---
     def handle_can_rx_callback(self, frame):
         can_id = frame.id
-        # self.get_logger().info(f"[CAN_RX] ID: {hex(can_id)}, DLC: {frame.dlc}, Data: {list(frame.data)}")
 
         try:
             # 現在キャッシュに登録されているMDD Base IDを走査
@@ -307,23 +320,30 @@ class ModuleManager(Node):
                     cache['limit_switches'] = [bool(b) for b in data[0:4]]
                     cache['error_code'] = data[4]
 
-                    in_grace_period = (time.monotonic() - self.control_start_monotonic) < 1.2
-                    if data[5] == 0 and self.is_running and in_grace_period:
-                        # 制御開始直後の遷移猶予期間中は、古い待機ステータス(0)による誤リセットを防ぐ
-                        cache['system_status'] = 1
+                    prev_status = cache.get('system_status', 0)
+                    raw_status = int(data[5])
+                    cache['system_status'] = raw_status
+
+                    if raw_status == 1:
+                        self.mdd_param_confirmed[base_id] = True
                     else:
-                        cache['system_status'] = data[5]
-                    
-                    # マイコンが待機状態（0）にリセットされたことを検知したら、PC側の制御フラグも安全のために即座にFalseに戻す
-                    if data[5] == 0 and self.is_running and not in_grace_period:
-                        self.is_running = False
-                        module_name = ""
-                        for module in self.config.get('modules', []):
-                            if int(module['base_id'], 16) == base_id:
-                                module_name = module['name']
-                                break
-                        self.get_logger().warn(f"マイコン '{module_name}' の待機状態へのリセットを検知したため、PC側の制御フラグを安全にリセットしました。")
-                    
+                        sent_at = self.mdd_param_sent_at.get(base_id, 0.0)
+                        in_grace_period = (time.monotonic() - sent_at) < 1.5
+                        if not self.is_sending_params and not in_grace_period:
+                            if self.mdd_param_confirmed.get(base_id, False) or (prev_status == 1 and self.is_running):
+                                self.mdd_param_confirmed[base_id] = False
+                                self.is_running = False
+                                module_name = ""
+                                for module in self.config.get('modules', []):
+                                    if int(module['base_id'], 16) == base_id:
+                                        module_name = module['name']
+                                        break
+                                for m_name in self.mdd_targets:
+                                    self.mdd_targets[m_name] = [0.0, 0.0, 0.0, 0.0]
+                                warn_msg = f"マイコン '{module_name}' ({hex(base_id)}) の待機状態へのリセットを検知したため、PC側の制御フラグを安全にリセットしました。"
+                                self.get_logger().warn(warn_msg)
+                                self.publish_ui_log(f"[SYSTEM] {warn_msg}")
+
                     self.publish_mdd_feedback(base_id)
 
                 # B. エンコーダ角度 (Base ID + 0x40 = 0x240)
@@ -377,93 +397,173 @@ class ModuleManager(Node):
         if topic_name in self.publishers_dict:
             self.publishers_dict[topic_name].publish(msg)
 
+    # --- 4. 複数MDD構成時のKeepaliveおよび個別MDDパラメータ送信ヘルパー ---
+    def send_keepalive_to_mdds(self, mdd_modules):
+        """他のMDDのパラメータ送信中に、既に制御開始したMDDがCAN受信タイムアウト(500ms)しないよう0x22xを送る"""
+        for mod in mdd_modules:
+            base_id = int(mod['base_id'], 16)
+            if self.mdd_param_confirmed.get(base_id, False) or self.mdd_param_sent_at.get(base_id, 0.0) > 0.0:
+                frame = Frame()
+                frame.header.stamp = self.get_clock().now().to_msg()
+                frame.id = base_id + 0x20
+                frame.dlc = 8
+                frame.is_extended = False
+                frame.is_rtr = False
+                frame.data = [0] * 8
+                self.can_tx_pub.publish(frame)
+
+    def send_single_mdd_params(self, module, all_mdd_modules):
+        base_id = int(module['base_id'], 16)
+        params = module.get('parameters', {})
+
+        # 4つのモータ (m1〜m4) のゲイン・直径・方向を送信 (35ms間隔)
+        for idx, motor_key in enumerate(['m1', 'm2', 'm3', 'm4']):
+            m_param = params.get(motor_key, {"p": 1.0, "i": 0.0, "d": 0.0, "diameter": 100.0, "direction": 1})
+
+            p_gain = max(-32768, min(32767, int(float(m_param.get('p', 1.0)) * 1000)))
+            i_gain = max(-32768, min(32767, int(float(m_param.get('i', 0.0)) * 1000)))
+            d_gain = max(-32768, min(32767, int(float(m_param.get('d', 0.0)) * 1000)))
+
+            diameter = float(m_param.get('diameter', 100.0))
+            direction = float(m_param.get('direction', 1.0))
+            diameter_dir = max(-32768, min(32767, int(diameter * direction)))
+
+            payload = struct.pack('<hhhh', p_gain, i_gain, d_gain, diameter_dir)
+            motor_id = base_id + idx
+
+            frame = Frame()
+            frame.header.stamp = self.get_clock().now().to_msg()
+            frame.id = motor_id
+            frame.dlc = 8
+            frame.is_extended = False
+            frame.is_rtr = False
+            frame.data = list(payload)
+            self.can_tx_pub.publish(frame)
+
+            self.get_logger().info(
+                f"パラメータ送信: {module['name']} M{idx+1} (ID:{hex(motor_id)}) "
+                f"P={p_gain}, I={i_gain}, D={d_gain}, 車輪={diameter_dir}"
+            )
+            time.sleep(0.035)
+            self.send_keepalive_to_mdds(all_mdd_modules)
+
+        # 4ch モード設定 (Base ID + 0x10 = 例: 0x210) の送信
+        modes = [
+            int(params.get('m1', {}).get('mode', 0)),
+            int(params.get('m2', {}).get('mode', 0)),
+            int(params.get('m3', {}).get('mode', 0)),
+            int(params.get('m4', {}).get('mode', 0))
+        ]
+        mode_payload = modes + [0] * 4
+
+        mode_frame = Frame()
+        mode_frame.header.stamp = self.get_clock().now().to_msg()
+        mode_frame.id = base_id + 0x10
+        mode_frame.dlc = 4
+        mode_frame.is_extended = False
+        mode_frame.is_rtr = False
+        mode_frame.data = mode_payload
+        self.can_tx_pub.publish(mode_frame)
+
+        self.mdd_param_sent_at[base_id] = time.monotonic()
+        self.get_logger().info(f"モード設定送信: {module['name']} (ID:{hex(base_id + 0x10)}) モード={modes}")
+        time.sleep(0.040)
+
+        # 起動直後のマイコンのCAN受信タイムアウト防止用として初期目標値(0)を即座に送信
+        zero_frame = Frame()
+        zero_frame.header.stamp = self.get_clock().now().to_msg()
+        zero_frame.id = base_id + 0x20
+        zero_frame.dlc = 8
+        zero_frame.is_extended = False
+        zero_frame.is_rtr = False
+        zero_frame.data = [0] * 8
+        self.can_tx_pub.publish(zero_frame)
+        self.send_keepalive_to_mdds(all_mdd_modules)
+
     # --- 5. パラメータ送信 ＆ 制御実行モード遷移トリガーサービス ---
     def handle_start_control_service(self, request, response):
-        # 未使用の引数を明示的に無視
         _ = request
         self.get_logger().info("スタート制御要求を受信しました。パラメータの送信を開始します。")
 
         self.is_sending_params = True
         try:
-            # 構成ファイル内のすべてのmddモジュールに対してパラメータを順次送信
-            for module in self.config.get('modules', []):
-                if module['type'] != 'mdd':
-                    continue
+            # 送信前に最新の設定ファイルを読み込んで反映
+            config_path = self.get_config_path()
+            if os.path.exists(config_path):
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    self.config = json.load(f)
 
-                base_id = int(module['base_id'], 16)
-                params = module.get('parameters', {})
+            mdd_modules = [m for m in self.config.get('modules', []) if m.get('type') == 'mdd']
+            if not mdd_modules:
+                self.control_start_monotonic = time.monotonic()
+                self.is_running = True
+                response.success = True
+                response.message = "MDDモジュールが登録されていないため、即時制御モードを開始しました。"
+                return response
 
-                # 4つのモータ (m1〜m4) のゲイン・直径・方向を送信
-                for idx, motor_key in enumerate(['m1', 'm2', 'm3', 'm4']):
-                    m_param = params.get(motor_key, {"p": 1.0, "i": 0.0, "d": 0.0, "diameter": 100.0, "direction": 1})
-                    
-                    p_gain = int(float(m_param.get('p', 1.0)) * 1000)
-                    p_gain = max(-32768, min(32767, p_gain))
-                    
-                    i_gain = int(float(m_param.get('i', 0.0)) * 1000)
-                    i_gain = max(-32768, min(32767, i_gain))
-                    
-                    d_gain = int(float(m_param.get('d', 0.0)) * 1000)
-                    d_gain = max(-32768, min(32767, d_gain))
-                    
-                    # 直径に方向の符号をかける (例: 100 * 1 = 100, 100 * -1 = -100)
-                    diameter = float(m_param.get('diameter', 100.0))
-                    direction = float(m_param.get('direction', 1.0))
-                    diameter_dir = int(diameter * direction)
-                    diameter_dir = max(-32768, min(32767, diameter_dir))
-                    
-                    payload = struct.pack('<hhhh', p_gain, i_gain, d_gain, diameter_dir)
-                    
-                    # 送信先のCAN ID: 0x200 + モータインデックス (0x200, 0x201, 0x202, 0x203)
-                    motor_id = base_id + idx
-                    
-                    frame = Frame()
-                    frame.header.stamp = self.get_clock().now().to_msg()
-                    frame.id = motor_id
-                    frame.dlc = 8
-                    frame.is_extended = False
-                    frame.is_rtr = False
-                    frame.data = list(payload)
-                    self.can_tx_pub.publish(frame)
-                    
-                    self.get_logger().info(f"パラメータ送信: モータ{idx+1} (ID:{hex(motor_id)}) P={p_gain}, I={i_gain}, D={d_gain}, 車輪={diameter_dir}")
-                    # Ethernet-CANおよびマイコン側の受信バッファ溢れを防ぐため遅延を挟む
-                    time.sleep(0.025)
-
-                # 4ch モード設定 (0x210) の送信
-                modes = [
-                    int(params.get('m1', {}).get('mode', 0)),
-                    int(params.get('m2', {}).get('mode', 0)),
-                    int(params.get('m3', {}).get('mode', 0)),
-                    int(params.get('m4', {}).get('mode', 0))
-                ]
-                
-                # Payload 4B: 各モータのモード (0=速度, 1=角度, 2=位置) を 8B にアライン
-                mode_payload = modes + [0]*4
-                
-                mode_frame = Frame()
-                mode_frame.header.stamp = self.get_clock().now().to_msg()
-                mode_frame.id = base_id + 0x10  # 例: 0x210
-                mode_frame.dlc = 4
-                mode_frame.is_extended = False
-                mode_frame.is_rtr = False
-                mode_frame.data = mode_payload
-                self.can_tx_pub.publish(mode_frame)
-                
-                self.get_logger().info(f"モード設定送信 (ID:{hex(base_id + 0x10)}): モード={modes}")
-                time.sleep(0.025)
-
-                # キャッシュ上のsystem_statusも一旦1（制御実行中）に更新して、直後の0x240/0x250受信で古い0が配信されるのを防ぐ
+            for mod in mdd_modules:
+                base_id = int(mod['base_id'], 16)
+                self.mdd_param_confirmed[base_id] = False
+                self.mdd_param_sent_at[base_id] = 0.0
                 if base_id in self.mdd_feedback_cache:
-                    self.mdd_feedback_cache[base_id]['system_status'] = 1
+                    self.mdd_feedback_cache[base_id]['system_status'] = 0
 
-            # 制御開始時刻を記録して制御実行中フラグをONにする
-            self.control_start_monotonic = time.monotonic()
-            self.is_running = True
-            response.success = True
-            response.message = "パラメータが正常に送信され、制御システムが実行状態に遷移しました。"
-            self.get_logger().info("システムが『制御実行中』になりました。")
-        
+            max_rounds = 6
+            for round_num in range(1, max_rounds + 1):
+                pending_mdds = [
+                    mod for mod in mdd_modules
+                    if not self.mdd_param_confirmed.get(int(mod['base_id'], 16), False)
+                ]
+                if not pending_mdds:
+                    break
+
+                pending_names = ", ".join(f"{m['name']}({m['base_id']})" for m in pending_mdds)
+                log_msg = f"[PARAM] パラメータ送信ラウンド {round_num} (未完了: {pending_names})"
+                self.get_logger().info(log_msg)
+                self.publish_ui_log(log_msg)
+
+                for mod in pending_mdds:
+                    self.send_single_mdd_params(mod, mdd_modules)
+
+                # 最大 400ms 間、40ms ごとに keepalive を送りながら全MDDからの完了応答 (0x230 data[5] == 1) を待機
+                wait_start = time.monotonic()
+                while (time.monotonic() - wait_start) < 0.40:
+                    if all(self.mdd_param_confirmed.get(int(m['base_id'], 16), False) for m in mdd_modules):
+                        break
+                    self.send_keepalive_to_mdds(mdd_modules)
+                    time.sleep(0.040)
+
+                if all(self.mdd_param_confirmed.get(int(m['base_id'], 16), False) for m in mdd_modules):
+                    break
+
+            unconfirmed_mdds = [
+                f"{m['name']}({m['base_id']})"
+                for m in mdd_modules
+                if not self.mdd_param_confirmed.get(int(m['base_id'], 16), False)
+            ]
+            confirmed_count = len(mdd_modules) - len(unconfirmed_mdds)
+
+            if not unconfirmed_mdds:
+                self.control_start_monotonic = time.monotonic()
+                self.is_running = True
+                msg = f"全 {len(mdd_modules)} 台のMDDマイコンの設定完了を確認し、制御システムが実行状態に遷移しました。"
+                self.get_logger().info(msg)
+                self.publish_ui_log(f"[SYSTEM] {msg}")
+                response.success = True
+                response.message = msg
+            else:
+                if confirmed_count > 0:
+                    self.control_start_monotonic = time.monotonic()
+                    self.is_running = True
+                warn_msg = (
+                    f"未応答のMDDがあります ({', '.join(unconfirmed_mdds)})。"
+                    f"CANチャンネル選択 (CAN1 / CAN2) または基板の電源・配線を確認してください。"
+                )
+                self.get_logger().warn(warn_msg)
+                self.publish_ui_log(f"[WARNING] {warn_msg}")
+                response.success = False
+                response.message = warn_msg
+
         except Exception as e:
             self.is_running = False
             response.success = False
@@ -478,6 +578,7 @@ class ModuleManager(Node):
         """
         設定ファイル更新時にトピックを動的再生成するサービスハンドラー
         """
+        _ = request
         self.get_logger().info("モジュール設定のリロード要求を受信しました。トピックを再生成します。")
         try:
             self.load_config_and_initialize()

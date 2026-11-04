@@ -11,6 +11,8 @@
 #include <iostream>
 #include <cstring>
 #include <cerrno>
+#include <algorithm>
+#include <cctype>
 
 // POSIX ネットワークヘッダー
 #include <sys/types.h>
@@ -34,7 +36,7 @@ class EthCanBridgeNode : public rclcpp::Node
 {
 public:
   EthCanBridgeNode()
-  : Node("eth_can_bridge_node"), is_connected_(false), sock_(-1)
+  : Node("eth_can_bridge_node"), is_connected_(false), sock_(-1), manual_disconnected_(false)
   {
     // ROS2パラメータの宣言と取得
     this->declare_parameter<std::string>("target_ip", "192.168.2.123");
@@ -46,7 +48,7 @@ public:
 
     target_ip_ = this->get_parameter("target_ip").as_string();
     target_port_ = this->get_parameter("target_port").as_int();
-    can_channel_ = this->get_parameter("can_channel").as_string();
+    can_channel_ = normalize_can_channel(this->get_parameter("can_channel").as_string());
     poll_interval_ms_ = this->get_parameter("poll_interval_ms").as_double();
     poll_suppress_after_tx_ms_ = this->get_parameter("poll_suppress_after_tx_ms").as_double();
     config_frame_repeat_ = this->get_parameter("config_frame_repeat").as_int();
@@ -110,10 +112,46 @@ private:
   struct PendingTxItem
   {
     uint16_t can_id;
-    bool send_to_can2;
     bool is_config_frame;
     uint8_t payload[20];
   };
+
+  // STM32 LANtoCAN 60Bパケット内のハードウェアCAN診断情報 (CanDebug構造体: 17バイト)
+  struct CanHwDiag
+  {
+    uint8_t boff = 0;
+    uint8_t epvf = 0;
+    uint8_t ewgf = 0;
+    uint8_t lec = 0;
+    uint8_t tec = 0;
+    uint8_t rec = 0;
+    uint8_t tx_free = 3;
+  };
+
+  static std::string normalize_can_channel(const std::string& ch)
+  {
+    std::string lower = ch;
+    std::transform(lower.begin(), lower.end(), lower.begin(),
+      [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    if (lower == "can2" || lower == "2") {
+      return "can2";
+    }
+    if (lower == "both" || lower == "can1+2" || lower == "all") {
+      return "both";
+    }
+    return "can1";
+  }
+
+  static std::string format_channel_label(const std::string& ch)
+  {
+    if (ch == "can2") {
+      return "CAN2";
+    }
+    if (ch == "both") {
+      return "CAN1+2";
+    }
+    return "CAN1";
+  }
 
   // パラメータ設定 (0x200..0x203) やモード設定 (0x210) など、取りこぼし厳禁の設定用フレームかどうかを判定
   static bool is_config_can_id(uint16_t can_id)
@@ -121,6 +159,23 @@ private:
     uint16_t sub_id = can_id & 0x0FF;
     // MDD Base ID (例: 0x200, 0x400) に対する +0x00..+0x1F を設定フレームとして扱う
     return (can_id >= 0x200) && (sub_id < 0x20);
+  }
+
+  // STM32 CanDebug (17B) のデコード:
+  // offset+0..3: err (uint32 LE), offset+4..7: esr (uint32 LE),
+  // offset+8: lec, offset+9: tec, offset+10: rec,
+  // offset+11: ewgf, offset+12: epvf, offset+13: boff, offset+14: tx_free
+  static CanHwDiag parse_can_debug(const uint8_t* buf, size_t offset)
+  {
+    CanHwDiag d{};
+    d.lec = buf[offset + 8];
+    d.tec = buf[offset + 9];
+    d.rec = buf[offset + 10];
+    d.ewgf = buf[offset + 11];
+    d.epvf = buf[offset + 12];
+    d.boff = buf[offset + 13];
+    d.tx_free = buf[offset + 14];
+    return d;
   }
 
   // --- 1. ROS2トピック ➔ 送信キュー登録 (TX) ---
@@ -144,26 +199,55 @@ private:
     }
     uint8_t dlc = msg->dlc > 8 ? 8 : msg->dlc;
 
-    bool send_to_can2 = false;
-    if (can_channel_ == "can2") {
-      send_to_can2 = true;
-    } else if (can_channel_ == "both" && msg->header.frame_id == "can2") {
-      send_to_can2 = true;
+    std::string active_ch;
+    {
+      std::lock_guard<std::mutex> lock(socket_mutex_);
+      active_ch = can_channel_;
     }
 
-    size_t base_offset = send_to_can2 ? 10 : 0;
-    item.payload[base_offset]     = static_cast<uint8_t>((standard_id >> 8) & 0xFF);
-    item.payload[base_offset + 1] = static_cast<uint8_t>(standard_id & 0xFF);
-    for (size_t i = 0; i < dlc; ++i) {
-      item.payload[base_offset + 2 + i] = msg->data[i];
+    bool send_can1 = false;
+    bool send_can2 = false;
+    if (msg->header.frame_id == "can1") {
+      send_can1 = true;
+    } else if (msg->header.frame_id == "can2") {
+      send_can2 = true;
+    } else if (active_ch == "can2") {
+      send_can2 = true;
+    } else if (active_ch == "both") {
+      send_can1 = true;
+      send_can2 = true;
+    } else {
+      send_can1 = true;
+    }
+
+    if (send_can1) {
+      item.payload[0] = static_cast<uint8_t>((standard_id >> 8) & 0xFF);
+      item.payload[1] = static_cast<uint8_t>(standard_id & 0xFF);
+      for (size_t i = 0; i < dlc; ++i) {
+        item.payload[2 + i] = msg->data[i];
+      }
+    }
+    if (send_can2) {
+      item.payload[10] = static_cast<uint8_t>((standard_id >> 8) & 0xFF);
+      item.payload[11] = static_cast<uint8_t>(standard_id & 0xFF);
+      for (size_t i = 0; i < dlc; ++i) {
+        item.payload[12 + i] = msg->data[i];
+      }
     }
 
     item.can_id = standard_id;
-    item.send_to_can2 = send_to_can2;
     item.is_config_frame = is_config_can_id(standard_id);
 
     std::lock_guard<std::mutex> lock(tx_queue_mutex_);
     if (item.is_config_frame) {
+      // 同一CAN IDの古い設定フレームがキューに残っていれば削除して滞留・洪水化を防ぐ
+      tx_queue_.erase(
+        std::remove_if(tx_queue_.begin(), tx_queue_.end(),
+          [&](const PendingTxItem& existing) {
+            return existing.is_config_frame && existing.can_id == item.can_id;
+          }),
+        tx_queue_.end());
+
       // 設定フレーム (0x200..0x203, 0x210) はSTM32側の1msタイマーで確実に拾わせるため複数回キューに積む
       for (int r = 0; r < config_frame_repeat_; ++r) {
         tx_queue_.push_back(item);
@@ -171,10 +255,7 @@ private:
     } else {
       // 周期制御フレーム (0x220, 0x100, 0x300等) は同一CAN IDの未送信フレームがあれば最新値で上書きして遅延蓄積を防ぐ
       for (auto & existing : tx_queue_) {
-        if (!existing.is_config_frame &&
-            existing.can_id == item.can_id &&
-            existing.send_to_can2 == item.send_to_can2)
-        {
+        if (!existing.is_config_frame && existing.can_id == item.can_id) {
           std::memcpy(existing.payload, item.payload, sizeof(item.payload));
           return;
         }
@@ -198,8 +279,7 @@ private:
   //    PC側から定期的に20Bパケット(送信データまたはゼロ埋めpoll)を送らないと次の受信パケットが返らない。
   // 2) STM32の main() ループは約0.1msで回る一方、CAN送信処理 interrupt() は1ms周期タイマーで動作し、
   //    単一バッファ eth_recv_data の先頭20Bのみを参照する。
-  //    そのため、20Bパケットを1ms未満の間隔で連続送信したり、送信直後にゼロpollパケットを送ると、
-  //    1msタイマーが発火する前に eth_recv_data が上書きされてCAN送信が欠落する。
+  //    そのため、異なる設定IDへ切り替える際は最低8.0msホールドし、設定フレーム送信直後は15.0ms間ゼロpollを抑制する。
   void io_thread_loop()
   {
     constexpr size_t ANALYZER_RX_SIZE = 60;
@@ -213,21 +293,26 @@ private:
     auto last_rx_publish_time1 = std::chrono::steady_clock::now() - 100ms;
 
     auto last_wire_send_time = std::chrono::steady_clock::now() - 100ms;
-    auto last_real_tx_time = std::chrono::steady_clock::now() - 100ms;
+    auto last_config_tx_time = std::chrono::steady_clock::now() - 100ms;
+    bool has_last_sent_config_id = false;
+    uint16_t last_sent_config_id = 0;
 
     while (io_thread_running_ && rclcpp::ok()) {
       int current_sock = -1;
+      std::string active_ch;
       {
         std::lock_guard<std::mutex> lock(socket_mutex_);
         if (is_connected_ && sock_ >= 0) {
           current_sock = sock_;
         }
+        active_ch = can_channel_;
       }
 
       if (current_sock < 0) {
         buffer_filled = 0;
         last_rx_id[0] = 0;
         last_rx_id[1] = 0;
+        has_last_sent_config_id = false;
         std::this_thread::sleep_for(50ms);
         continue;
       }
@@ -276,8 +361,29 @@ private:
             buffer_filled = 0;
             auto now_steady = std::chrono::steady_clock::now();
 
+            // 0. STM32 CAN1/CAN2 ハードウェア診断ブロック (offset 23..39, 43..59) の解析
+            CanHwDiag diag1 = parse_can_debug(rx_buffer, 23);
+            CanHwDiag diag2 = parse_can_debug(rx_buffer, 43);
+            {
+              std::lock_guard<std::mutex> lock(socket_mutex_);
+              hw_diag_can1_ = diag1;
+              hw_diag_can2_ = diag2;
+            }
+            if ((active_ch == "can1" || active_ch == "both") && diag1.boff) {
+              RCLCPP_WARN_THROTTLE(
+                this->get_logger(), *this->get_clock(), 3000,
+                "[HW DIAG] CAN1 が Bus-Off 状態です (BOFF=1, TEC=%u, REC=%u, LEC=%u)。CAN2への切り替えを推奨します。",
+                diag1.tec, diag1.rec, diag1.lec);
+            }
+            if ((active_ch == "can2" || active_ch == "both") && diag2.boff) {
+              RCLCPP_WARN_THROTTLE(
+                this->get_logger(), *this->get_clock(), 3000,
+                "[HW DIAG] CAN2 が Bus-Off 状態です (BOFF=1, TEC=%u, REC=%u, LEC=%u)。",
+                diag2.tec, diag2.rec, diag2.lec);
+            }
+
             // 1. CAN1 受信フレームの復元 (オフセット 0..9)
-            if (can_channel_ == "can1" || can_channel_ == "both") {
+            if (active_ch == "can1" || active_ch == "both") {
               uint16_t can1_id = static_cast<uint16_t>(
                 ((static_cast<uint16_t>(rx_buffer[0]) << 8) | rx_buffer[1]) & 0x7FF);
               if (can1_id != 0) {
@@ -308,7 +414,7 @@ private:
             }
 
             // 2. CAN2 受信フレームの復元 (オフセット 10..19)
-            if (can_channel_ == "can2" || can_channel_ == "both") {
+            if (active_ch == "can2" || active_ch == "both") {
               uint16_t can2_id = static_cast<uint16_t>(
                 ((static_cast<uint16_t>(rx_buffer[10]) << 8) | rx_buffer[11]) & 0x7FF);
               if (can2_id != 0) {
@@ -343,6 +449,8 @@ private:
       auto now = std::chrono::steady_clock::now();
       double since_last_send_ms = std::chrono::duration<double, std::milli>(
         now - last_wire_send_time).count();
+      double since_config_tx_ms = std::chrono::duration<double, std::milli>(
+        now - last_config_tx_time).count();
 
       // STM32の1msタイマー割り込みが確実に前回の eth_recv_data を処理できるよう、最低2.0msの間隔を空ける
       if (since_last_send_ms < 2.0) {
@@ -350,29 +458,41 @@ private:
       }
 
       uint8_t tx_payload[ANALYZER_TX_SIZE];
-      bool has_real_tx = false;
+      bool is_config_tx = false;
       bool should_send_wire = false;
 
       {
         std::lock_guard<std::mutex> lock(tx_queue_mutex_);
         if (!tx_queue_.empty()) {
-          PendingTxItem item = tx_queue_.front();
-          tx_queue_.pop_front();
-          std::memcpy(tx_payload, item.payload, ANALYZER_TX_SIZE);
-          has_real_tx = true;
-          should_send_wire = true;
+          const PendingTxItem& front = tx_queue_.front();
+          // 異なる設定CAN IDへ切り替える際は、前回の設定IDがSTM32で確実に送信完了するよう最低8.0ms保持する
+          bool id_switch_hold = front.is_config_frame &&
+            has_last_sent_config_id &&
+            (last_sent_config_id != front.can_id) &&
+            (since_config_tx_ms < 8.0);
+
+          if (!id_switch_hold) {
+            PendingTxItem item = tx_queue_.front();
+            tx_queue_.pop_front();
+            std::memcpy(tx_payload, item.payload, ANALYZER_TX_SIZE);
+            is_config_tx = item.is_config_frame;
+            if (item.is_config_frame) {
+              has_last_sent_config_id = true;
+              last_sent_config_id = item.can_id;
+            }
+            should_send_wire = true;
+          }
         }
       }
 
       if (!should_send_wire) {
-        double since_real_tx_ms = std::chrono::duration<double, std::milli>(
-          now - last_real_tx_time).count();
-        // 実フレーム送信直後はSTM32の eth_recv_data をゼロで上書きしないよう poll を抑制し、
-        // アイドル時は poll_interval_ms_ 周期で 20B ゼロパケットを送信して CAN RX を継続させる
+        // 設定フレーム送信直後はSTM32の eth_recv_data をゼロで上書きしないよう poll を抑制し、
+        // 通常時 (周期制御フレーム送信中を含む) は poll_interval_ms_ 周期で 20B ゼロパケットを送信して 5ms CAN RX を継続させる
         if (since_last_send_ms >= poll_interval_ms_ &&
-            since_real_tx_ms >= poll_suppress_after_tx_ms_)
+            since_config_tx_ms >= poll_suppress_after_tx_ms_)
         {
           std::memset(tx_payload, 0, ANALYZER_TX_SIZE);
+          has_last_sent_config_id = false;
           should_send_wire = true;
         }
       }
@@ -397,8 +517,8 @@ private:
         }
 
         last_wire_send_time = now;
-        if (has_real_tx) {
-          last_real_tx_time = now;
+        if (is_config_tx) {
+          last_config_tx_time = now;
         }
       }
     }
@@ -415,7 +535,8 @@ private:
       tx_queue_.clear();
     }
 
-    RCLCPP_INFO(this->get_logger(), "Ethernet-CAN 基板へ接続を試みています... (%s:%d)", ip.c_str(), port);
+    RCLCPP_INFO(this->get_logger(), "Ethernet-CAN 基板へ接続を試みています... (%s:%d [%s])",
+      ip.c_str(), port, format_channel_label(can_channel_).c_str());
 
     int s = socket(AF_INET, SOCK_STREAM, 0);
     if (s < 0) {
@@ -456,11 +577,13 @@ private:
 
     sock_ = s;
     is_connected_ = true;
+    manual_disconnected_ = false;
     target_ip_ = ip;
     target_port_ = port;
     last_error_ = "";
 
-    RCLCPP_INFO(this->get_logger(), "Ethernet-CAN 基板 (%s:%d) へのTCP接続が完了しました！", ip.c_str(), port);
+    RCLCPP_INFO(this->get_logger(), "Ethernet-CAN 基板 (%s:%d [%s]) へのTCP接続が完了しました！",
+      ip.c_str(), port, format_channel_label(can_channel_).c_str());
     return true;
   }
 
@@ -494,7 +617,7 @@ private:
       bool need_connect = false;
       {
         std::lock_guard<std::mutex> lock(socket_mutex_);
-        need_connect = (!is_connected_ || sock_ < 0);
+        need_connect = (!manual_disconnected_) && (!is_connected_ || sock_ < 0);
       }
 
       if (need_connect) {
@@ -512,9 +635,22 @@ private:
     {
       std::lock_guard<std::mutex> lock(socket_mutex_);
       status_msg.is_connected = is_connected_;
-      status_msg.active_port = target_ip_ + ":" + std::to_string(target_port_);
+      status_msg.active_port = target_ip_ + ":" + std::to_string(target_port_) +
+        " [" + format_channel_label(can_channel_) + "]";
       status_msg.bitrate = 1000000;
-      status_msg.error_message = last_error_;
+
+      std::string diag_err = last_error_;
+      if (is_connected_) {
+        if ((can_channel_ == "can1" || can_channel_ == "both") && hw_diag_can1_.boff) {
+          diag_err = "CAN1 ハードウェア Bus-Off 検知 (BOFF=1, TEC=" +
+            std::to_string(hw_diag_can1_.tec) + ", LEC=" + std::to_string(hw_diag_can1_.lec) +
+            ") - CAN2への切り替えを推奨";
+        } else if ((can_channel_ == "can2" || can_channel_ == "both") && hw_diag_can2_.boff) {
+          diag_err = "CAN2 ハードウェア Bus-Off 検知 (BOFF=1, TEC=" +
+            std::to_string(hw_diag_can2_.tec) + ", LEC=" + std::to_string(hw_diag_can2_.lec) + ")";
+        }
+      }
+      status_msg.error_message = diag_err;
     }
     can_status_pub_->publish(status_msg);
   }
@@ -524,9 +660,22 @@ private:
     const std::shared_ptr<altair_interfaces::srv::ConnectCan::Request> request,
     std::shared_ptr<altair_interfaces::srv::ConnectCan::Response> response)
   {
-    (void)request;
+    if (request->port.empty() && !request->auto_connect) {
+      {
+        std::lock_guard<std::mutex> lock(socket_mutex_);
+        manual_disconnected_ = true;
+        close_socket_nolock();
+        last_error_ = "";
+      }
+      publish_status();
+      response->success = true;
+      response->message = "Ethernet-CAN 接続を切断しました。";
+      return;
+    }
+
     RCLCPP_INFO(this->get_logger(), "手動再接続リクエストを受信しました。");
     bool ok = trigger_connect(target_ip_, target_port_);
+    publish_status();
     response->success = ok;
     response->message = ok ? "接続成功" : last_error_;
   }
@@ -535,16 +684,59 @@ private:
     const std::shared_ptr<altair_interfaces::srv::ConnectEthCan::Request> request,
     std::shared_ptr<altair_interfaces::srv::ConnectEthCan::Response> response)
   {
-    RCLCPP_INFO(this->get_logger(), "設定変更リクエストを受信しました: %s:%d",
-      request->target_ip.c_str(), request->target_port);
+    // 空IPの場合は手動切断リクエストとして処理
+    if (request->target_ip.empty()) {
+      {
+        std::lock_guard<std::mutex> lock(socket_mutex_);
+        manual_disconnected_ = true;
+        close_socket_nolock();
+        last_error_ = "";
+      }
+      publish_status();
+      response->success = true;
+      response->message = "Ethernet-CAN 接続を切断しました。";
+      return;
+    }
+
+    // チャンネルのみ即時変更リクエスト
+    if (request->target_ip == "__CHANNEL_ONLY__") {
+      std::string ch = normalize_can_channel(request->can_channel);
+      {
+        std::lock_guard<std::mutex> lock(socket_mutex_);
+        can_channel_ = ch;
+      }
+      {
+        std::lock_guard<std::mutex> qlock(tx_queue_mutex_);
+        tx_queue_.clear();
+      }
+      publish_status();
+      RCLCPP_INFO(this->get_logger(), "Ethernet-CAN 使用チャンネルを %s に切り替えました。",
+        format_channel_label(ch).c_str());
+      response->success = true;
+      response->message = "使用CANチャンネルを " + format_channel_label(ch) + " に切り替えました。";
+      return;
+    }
+
+    if (!request->can_channel.empty()) {
+      std::lock_guard<std::mutex> lock(socket_mutex_);
+      can_channel_ = normalize_can_channel(request->can_channel);
+    }
+
+    RCLCPP_INFO(this->get_logger(), "設定変更リクエストを受信しました: %s:%d [%s]",
+      request->target_ip.c_str(), request->target_port, format_channel_label(can_channel_).c_str());
     bool ok = trigger_connect(request->target_ip, request->target_port);
+    publish_status();
     response->success = ok;
-    response->message = ok ? "接続成功" : last_error_;
+    response->message = ok
+      ? ("Ethernet-CAN (" + request->target_ip + ":" + std::to_string(request->target_port) +
+         " [" + format_channel_label(can_channel_) + "]) に接続しました。")
+      : last_error_;
   }
 
   // 内部変数
   std::atomic<bool> is_connected_;
   int sock_;
+  bool manual_disconnected_;
   std::mutex socket_mutex_;
   std::string target_ip_;
   int target_port_;
@@ -553,6 +745,8 @@ private:
   double poll_suppress_after_tx_ms_;
   int config_frame_repeat_;
   std::string last_error_;
+  CanHwDiag hw_diag_can1_{};
+  CanHwDiag hw_diag_can2_{};
 
   // 送信キュー
   std::mutex tx_queue_mutex_;

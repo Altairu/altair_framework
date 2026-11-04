@@ -3,6 +3,8 @@ import json
 import shutil
 import threading
 import asyncio
+import subprocess
+import platform
 from pathlib import Path
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
@@ -38,7 +40,7 @@ class ConnectionManager:
             self.active_connections.remove(websocket)
 
     async def broadcast(self, message: dict):
-        for connection in self.active_connections:
+        for connection in list(self.active_connections):
             try:
                 await connection.send_json(message)
             except Exception:
@@ -48,12 +50,22 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
+def normalize_can_channel(ch: str) -> str:
+    val = (ch or "can1").strip().lower()
+    if val in ("can2", "2"):
+        return "can2"
+    if val in ("both", "can1+2", "all"):
+        return "both"
+    return "can1"
+
+
 # --- ROS2 ノード定義 (Webサーバー内部で動作) ---
 class WebServerROSNode(Node):
     def __init__(self, loop):
         super().__init__('web_server_ros_node')
         self.loop = loop
         self.callback_group = ReentrantCallbackGroup()
+        self.active_can_channel = "can1"
 
         # 各種サブスクライバ (テレメトリをブラウザに流す用)
         self.can_status_sub = self.create_subscription(
@@ -66,6 +78,16 @@ class WebServerROSNode(Node):
         )
         self.behavior_log_sub = self.create_subscription(
             String, '/altair/behavior/log', self.behavior_log_callback, 100,
+            callback_group=self.callback_group
+        )
+
+        # 生CAN送受信フレーム監視サブスクライバ (Web UI システム送受信CANログ用)
+        self.can_rx_sub = self.create_subscription(
+            Frame, '/altair/can/rx', self.can_rx_raw_callback, 200,
+            callback_group=self.callback_group
+        )
+        self.can_tx_sub = self.create_subscription(
+            Frame, '/altair/can/tx', self.can_tx_raw_callback, 200,
             callback_group=self.callback_group
         )
 
@@ -89,7 +111,8 @@ class WebServerROSNode(Node):
         # モジュール構成同期用パブリッシャ (操縦PCからNUCへの同期用)
         self.config_sync_pub = self.create_publisher(String, '/altair/config_sync', 10)
 
-        # 1秒周期でモジュール設定ファイルを監視し、動的にMDDフィードバックサブスクライバを作成
+        # 初回同期 + 2秒周期でモジュール設定ファイルを監視し、動的にMDDフィードバックサブスクライバを作成
+        self.sync_mdd_subscriptions()
         self.create_timer(2.0, self.sync_mdd_subscriptions, callback_group=self.callback_group)
 
     def sync_mdd_subscriptions(self):
@@ -122,6 +145,8 @@ class WebServerROSNode(Node):
 
     def make_mdd_feedback_callback(self, name):
         def callback(msg):
+            if not manager.active_connections:
+                return
             # WebSocket経由でブラウザに配信
             telemetry_data = {
                 "type": "mdd_feedback",
@@ -140,6 +165,30 @@ class WebServerROSNode(Node):
                 self.loop
             )
         return callback
+
+    def _format_raw_can_frame(self, direction: str, msg: Frame) -> str:
+        ch = msg.header.frame_id if msg.header.frame_id else self.active_can_channel
+        dlc = max(0, min(8, int(msg.dlc)))
+        hex_str = " ".join(f"{int(b) & 0xFF:02X}" for b in msg.data[:dlc])
+        return f"[{direction}] ({ch}) ID: 0x{int(msg.id):03X} [{dlc}] {hex_str}"
+
+    def can_rx_raw_callback(self, msg: Frame):
+        if not manager.active_connections:
+            return
+        line = self._format_raw_can_frame("RX", msg)
+        asyncio.run_coroutine_threadsafe(
+            manager.broadcast({"type": "raw_can_frame", "data": line}),
+            self.loop
+        )
+
+    def can_tx_raw_callback(self, msg: Frame):
+        if not manager.active_connections:
+            return
+        line = self._format_raw_can_frame("TX", msg)
+        asyncio.run_coroutine_threadsafe(
+            manager.broadcast({"type": "raw_can_frame", "data": line}),
+            self.loop
+        )
 
     def can_status_callback(self, msg):
         status_data = {
@@ -178,14 +227,7 @@ class WebServerROSNode(Node):
         if env_path:
             candidates.append(Path(env_path).expanduser())
 
-        # ROS2インストール先 (share/altair_core/config)
-        try:
-            share_dir = Path(get_package_share_directory('altair_core'))
-            candidates.append(share_dir / 'config' / 'modules_config.json')
-        except PackageNotFoundError:
-            pass
-
-        # 開発時の代表的な相対パス
+        # 開発時の代表的な相対パス・ソースツリー優先
         cwd = Path.cwd()
         candidates.append(cwd / 'altair_core' / 'config' / 'modules_config.json')
         candidates.append(cwd / 'config' / 'modules_config.json')
@@ -197,6 +239,15 @@ class WebServerROSNode(Node):
         # ワークスペース内開発時の altair_core 基準の相対パス
         if len(this_file.parents) >= 3:
             candidates.append(this_file.parents[2] / 'altair_core' / 'config' / 'modules_config.json')
+        if len(this_file.parents) >= 5:
+            candidates.append(this_file.parents[4] / 'altair_core' / 'config' / 'modules_config.json')
+
+        # ROS2インストール先 (share/altair_core/config)
+        try:
+            share_dir = Path(get_package_share_directory('altair_core'))
+            candidates.append(share_dir / 'config' / 'modules_config.json')
+        except PackageNotFoundError:
+            pass
 
         for path in candidates:
             if path.exists():
@@ -241,11 +292,18 @@ class ConnectRequest(BaseModel):
     auto_connect: bool
 
 class ConnectEthRequest(BaseModel):
-    target_ip: str
+    target_ip: str = "192.168.2.123"
     target_port: int = 5000
+    can_channel: str = "can1"
+
+class ChannelEthRequest(BaseModel):
+    can_channel: str = "can1"
 
 class StartBehaviorRequest(BaseModel):
     behavior_name: str
+
+class BehaviorFileRequest(BaseModel):
+    name: str
 
 class MddCmdRequest(BaseModel):
     name: str
@@ -263,18 +321,44 @@ class SaveBlocklyRequest(BaseModel):
     code: str
     xml: str = ""
 
+
+def load_saved_eth_config() -> dict:
+    default_cfg = {"target_ip": "192.168.2.123", "target_port": 5000, "can_channel": "can1"}
+    config_file = "network_config.json"
+    if os.path.exists(config_file):
+        try:
+            with open(config_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return {
+                    "target_ip": data.get("target_ip", "192.168.2.123"),
+                    "target_port": int(data.get("target_port", 5000)),
+                    "can_channel": normalize_can_channel(data.get("can_channel", "can1")),
+                }
+        except Exception:
+            pass
+    return default_cfg
+
+
+def save_eth_config(cfg: dict):
+    config_file = "network_config.json"
+    try:
+        with open(config_file, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"network_config.json の保存に失敗しました: {e}")
+
+
 # --- REST API ルーティング ---
 
 @app.get("/api/ports")
 async def get_ports():
     """NUC側の利用可能なシリアルポート一覧を取得"""
-    if not ros_node.get_ports_client.wait_for_service(timeout_sec=1.0):
-        raise HTTPException(status_code=503, detail="NUCのポート検出サービスが利用できません。")
+    if not ros_node.get_ports_client.wait_for_service(timeout_sec=0.5):
+        return {"ports": []}
     
     req = GetAvailablePorts.Request()
     future = ros_node.get_ports_client.call_async(req)
     
-    # ROS2非同期コールを待機
     while not future.done():
         await asyncio.sleep(0.05)
     
@@ -301,29 +385,26 @@ async def connect_can(req_data: ConnectRequest):
 @app.get("/api/eth_can/config")
 async def get_eth_can_config():
     """Ethernet-CAN の設定を取得"""
-    config_file = "network_config.json"
-    if os.path.exists(config_file):
-        try:
-            with open(config_file, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            pass
-    return {"target_ip": "192.168.2.123", "target_port": 5000, "can_channel": "can1"}
+    cfg = load_saved_eth_config()
+    if ros_node:
+        ros_node.active_can_channel = cfg["can_channel"]
+    return cfg
 
 @app.post("/api/eth_can/connect")
 async def connect_eth_can(req_data: ConnectEthRequest):
     """Ethernet-CAN 基板への接続・再接続指示"""
-    # 設定ファイルに保存
-    config_file = "network_config.json"
-    cfg = {"target_ip": req_data.target_ip, "target_port": req_data.target_port, "can_channel": "can1"}
-    try:
-        with open(config_file, "w", encoding="utf-8") as f:
-            json.dump(cfg, f, indent=2, ensure_ascii=False)
-    except Exception as e:
-        print(f"network_config.json の保存に失敗しました: {e}")
+    can_channel = normalize_can_channel(req_data.can_channel)
+    if ros_node:
+        ros_node.active_can_channel = can_channel
+
+    cfg = {
+        "target_ip": req_data.target_ip,
+        "target_port": req_data.target_port,
+        "can_channel": can_channel,
+    }
+    save_eth_config(cfg)
 
     if not ros_node.connect_eth_can_client.wait_for_service(timeout_sec=1.0):
-        # 従来の /altair/can/connect もフォールバックで試行
         if ros_node.connect_can_client.wait_for_service(timeout_sec=0.5):
             req = ConnectCan.Request()
             req.port = f"{req_data.target_ip}:{req_data.target_port}"
@@ -338,6 +419,8 @@ async def connect_eth_can(req_data: ConnectEthRequest):
     req = ConnectEthCan.Request()
     req.target_ip = req_data.target_ip
     req.target_port = req_data.target_port
+    if hasattr(req, "can_channel"):
+        req.can_channel = can_channel
 
     future = ros_node.connect_eth_can_client.call_async(req)
     while not future.done():
@@ -345,6 +428,59 @@ async def connect_eth_can(req_data: ConnectEthRequest):
 
     res = future.result()
     return {"success": res.success, "message": res.message}
+
+@app.post("/api/eth_can/channel")
+async def set_eth_can_channel(req_data: ChannelEthRequest):
+    """Ethernet-CAN の使用CANチャンネル (CAN1 / CAN2 / CAN1+2) を即時切替"""
+    can_channel = normalize_can_channel(req_data.can_channel)
+    if ros_node:
+        ros_node.active_can_channel = can_channel
+
+    cfg = load_saved_eth_config()
+    cfg["can_channel"] = can_channel
+    save_eth_config(cfg)
+
+    if ros_node.connect_eth_can_client.wait_for_service(timeout_sec=0.8):
+        req = ConnectEthCan.Request()
+        req.target_ip = "__CHANNEL_ONLY__"
+        req.target_port = int(cfg.get("target_port", 5000))
+        if hasattr(req, "can_channel"):
+            req.can_channel = can_channel
+        future = ros_node.connect_eth_can_client.call_async(req)
+        while not future.done():
+            await asyncio.sleep(0.05)
+        res = future.result()
+        return {"success": res.success, "message": res.message}
+
+    label = "CAN2" if can_channel == "can2" else ("CAN1+2" if can_channel == "both" else "CAN1")
+    return {"success": True, "message": f"使用CANチャンネルを {label} に設定しました。"}
+
+@app.post("/api/eth_can/disconnect")
+async def disconnect_eth_can():
+    """Ethernet-CAN 接続を切断"""
+    if ros_node.connect_eth_can_client.wait_for_service(timeout_sec=0.8):
+        req = ConnectEthCan.Request()
+        req.target_ip = ""
+        req.target_port = 0
+        if hasattr(req, "can_channel"):
+            req.can_channel = ""
+        future = ros_node.connect_eth_can_client.call_async(req)
+        while not future.done():
+            await asyncio.sleep(0.05)
+        res = future.result()
+        return {"success": res.success, "message": res.message}
+
+    if ros_node.connect_can_client.wait_for_service(timeout_sec=0.5):
+        req = ConnectCan.Request()
+        req.port = ""
+        req.auto_connect = False
+        future = ros_node.connect_can_client.call_async(req)
+        while not future.done():
+            await asyncio.sleep(0.05)
+        res = future.result()
+        return {"success": res.success, "message": res.message}
+
+    return {"success": False, "message": "Ethernet-CAN ブリッジサービスが利用できません。"}
 
 @app.post("/api/start_control")
 async def start_control():
@@ -390,24 +526,27 @@ async def stop_behavior():
     res = future.result()
     return {"success": res.success, "message": res.message}
 
+
+def get_user_behaviors_dir() -> str:
+    paths = [
+        "c:/Users/106no/Documents/GitHub/altair_framework/altair_core/user_behaviors",
+        "./altair_core/user_behaviors",
+        "user_behaviors",
+        "./user_behaviors",
+        os.path.join(os.path.expanduser('~'), "ros2_ws/src/altair_framework/altair_core/user_behaviors"),
+        "./src/altair_framework/altair_core/user_behaviors"
+    ]
+    for p in paths:
+        if os.path.isdir(p):
+            return os.path.abspath(p)
+    os.makedirs("user_behaviors", exist_ok=True)
+    return os.path.abspath("user_behaviors")
+
+
 @app.post("/api/behavior/save_blockly")
 async def save_blockly(req_data: SaveBlocklyRequest):
     """Blocklyで生成されたPythonコードおよびブロックXMLレイアウトをファイルとして保存"""
-    paths = [
-        "c:/Users/106no/Documents/GitHub/altair_framework/altair_core/user_behaviors",
-        os.path.join(os.path.expanduser('~'), "ros2_ws/src/altair_framework/altair_core/user_behaviors"),
-        "./src/altair_framework/altair_core/user_behaviors",
-        "user_behaviors"
-    ]
-    dest_dir = None
-    for p in paths:
-        if os.path.exists(p):
-            dest_dir = p
-            break
-    if not dest_dir:
-        dest_dir = "user_behaviors"
-        os.makedirs(dest_dir, exist_ok=True)
-        
+    dest_dir = get_user_behaviors_dir()
     dest_file = os.path.join(dest_dir, "blockly_behavior.py")
     try:
         with open(dest_file, "w", encoding="utf-8") as f:
@@ -426,22 +565,7 @@ async def save_blockly(req_data: SaveBlocklyRequest):
 @app.get("/api/behavior/list")
 async def list_behaviors():
     """user_behaviors/ ディレクトリ内の実行可能なPythonファイル一覧を取得"""
-    user_behaviors_dir = None
-    paths = [
-        "user_behaviors",
-        "./user_behaviors",
-        "./altair_core/user_behaviors",
-        os.path.join(os.path.expanduser('~'), "ros2_ws/src/altair_framework/user_behaviors"),
-        "c:/Users/106no/Documents/GitHub/altair_framework/user_behaviors"
-    ]
-    for p in paths:
-        if os.path.isdir(p):
-            user_behaviors_dir = p
-            break
-    
-    if not user_behaviors_dir:
-        return {"success": False, "behaviors": []}
-    
+    user_behaviors_dir = get_user_behaviors_dir()
     try:
         behaviors = []
         for f in os.listdir(user_behaviors_dir):
@@ -452,24 +576,96 @@ async def list_behaviors():
     except Exception as e:
         return {"success": False, "behaviors": [], "error": str(e)}
 
+@app.post("/api/behavior/create")
+async def create_behavior(req_data: BehaviorFileRequest):
+    """新しい動作スクリプトのテンプレートファイルを作成"""
+    raw_name = req_data.name.strip()
+    if not raw_name:
+        return {"success": False, "message": "ファイル名を入力してください。"}
+    if not raw_name.endswith(".py"):
+        raw_name += ".py"
+    safe_name = os.path.basename(raw_name)
+    dest_dir = get_user_behaviors_dir()
+    dest_file = os.path.join(dest_dir, safe_name)
+    if os.path.exists(dest_file):
+        return {"success": False, "message": f"すでに '{safe_name}' が存在します。"}
+
+    template = f'''#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+Altair ユーザー動作プログラム: {safe_name}
+"""
+
+import sys
+import os
+import rclpy
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from altair_core.base_behavior import AltairBehavior
+
+
+class CustomBehavior(AltairBehavior):
+    def on_init(self):
+        self.get_logger().info("{safe_name} を初期化しました。")
+
+    def loop(self):
+        # ここに周期制御ロジックを記述します
+        pass
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    behavior = CustomBehavior("custom_behavior_node")
+    behavior.run(rate_hz=100.0)
+
+
+if __name__ == "__main__":
+    main()
+'''
+    try:
+        with open(dest_file, "w", encoding="utf-8") as f:
+            f.write(template)
+        return {"success": True, "name": safe_name, "message": f"新規スクリプト '{safe_name}' を作成しました。"}
+    except Exception as e:
+        return {"success": False, "message": f"スクリプト作成失敗: {e}"}
+
+@app.post("/api/behavior/delete")
+async def delete_behavior(req_data: BehaviorFileRequest):
+    """指定された動作スクリプトを削除"""
+    safe_name = os.path.basename(req_data.name.strip())
+    if not safe_name:
+        return {"success": False, "message": "削除対象が指定されていません。"}
+    dest_dir = get_user_behaviors_dir()
+    target = os.path.join(dest_dir, safe_name)
+    if not os.path.exists(target):
+        return {"success": False, "message": f"'{safe_name}' が見つかりません。"}
+    try:
+        os.remove(target)
+        return {"success": True, "message": f"スクリプト '{safe_name}' を削除しました。"}
+    except Exception as e:
+        return {"success": False, "message": f"削除失敗: {e}"}
+
+@app.post("/api/behavior/open_folder")
+async def open_behavior_folder():
+    """動作スクリプト保存ディレクトリをOSのファイルマネージャーで開く"""
+    dest_dir = get_user_behaviors_dir()
+    try:
+        system = platform.system()
+        if system == "Windows":
+            os.startfile(dest_dir)
+        elif system == "Darwin":
+            subprocess.Popen(["open", dest_dir])
+        else:
+            subprocess.Popen(["xdg-open", dest_dir])
+        return {"success": True, "message": f"フォルダーを開きました: {dest_dir}"}
+    except Exception as e:
+        return {"success": False, "message": f"フォルダーを開けませんでした ({dest_dir}): {e}"}
+
 @app.get("/api/behavior/get_blockly_workspace")
 async def get_blockly_workspace():
     """保存されているBlocklyのブロックレイアウト(XML文字列)を取得"""
-    paths = [
-        "user_behaviors",
-        "./user_behaviors",
-        "c:/Users/106no/Documents/GitHub/altair_framework/altair_core/user_behaviors",
-        os.path.join(os.path.expanduser('~'), "ros2_ws/src/altair_framework/altair_core/user_behaviors"),
-        "./src/altair_framework/altair_core/user_behaviors"
-    ]
-    dest_dir = None
-    for p in paths:
-        if os.path.exists(p):
-            dest_dir = p
-            break
-    if not dest_dir:
-        dest_dir = "user_behaviors"
-        
+    dest_dir = get_user_behaviors_dir()
     xml_file = os.path.join(dest_dir, "blockly_workspace.xml")
     if os.path.exists(xml_file):
         try:
@@ -482,12 +678,13 @@ async def get_blockly_workspace():
     default_xml = '<xml xmlns="https://developers.google.com/blockly/xml"><block type="event_macro" id="initial_entry" x="30" y="30"></block></xml>'
     return {"success": True, "xml": default_xml}
 
-# --- 📁 プロファイル管理 (REST API) ---
+# --- プロファイル管理 (REST API) ---
 
 def get_profiles_dir():
     # プロファイル保存ディレクトリの探索
     paths = [
         "c:/Users/106no/Documents/GitHub/altair_framework/altair_core/profiles",
+        "./altair_core/profiles",
         os.path.join(os.path.expanduser('~'), 'ros2_ws/src/altair_framework/altair_core/profiles'),
         "./src/altair_framework/altair_core/profiles",
         "profiles"
@@ -638,7 +835,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
     except WebSocketDisconnect:
         manager.disconnect(websocket)
-    except Exception as e:
+    except Exception:
         manager.disconnect(websocket)
 
 

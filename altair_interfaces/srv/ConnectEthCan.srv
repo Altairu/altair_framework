@@ -3,6 +3,7 @@
 # Request
 string target_ip         # 接続先IPアドレス (例: "192.168.2.123")
 int32 target_port        # 接続先ポート番号 (例: 5000)
+string can_channel       # 使用するCANチャンネル ("can1" / "can2" / "both")
 ---
 # Response
 bool success             # 接続が成功したか

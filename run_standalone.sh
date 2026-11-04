@@ -67,6 +67,8 @@ echo "====== Altair Framework: Starting Standalone System (Single PC) ======"
 SHOULD_BUILD=0
 if [ ! -f "install/setup.bash" ]; then
     SHOULD_BUILD=1
+elif [ "altair_interfaces/srv/ConnectEthCan.srv" -nt "install/setup.bash" ]; then
+    SHOULD_BUILD=1
 elif [ ! -f "install/altair_core/lib/altair_core/module_manager" ] || [ ! -f "install/altair_web_server/lib/altair_web_server/web_server_node" ]; then
     SHOULD_BUILD=1
 elif [ "$USE_USB" -eq 1 ] && [ ! -f "install/altair_can_bridge/lib/altair_can_bridge/can_bridge_node" ]; then
@@ -109,7 +111,7 @@ if [ "$USE_USB" -eq 1 ]; then
     ros2 run altair_can_bridge can_bridge_node &
     PID_BRIDGE=$!
 else
-    echo "1. Ethernet-CAN ブリッジノードを起動中 (${TARGET_IP}:${TARGET_PORT})..."
+    echo "1. Ethernet-CAN ブリッジノードを起動中 (${TARGET_IP}:${TARGET_PORT}, チャンネル: ${CAN_CHANNEL})..."
     ros2 run altair_eth_can_bridge eth_can_bridge_node \
         --ros-args \
         -p target_ip:="${TARGET_IP}" \
