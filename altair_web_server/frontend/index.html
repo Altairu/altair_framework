@@ -53,6 +53,9 @@
         <a href="#" class="menu-item" data-target="view-behavior">
           <i class="fa-solid fa-code"></i> Python Program
         </a>
+        <a href="#" class="menu-item" data-target="view-simulator">
+          <i class="fa-solid fa-vr-cardboard"></i> Simulator
+        </a>
         <a href="#" class="menu-item" data-target="view-logs">
           <i class="fa-solid fa-receipt"></i> System Logs
         </a>
@@ -588,6 +591,106 @@
                 <span><i class="fa-solid fa-bars-staggered"></i> 送受信統合ストリーム (TX / RX)</span>
               </div>
               <div class="terminal-view can-terminal" id="can-logs-terminal"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= VIEW: SIMULATOR ================= -->
+      <section id="view-simulator" class="content-view">
+        <div class="view-header">
+          <div class="view-header-title">
+            <h1><i class="fa-solid fa-vr-cardboard"></i> Robot & CAN Simulator</h1>
+            <p class="subtitle">実機レス（--sim モード）環境での 2D 機体挙動・オドメトリ・アクチュエータ状態の可視化と制御</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-secondary" id="btn-sim-clear-trail">
+              <i class="fa-solid fa-eraser"></i> 軌跡クリア
+            </button>
+            <button class="btn btn-primary" id="btn-sim-reset-pose">
+              <i class="fa-solid fa-rotate-left"></i> 位置リセット (0, 0, 0)
+            </button>
+          </div>
+        </div>
+
+        <div class="sim-grid-layout">
+          <!-- 左側: 2D ミニマップ -->
+          <div class="sim-map-card glass-card">
+            <div class="card-header">
+              <div class="card-title">
+                <i class="fa-solid fa-map-location-dot"></i> 2D Field Mini-Map (オドメトリ可視化)
+              </div>
+              <div class="sim-coord-badges">
+                <span class="badge badge-info">X: <strong id="sim-disp-x">0.00</strong> m</span>
+                <span class="badge badge-info">Y: <strong id="sim-disp-y">0.00</strong> m</span>
+                <span class="badge badge-info">θ: <strong id="sim-disp-theta">0.0</strong>°</span>
+                <span class="badge badge-success">V: <strong id="sim-disp-v">0.00</strong> m/s</span>
+              </div>
+            </div>
+            <div class="sim-canvas-wrapper">
+              <canvas id="sim-canvas" width="600" height="600"></canvas>
+            </div>
+            <div class="sim-canvas-footer">
+              <span><i class="fa-solid fa-info-circle"></i> グリッド: 1マス = 0.5m (表示範囲: 6m × 6m) | 赤矢印: 進行方向 | 青線: 走行軌跡</span>
+            </div>
+          </div>
+
+          <!-- 右側: 仮想デバイス制御 & モニタ -->
+          <div class="sim-controls-column">
+            <!-- 1. リミットスイッチ注入 -->
+            <div class="glass-card sim-panel-card">
+              <div class="card-header">
+                <div class="card-title">
+                  <i class="fa-solid fa-toggle-on"></i> リミットスイッチ インジェクタ (自律テスト用)
+                </div>
+              </div>
+              <p class="sim-card-desc">
+                クリックで各MDDのリミットSWをON/OFFできます。Behaviorの <code>wait_until()</code> やリミット検知の動作試験に使用できます。
+              </p>
+              <div id="sim-limits-container" class="sim-limits-grid">
+                <!-- JavaScript で動的生成 -->
+                <div class="placeholder-text">MDDモジュールをロード中...</div>
+              </div>
+            </div>
+
+            <!-- 2. 電磁弁モジュールモニタ -->
+            <div class="glass-card sim-panel-card">
+              <div class="card-header">
+                <div class="card-title">
+                  <i class="fa-solid fa-faucet-drip"></i> 電磁弁モジュール (Solenoid) モニタ
+                </div>
+              </div>
+              <div id="sim-solenoids-container" class="sim-solenoids-list">
+                <div class="placeholder-text">電磁弁モジュールを待機中...</div>
+              </div>
+            </div>
+
+            <!-- 3. サーボモジュールモニタ -->
+            <div class="glass-card sim-panel-card">
+              <div class="card-header">
+                <div class="card-title">
+                  <i class="fa-solid fa-compass"></i> サーボモジュール (Servo) モニタ
+                </div>
+              </div>
+              <div id="sim-servos-container" class="sim-servos-list">
+                <div class="placeholder-text">サーボモジュールを待機中...</div>
+              </div>
+            </div>
+
+            <!-- 4. RViz2 ガイド -->
+            <div class="glass-card sim-panel-card sim-rviz-card">
+              <div class="card-header">
+                <div class="card-title">
+                  <i class="fa-solid fa-cube"></i> ROS 2 / RViz2 3D 可視化連携
+                </div>
+              </div>
+              <p class="sim-card-desc">
+                シミュレータモード起動中は ROS 2 標準の <code>/odom</code> (Odometry) と <code>/tf</code> (odom ➔ base_link) が自動ブロードキャストされます。
+              </p>
+              <div class="sim-command-box">
+                <code>./run_rviz.sh</code>
+                <span class="sim-box-hint">（別ターミナルで実行するだけで RViz2 上に軌跡とオドメトリが描画されます）</span>
+              </div>
             </div>
           </div>
         </div>

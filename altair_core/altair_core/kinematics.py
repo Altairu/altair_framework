@@ -153,3 +153,77 @@ class ChassisKinematics:
             vx_mm_s = -float(linear_y_m_s) * 1000.0
 
         return self.compute_from_altair_vel(vx_mm_s, vy_mm_s, float(angular_z_rad_s))
+
+    def compute_forward_from_speeds(self, motor_speeds_rps: List[float]):
+        """
+        各モータの回転速度 [rps] (m1..m4) からロボットの進行速度を順運動学で算出します。
+        シミュレータのオドメトリ計算などに利用されます。
+        
+        Returns:
+            Tuple[float, float, float]:
+            - linear_x_m_s  : 前進速度 [m/s] (REP-103準拠)
+            - linear_y_m_s  : 左移動速度 [m/s] (REP-103準拠)
+            - angular_z_rad_s: 旋回角速度 [rad/s] (左回り正)
+        """
+        r_t = self.turning_diameter_mm / 2000.0
+        if r_t <= 0:
+            r_t = 0.15
+
+        def get_v(slot_name: str, inv: float) -> float:
+            if not slot_name or slot_name == "none":
+                return 0.0
+            idx = int(slot_name[1]) - 1
+            rps = motor_speeds_rps[idx] if 0 <= idx < len(motor_speeds_rps) else 0.0
+            dia = self._get_motor_diameter_mm(slot_name)
+            # m/s
+            return rps * (math.pi * dia / 1000.0) * inv
+
+        slot_lf = self.motor_mapping.get("lf", "m1")
+        slot_rf = self.motor_mapping.get("rf", "m2")
+        slot_lr = self.motor_mapping.get("lr", "m3")
+        slot_rr = self.motor_mapping.get("rr", "m4")
+
+        inv_lf = -1.0 if self.motor_inverted.get("lf", False) else 1.0
+        inv_rf = -1.0 if self.motor_inverted.get("rf", False) else 1.0
+        inv_lr = -1.0 if self.motor_inverted.get("lr", False) else 1.0
+        inv_rr = -1.0 if self.motor_inverted.get("rr", False) else 1.0
+
+        v_lf = get_v(slot_lf, inv_lf)
+        v_rf = get_v(slot_rf, inv_rf)
+        v_lr = get_v(slot_lr, inv_lr)
+        v_rr = get_v(slot_rr, inv_rr)
+
+        vx_altair = 0.0
+        vy_altair = 0.0
+        omega = 0.0
+
+        if self.chassis_type == "4_MECANUM":
+            vy_altair = (v_lf + v_rf + v_lr + v_rr) / 4.0
+            vx_altair = (-v_lf + v_rf + v_lr - v_rr) / 4.0
+            omega = (-v_lf + v_rf - v_lr + v_rr) / (4.0 * r_t)
+
+        elif self.chassis_type == "4_OMNI":
+            c45 = 0.70710678
+            vy_altair = (v_lf + v_rf - v_lr - v_rr) / (4.0 * c45)
+            vx_altair = (-v_lf + v_rf - v_lr + v_rr) / (4.0 * c45)
+            omega = (-v_lf + v_rf + v_lr - v_rr) / (4.0 * r_t)
+
+        elif self.chassis_type == "3_OMNI":
+            v1, v2, v3 = v_lf, v_rf, v_lr
+            vy_altair = (2.0 * v1 - v2 - v3) / 3.0
+            vx_altair = (v3 - v2) / 1.7320508
+            omega = (v1 + v2 + v3) / (3.0 * r_t)
+
+        elif self.chassis_type == "2_DIFF":
+            v_l = (v_lf + v_lr) / 2.0 if (slot_lf != slot_lr) else v_lf
+            v_r = (v_rf + v_rr) / 2.0 if (slot_rf != slot_rr) else v_rf
+            vy_altair = (v_r + v_l) / 2.0
+            vx_altair = 0.0
+            omega = (v_r - v_l) / (2.0 * r_t)
+
+        # REP-103: linear.x = 前進 (vy_altair), linear.y = 左進 (-vx_altair)
+        linear_x = vy_altair
+        linear_y = -vx_altair
+        angular_z = omega
+
+        return linear_x, linear_y, angular_z

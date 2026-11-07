@@ -1777,3 +1777,240 @@ body {
   color: #e8eaed;
   letter-spacing: 0.3px;
 }
+
+/* ==========================================================================
+   19. シミュレータビュー (Simulator View) 用スタイル
+   ========================================================================== */
+.sim-grid-layout {
+  display: grid;
+  grid-template-columns: minmax(480px, 1.1fr) minmax(380px, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 1080px) {
+  .sim-grid-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sim-map-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sim-coord-badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sim-canvas-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #111318;
+  border-radius: 12px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#sim-canvas {
+  width: 100%;
+  max-width: 580px;
+  aspect-ratio: 1 / 1;
+  background-color: #0f1117;
+  border-radius: 8px;
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.6);
+}
+
+.sim-canvas-footer {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 4px 0;
+}
+
+.sim-controls-column {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sim-panel-card {
+  padding: 18px 20px;
+}
+
+.sim-card-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+/* リミットスイッチボタン群 */
+.sim-mdd-limit-block {
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.sim-mdd-limit-block:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.sim-mdd-limit-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text-main);
+  display: flex;
+  justify-content: space-between;
+}
+
+.sim-sw-btn-group {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.sim-sw-btn {
+  padding: 8px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: #f8f9fa;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.sim-sw-btn:hover {
+  background: #e8eaed;
+}
+
+.sim-sw-btn.active {
+  background: #fef7e0;
+  border-color: #f9ab00;
+  color: #b06000;
+  box-shadow: 0 0 8px rgba(249, 171, 0, 0.4);
+}
+
+.sim-sw-btn .indicator-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #dadce0;
+}
+
+.sim-sw-btn.active .indicator-dot {
+  background: #f29900;
+}
+
+/* 電磁弁インジケータ */
+.sim-solenoids-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+
+.sim-valve-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 4px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid var(--border-light);
+  font-size: 11px;
+}
+
+.sim-valve-item.active {
+  background: #e6f4ea;
+  border-color: #34a853;
+  color: #137333;
+  font-weight: 600;
+}
+
+.sim-valve-item .valve-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #dadce0;
+  margin-bottom: 4px;
+}
+
+.sim-valve-item.active .valve-dot {
+  background: #34a853;
+  box-shadow: 0 0 6px rgba(52, 168, 83, 0.5);
+}
+
+/* サーボゲージ */
+.sim-servos-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sim-servo-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.sim-servo-label {
+  min-width: 60px;
+  font-weight: 600;
+}
+
+.sim-servo-bar-bg {
+  flex: 1;
+  height: 8px;
+  background: #e8eaed;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.sim-servo-bar-fill {
+  height: 100%;
+  background: var(--primary-color);
+  width: 50%;
+  transition: width 0.1s linear;
+}
+
+.sim-servo-val {
+  min-width: 45px;
+  text-align: right;
+  font-family: monospace;
+}
+
+/* RViz2 コマンドボックス */
+.sim-rviz-card {
+  background: linear-gradient(135deg, rgba(26, 115, 232, 0.04) 0%, rgba(248, 249, 250, 1) 100%);
+}
+
+.sim-command-box {
+  background: #202124;
+  color: #8ab4f8;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-family: 'Consolas', monospace;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sim-box-hint {
+  font-size: 11px;
+  color: #9aa0a6;
+}

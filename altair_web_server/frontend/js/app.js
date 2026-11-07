@@ -194,6 +194,10 @@ document.addEventListener("DOMContentLoaded", () => {
         updateMddCardFeedback(msg.name, data);
         break;
 
+      case "sim_state":
+        handleSimStateUpdate(data);
+        break;
+
       case "raw_can_frame": // システム全体のCANログ用
         appendCanLog(data);
         break;
@@ -3075,6 +3079,300 @@ if __name__ == '__main__':
   if (btnCloseDrawer && codeDrawer) {
     btnCloseDrawer.addEventListener("click", () => {
       codeDrawer.classList.remove("open");
+    });
+  }
+
+  // =========================================================================
+  // 20. シミュレータ (Simulator) 制御 ＆ 2Dミニマップ描画
+  // =========================================================================
+  const simTrail = [];
+  const MAX_TRAIL_POINTS = 500;
+  let lastSimPose = { x: 0, y: 0, theta_deg: 0, vx: 0, vy: 0, omega_deg: 0 };
+  let activeLimitSwitches = {};
+
+  function handleSimStateUpdate(data) {
+    if (!data || !data.pose) return;
+
+    lastSimPose = data.pose;
+
+    // 数値バッジの更新
+    const dispX = document.getElementById("sim-disp-x");
+    const dispY = document.getElementById("sim-disp-y");
+    const dispTheta = document.getElementById("sim-disp-theta");
+    const dispV = document.getElementById("sim-disp-v");
+
+    if (dispX) dispX.textContent = data.pose.x.toFixed(2);
+    if (dispY) dispY.textContent = data.pose.y.toFixed(2);
+    if (dispTheta) dispTheta.textContent = data.pose.theta_deg.toFixed(1);
+    if (dispV) {
+      const speed = Math.hypot(data.pose.vx, data.pose.vy);
+      dispV.textContent = speed.toFixed(2);
+    }
+
+    // 軌跡ポイント追加 (0.02m以上変化があった場合)
+    if (simTrail.length === 0) {
+      simTrail.push({ x: data.pose.x, y: data.pose.y });
+    } else {
+      const last = simTrail[simTrail.length - 1];
+      if (Math.hypot(data.pose.x - last.x, data.pose.y - last.y) > 0.02) {
+        simTrail.push({ x: data.pose.x, y: data.pose.y });
+        if (simTrail.length > MAX_TRAIL_POINTS) simTrail.shift();
+      }
+    }
+
+    // 2D Canvas 描画
+    drawSimCanvas(data.pose);
+
+    // リミットスイッチUI更新
+    if (data.mdds) {
+      updateSimLimitsUI(data.mdds);
+    }
+
+    // 電磁弁UI更新
+    if (data.solenoids) {
+      updateSimSolenoidsUI(data.solenoids);
+    }
+
+    // サーボUI更新
+    if (data.servos) {
+      updateSimServosUI(data.servos);
+    }
+  }
+
+  function drawSimCanvas(pose) {
+    const canvas = document.getElementById("sim-canvas");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const w = canvas.width;
+    const h = canvas.height;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // スケール: 6m × 6m の領域を width × height にマッピング (1m = w / 6 px)
+    const fieldSize = 6.0;
+    const scale = w / fieldSize;
+    const originX = w / 2;
+    const originY = h / 2;
+
+    // 1. グリッド背景の描画
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.06)";
+    ctx.lineWidth = 1;
+
+    // 0.5m ごとの補助線
+    for (let m = -3.0; m <= 3.0; m += 0.5) {
+      const px = originX + m * scale;
+      const py = originY - m * scale;
+      // 垂直線
+      ctx.beginPath();
+      ctx.moveTo(px, 0);
+      ctx.lineTo(px, h);
+      ctx.stroke();
+      // 水平線
+      ctx.beginPath();
+      ctx.moveTo(0, py);
+      ctx.lineTo(w, py);
+      ctx.stroke();
+    }
+
+    // 中心軸 (X軸: 赤, Y軸: 緑)
+    ctx.strokeStyle = "rgba(234, 67, 53, 0.4)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(originX, 0);
+    ctx.lineTo(originX, h);
+    ctx.stroke();
+
+    ctx.strokeStyle = "rgba(52, 168, 83, 0.4)";
+    ctx.beginPath();
+    ctx.moveTo(0, originY);
+    ctx.lineTo(w, originY);
+    ctx.stroke();
+
+    // 2. 走行軌跡 (Trail) の描画
+    if (simTrail.length > 1) {
+      ctx.strokeStyle = "rgba(66, 133, 244, 0.7)";
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      for (let i = 0; i < simTrail.length; i++) {
+        // REP-103: ワールド座標 (X: 前, Y: 左) -> Canvas (px = originX - y * scale, py = originY - x * scale)
+        const px = originX - simTrail[i].y * scale;
+        const py = originY - simTrail[i].x * scale;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+
+    // 3. ロボット本体の描画
+    const robotPx = originX - pose.y * scale;
+    const robotPy = originY - pose.x * scale;
+    const robotHeadingRad = -(pose.theta_deg * Math.PI) / 180.0;
+
+    ctx.save();
+    ctx.translate(robotPx, robotPy);
+    ctx.rotate(robotHeadingRad);
+
+    const robotBodyW = 0.35 * scale; // 35cm幅
+    const robotBodyL = 0.40 * scale; // 40cm長
+
+    // シャシー本体
+    ctx.fillStyle = "rgba(30, 144, 255, 0.85)";
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    if (ctx.roundRect) {
+      ctx.roundRect(-robotBodyW / 2, -robotBodyL / 2, robotBodyW, robotBodyL, 6);
+    } else {
+      ctx.rect(-robotBodyW / 2, -robotBodyL / 2, robotBodyW, robotBodyL);
+    }
+    ctx.fill();
+    ctx.stroke();
+
+    // 車輪 (黒い車輪 4個)
+    const wheelW = 0.06 * scale;
+    const wheelL = 0.12 * scale;
+    ctx.fillStyle = "#111318";
+    ctx.strokeStyle = "#5f6368";
+    ctx.lineWidth = 1;
+
+    const wheels = [
+      { x: -robotBodyW / 2, y: -robotBodyL / 2 + wheelL / 2 },
+      { x: robotBodyW / 2 - wheelW, y: -robotBodyL / 2 + wheelL / 2 },
+      { x: -robotBodyW / 2, y: robotBodyL / 2 - wheelL * 1.5 },
+      { x: robotBodyW / 2 - wheelW, y: robotBodyL / 2 - wheelL * 1.5 },
+    ];
+    wheels.forEach((wh) => {
+      ctx.fillRect(wh.x, wh.y, wheelW, wheelL);
+      ctx.strokeRect(wh.x, wh.y, wheelW, wheelL);
+    });
+
+    // 進行方向の矢印 (Front: 上向き -Y方向)
+    ctx.fillStyle = "#ea4335";
+    ctx.beginPath();
+    ctx.moveTo(0, -robotBodyL / 2 - 8);
+    ctx.lineTo(8, -robotBodyL / 2 + 6);
+    ctx.lineTo(-8, -robotBodyL / 2 + 6);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  function updateSimLimitsUI(mdds) {
+    const container = document.getElementById("sim-limits-container");
+    if (!container) return;
+
+    let html = "";
+    mdds.forEach((mdd) => {
+      activeLimitSwitches[mdd.name] = mdd.limits;
+      html += `
+        <div class="sim-mdd-limit-block">
+          <div class="sim-mdd-limit-title">
+            <span><strong>${mdd.name}</strong> (${mdd.base_id})</span>
+            <span class="badge ${mdd.status === 1 ? 'badge-success' : 'badge-warning'}">
+              ${mdd.status === 1 ? 'Running' : 'Setup待ち'}
+            </span>
+          </div>
+          <div class="sim-sw-btn-group">
+            ${[0, 1, 2, 3].map(idx => `
+              <button class="sim-sw-btn ${mdd.limits[idx] ? 'active' : ''}" 
+                      onclick="window.toggleSimLimitSwitch('${mdd.name}', ${idx}, ${!mdd.limits[idx]})">
+                <span class="indicator-dot"></span>
+                <span>SW${idx + 1}: ${mdd.limits[idx] ? 'ON' : 'OFF'}</span>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    });
+    container.innerHTML = html;
+  }
+
+  window.toggleSimLimitSwitch = async (mddName, switchIndex, nextState) => {
+    try {
+      await fetch("/api/sim/limit_switch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mdd: mddName, index: switchIndex, state: nextState }),
+      });
+    } catch (err) {
+      console.error("リミットSWトグル失敗:", err);
+    }
+  };
+
+  function updateSimSolenoidsUI(solenoids) {
+    const container = document.getElementById("sim-solenoids-container");
+    if (!container) return;
+
+    let html = "";
+    solenoids.forEach((sol) => {
+      html += `
+        <div style="margin-bottom: 12px;">
+          <div style="font-size: 13px; font-weight: 600; margin-bottom: 6px;">
+            ${sol.name} (${sol.base_id})
+          </div>
+          <div class="sim-solenoids-grid">
+            ${sol.valves.map((v, i) => `
+              <div class="sim-valve-item ${v ? 'active' : ''}">
+                <div class="valve-dot"></div>
+                <span>CH${i + 1}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    });
+    container.innerHTML = html || '<div class="placeholder-text">電磁弁モジュールなし</div>';
+  }
+
+  function updateSimServosUI(servos) {
+    const container = document.getElementById("sim-servos-container");
+    if (!container) return;
+
+    let html = "";
+    servos.forEach((srv) => {
+      html += `
+        <div style="margin-bottom: 12px;">
+          <div style="font-size: 13px; font-weight: 600; margin-bottom: 6px;">
+            ${srv.name} (${srv.base_id})
+          </div>
+          <div class="sim-servos-grid">
+            ${srv.angles.map((ang, i) => `
+              <div class="sim-servo-row">
+                <span class="sim-servo-label">CH${i + 1}:</span>
+                <div class="sim-servo-bar-bg">
+                  <div class="sim-servo-bar-fill" style="width: ${(ang / 180.0) * 100}%;"></div>
+                </div>
+                <span class="sim-servo-val">${ang}°</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    });
+    container.innerHTML = html || '<div class="placeholder-text">サーボモジュールなし</div>';
+  }
+
+  // 位置リセット & 軌跡クリアボタンのリスナー
+  const btnSimReset = document.getElementById("btn-sim-reset-pose");
+  if (btnSimReset) {
+    btnSimReset.addEventListener("click", async () => {
+      try {
+        await fetch("/api/sim/reset_pose", { method: "POST" });
+        simTrail.length = 0;
+        showNotification("仮想ロボット位置を (0, 0, 0) にリセットしました。", "success");
+      } catch (err) {
+        showNotification("位置リセットに失敗しました", "error");
+      }
+    });
+  }
+
+  const btnSimClearTrail = document.getElementById("btn-sim-clear-trail");
+  if (btnSimClearTrail) {
+    btnSimClearTrail.addEventListener("click", () => {
+      simTrail.length = 0;
+      drawSimCanvas(lastSimPose);
+      showNotification("走行軌跡をクリアしました。", "info");
     });
   }
 });

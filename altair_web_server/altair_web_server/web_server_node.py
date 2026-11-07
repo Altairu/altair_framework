@@ -7,7 +7,7 @@ import subprocess
 import platform
 from pathlib import Path
 import uvicorn
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -24,7 +24,7 @@ from altair_core.paths import (
 )
 
 # ROS2 メッセージ・サービス
-from std_msgs.msg import String
+from std_msgs.msg import String, Empty
 from sensor_msgs.msg import Joy
 from can_msgs.msg import Frame
 from altair_interfaces.msg import CanStatus, MddFeedback, MddCommand, ServoCommand, SolenoidCommand
@@ -119,6 +119,13 @@ class WebServerROSNode(Node):
 
         # モジュール構成同期用パブリッシャ (操縦PCからNUCへの同期用)
         self.config_sync_pub = self.create_publisher(String, '/altair/config_sync', 10)
+
+        # シミュレータモード連携用 (/odom, ミニマップ, リミットSWトグル)
+        self.sim_limit_pub = self.create_publisher(String, '/altair/sim/set_limit_sw', 10)
+        self.sim_reset_pub = self.create_publisher(Empty, '/altair/sim/reset_pose', 10)
+        self.sim_state_sub = self.create_subscription(
+            String, '/altair/sim/state', self.on_sim_state, 10, callback_group=self.callback_group
+        )
 
         # 初回同期 + 2秒周期でモジュール設定ファイルを監視し、動的にMDDフィードバックサブスクライバを作成
         self.sync_mdd_subscriptions()
@@ -254,6 +261,18 @@ class WebServerROSNode(Node):
         msg = SolenoidCommand()
         msg.valves = [bool(v) for v in valves]
         self.publishers_dict[topic].publish(msg)
+
+    def on_sim_state(self, msg: String):
+        if not manager.active_connections:
+            return
+        try:
+            data = json.loads(msg.data)
+            asyncio.run_coroutine_threadsafe(
+                manager.broadcast({"type": "sim_state", "data": data}),
+                self.loop
+            )
+        except Exception:
+            pass
 
 
 # --- グローバルなROSノードインスタンスの初期化 ---
@@ -774,6 +793,28 @@ async def update_current_config(config_data: dict):
         return {"success": True, "message": "設定ファイルを更新しました。"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"保存に失敗しました: {str(e)}")
+
+
+@app.post("/api/sim/limit_switch")
+async def toggle_sim_limit_switch(request: Request):
+    """シミュレータモード用: リミットスイッチの状態を注入"""
+    if not ros_node:
+        raise HTTPException(status_code=500, detail="ROS 2 node not initialized")
+    body = await request.json()
+    msg = String()
+    msg.data = json.dumps(body)
+    ros_node.sim_limit_pub.publish(msg)
+    return {"success": True, "message": "リミットスイッチ状態を送信しました"}
+
+
+@app.post("/api/sim/reset_pose")
+async def reset_sim_pose():
+    """シミュレータモード用: 仮想ロボットの位置を (0, 0, 0) にリセット"""
+    if not ros_node:
+        raise HTTPException(status_code=500, detail="ROS 2 node not initialized")
+    msg = Empty()
+    ros_node.sim_reset_pub.publish(msg)
+    return {"success": True, "message": "仮想ロボット位置をリセットしました"}
 
 
 # --- WebSocket リアルタイム通信 (双方向) ---
