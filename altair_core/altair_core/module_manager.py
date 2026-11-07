@@ -3,17 +3,24 @@ import os
 import struct
 import time
 from pathlib import Path
+from typing import Dict
+
 import rclpy
 from rclpy.node import Node
 from rclpy.callback_groups import ReentrantCallbackGroup
 from std_srvs.srv import Trigger
-from ament_index_python.packages import PackageNotFoundError, get_package_share_directory
 
 # ROS2 標準 ＆ カスタムメッセージ
-from std_msgs.msg import String
+from std_msgs.msg import Bool, String
+from geometry_msgs.msg import Twist
 from can_msgs.msg import Frame
-from altair_interfaces.msg import MddFeedback, MddCommand, ServoCommand, SolenoidCommand
 from altair_interfaces.srv import TriggerControl
+
+from altair_core.paths import get_config_path
+from altair_core.kinematics import ChassisKinematics
+from altair_core.modules import BaseModulePlugin, discover_module_plugins, get_module_plugin_class
+from altair_core.modules.mdd_module import MddModulePlugin
+
 
 class ModuleManager(Node):
     def __init__(self):
@@ -26,7 +33,7 @@ class ModuleManager(Node):
         # パブリッシャ: Web UIコンソールへのシステムログ通知用
         self.behavior_log_pub = self.create_publisher(String, '/altair/behavior/log', 50)
 
-        # サブスクライバ: NUCからのCAN受信用のトピック
+        # サブスクライバ: NUC/ブリッジからのCAN受信用のトピック
         self.can_rx_sub = self.create_subscription(
             Frame, '/altair/can/rx', self.handle_can_rx_callback, 100,
             callback_group=self.callback_group
@@ -35,6 +42,22 @@ class ModuleManager(Node):
         # サブスクライバ: 構成ファイル同期用トピック
         self.config_sync_sub = self.create_subscription(
             String, '/altair/config_sync', self.handle_config_sync_callback, 10,
+            callback_group=self.callback_group
+        )
+
+        # サブスクライバ: 外部操縦・自律移動用 /altair/cmd_vel および /cmd_vel (geometry_msgs/Twist)
+        self.altair_cmd_vel_sub = self.create_subscription(
+            Twist, '/altair/cmd_vel', self.handle_cmd_vel_callback, 10,
+            callback_group=self.callback_group
+        )
+        self.std_cmd_vel_sub = self.create_subscription(
+            Twist, '/cmd_vel', self.handle_cmd_vel_callback, 10,
+            callback_group=self.callback_group
+        )
+
+        # サブスクライバ: 緊急停止用トピック (/altair/emergency_stop)
+        self.estop_sub = self.create_subscription(
+            Bool, '/altair/emergency_stop', self.handle_emergency_stop_callback, 10,
             callback_group=self.callback_group
         )
 
@@ -50,30 +73,35 @@ class ModuleManager(Node):
             callback_group=self.callback_group
         )
 
-        # 動的生成したパブリッシャ/サブスクライバの保持用ディクショナリ
+        # 動的生成したパブリッシャ/サブスクライバおよびモジュールプラグインインスタンスの保持
         self.publishers_dict = {}
         self.subscriptions_dict = {}
-        
-        # モータごとの最新フィードバックデータをキャッシュする（角度と速度を1つのトピックに統合するため）
-        self.mdd_feedback_cache = {}
-        # 各MDD (base_id) がパラメータ設定完了 (system_status == 1) を返したかの追跡辞書
-        self.mdd_param_confirmed = {}
-        # 各MDD (base_id) へ最後にパラメータを送った時刻 (monotonic秒)
-        self.mdd_param_sent_at = {}
+        self.module_plugins: Dict[str, BaseModulePlugin] = {}
 
-        # 指令値キャッシュ（10msの周期送信タイマーで使用する最新の目標値）
+        # 互換性維持およびMDDパラメータ確認用のキャッシュ辞書
+        self.mdd_feedback_cache = {}
+        self.mdd_param_confirmed = {}
+        self.mdd_param_sent_at = {}
         self.mdd_targets = {}
         self.servo_angles = {}
         self.solenoid_valves = {}
 
         # 制御システムの状態 (False = パラメータ送信待ち, True = 制御実行中)
         self.is_running = False
-        # パラメータ送信中フラグ（パラメータ送信中に周期コマンドが割り込むのを防ぐ）
         self.is_sending_params = False
-        # 制御開始時刻（モード遷移直後の古いキャッシュや遷移中の0x230フレームによる誤リセットを防ぐ猶予期間用）
         self.control_start_monotonic = 0.0
+        self.emergency_stopped = False
 
-        # 設定ファイルのロードと動的初期化
+        # Cmd Mux (優先度調停・ウォッチドッグ) 用状態
+        self.config = {"modules": []}
+        self.kinematics = ChassisKinematics(self.config)
+        self.last_cmd_vel_time = 0.0
+        self.cmd_vel_active = False
+        self.cmd_vel_timeout_sec = 0.5
+        self.manual_override_window_sec = 0.5
+
+        # プラグインの自動検出と設定ロード
+        discover_module_plugins()
         self.load_config_and_initialize()
 
         # 10ms周期のCANコマンド送信タイマー (100Hz: マイコンの制御周期およびEthernet-CANの1msポーリングに適合)
@@ -82,7 +110,7 @@ class ModuleManager(Node):
             callback_group=self.callback_group
         )
 
-        self.get_logger().info("Module Manager ノードが起動しました。初期設定ロード完了。")
+        self.get_logger().info("Module Manager ノードが起動しました (プラグイン・/cmd_vel・CmdMux対応)。")
 
     def publish_ui_log(self, text: str):
         msg = String()
@@ -91,21 +119,17 @@ class ModuleManager(Node):
 
     def load_config_and_initialize(self):
         """
-        config/modules_config.json をロードし、動的トピックを構築する
+        modules_config.json をロードし、モジュールプラグインおよび動的トピックを構築する
         """
-        # 一旦既存の動的トピックをクリア
-        for sub in self.subscriptions_dict.values():
-            self.destroy_subscription(sub)
-        for pub in self.publishers_dict.values():
-            self.destroy_publisher(pub)
-        
+        for plugin in self.module_plugins.values():
+            plugin.destroy_ros_interfaces()
+        self.module_plugins.clear()
         self.publishers_dict.clear()
         self.subscriptions_dict.clear()
         self.mdd_feedback_cache.clear()
         self.mdd_param_confirmed.clear()
         self.mdd_param_sent_at.clear()
 
-        # パッケージのシェアディレクトリまたはローカルパスからロード
         config_path = self.get_config_path()
         self.get_logger().info(f"設定ファイルをロード中: {config_path}")
 
@@ -116,292 +140,103 @@ class ModuleManager(Node):
             self.get_logger().error(f"設定ファイルの読み込みに失敗しました: {str(e)}")
             return
 
-        # 各モジュールをループ処理して動的トピックを作成
-        for module in self.config.get('modules', []):
-            name = module['name']
-            mtype = module['type']
-            base_id = int(module['base_id'], 16)
+        # 運動学計算器の初期化
+        self.kinematics = ChassisKinematics(self.config)
+        chassis_cfg = self.config.get("chassis", {})
+        self.cmd_vel_timeout_sec = float(chassis_cfg.get("cmd_vel_timeout_sec", 0.5))
 
-            self.get_logger().info(f"モジュールを登録: {name} (タイプ: {mtype}, BaseID: {hex(base_id)})")
+        # 各モジュールをプラグインレジストリから生成・初期化
+        for module_cfg in self.config.get('modules', []):
+            name = module_cfg['name']
+            mtype = module_cfg['type']
+            base_id = int(str(module_cfg['base_id']), 16)
 
-            if mtype == 'mdd':
-                # 指令キャッシュ初期化
-                self.mdd_targets[name] = [0.0, 0.0, 0.0, 0.0]
+            plugin_cls = get_module_plugin_class(mtype)
+            if plugin_cls is None:
+                self.get_logger().error(f"未登録のモジュールタイプです: '{mtype}' (モジュール名: {name})")
+                continue
 
-                # MDDモータ指令用サブスクライバ
-                topic_name = f"/altair/{name}/cmd"
-                self.subscriptions_dict[topic_name] = self.create_subscription(
-                    MddCommand, topic_name,
-                    self.make_mdd_cmd_callback(name), 10,
-                    callback_group=self.callback_group
-                )
-                
-                # MDDフィードバック用パブリッシャ
-                feedback_topic = f"/altair/{name}/feedback"
-                self.publishers_dict[feedback_topic] = self.create_publisher(
-                    MddFeedback, feedback_topic, 10
-                )
-
-                # フィードバック用キャッシュの初期化
-                self.mdd_feedback_cache[base_id] = {
-                    'limit_switches': [False, False, False, False],
-                    'error_code': 0,
-                    'system_status': 0,
-                    'angles': [0.0, 0.0, 0.0, 0.0],
-                    'speeds': [0.0, 0.0, 0.0, 0.0]
-                }
-                self.mdd_param_confirmed[base_id] = False
-                self.mdd_param_sent_at[base_id] = 0.0
-
-            elif mtype == 'servo':
-                # 指令キャッシュ初期化
-                self.servo_angles[name] = [90, 90, 90, 90, 90, 90]
-
-                # サーボ指令用サブスクライバ
-                topic_name = f"/altair/{name}/cmd"
-                self.subscriptions_dict[topic_name] = self.create_subscription(
-                    ServoCommand, topic_name,
-                    self.make_servo_cmd_callback(name), 10,
-                    callback_group=self.callback_group
-                )
-
-            elif mtype == 'solenoid':
-                # 指令キャッシュ初期化
-                self.solenoid_valves[name] = [False] * 12
-
-                # 電磁弁指令用サブスクライバ
-                topic_name = f"/altair/{name}/cmd"
-                self.subscriptions_dict[topic_name] = self.create_subscription(
-                    SolenoidCommand, topic_name,
-                    self.make_solenoid_cmd_callback(name), 10,
-                    callback_group=self.callback_group
-                )
+            plugin = plugin_cls(self, module_cfg)
+            plugin.setup_ros_interfaces()
+            self.module_plugins[name] = plugin
+            self.get_logger().info(f"モジュールプラグインを登録: {name} (タイプ: {mtype}, BaseID: {hex(base_id)})")
 
     def get_config_path(self):
+        """モジュール構成ファイルの絶対パスを探索して返す"""
+        return get_config_path()
+
+    # --- 1. 外部速度指令 (/altair/cmd_vel, /cmd_vel) & 緊急停止コールバック ---
+    def handle_emergency_stop_callback(self, msg: Bool):
+        self.emergency_stopped = bool(msg.data)
+        if self.emergency_stopped:
+            self.is_running = False
+            for plugin in self.module_plugins.values():
+                if isinstance(plugin, MddModulePlugin):
+                    plugin.set_targets_direct([0.0, 0.0, 0.0, 0.0])
+            self.get_logger().warn("[E-STOP] 緊急停止信号を受信しました。全MDD出力を即時停止しました。")
+            self.publish_ui_log("[E-STOP] 緊急停止信号を受信しました。")
+        else:
+            self.get_logger().info("[E-STOP] 緊急停止が解除されました。再開するには /altair/start_control を呼んでください。")
+
+    def handle_cmd_vel_callback(self, msg: Twist):
         """
-        モジュール構成ファイルの絶対パスを探索して返す
+        外部の操縦ノードや自律移動ノードからの Twist 指令を逆運動学変換し、
+        手動操作 (直接 /cmd) と競合しない場合に対象MDDへ反映する (Cmd Mux)。
         """
-        candidates = []
+        target_mdd_name = self.kinematics.drive_module_name
+        plugin = self.module_plugins.get(target_mdd_name)
+        if not isinstance(plugin, MddModulePlugin):
+            return
 
-        # 明示指定があれば最優先
-        env_path = os.getenv('ALTAIR_MODULES_CONFIG')
-        if env_path:
-            candidates.append(Path(env_path).expanduser())
+        now = time.monotonic()
+        # 手動/直接指令が直近 (0.5秒以内) に来ており、それが cmd_vel 由来でない場合は手動優先
+        if not self.cmd_vel_active and (now - plugin.last_cmd_time) < self.manual_override_window_sec:
+            return
 
-        # 開発時の代表的な相対パス・ソースツリー優先 (Webサーバー側での保存先と一致させる)
-        cwd = Path.cwd()
-        candidates.append(cwd / 'altair_core' / 'config' / 'modules_config.json')
-        candidates.append(cwd / 'config' / 'modules_config.json')
-
-        this_file = Path(__file__).resolve()
-        candidates.append(this_file.parent.parent / 'config' / 'modules_config.json')
-
-        if len(this_file.parents) >= 5:
-            candidates.append(this_file.parents[4] / 'altair_core' / 'config' / 'modules_config.json')
-
-        # ROS2インストール先 (share/altair_core/config)
-        try:
-            share_dir = Path(get_package_share_directory('altair_core'))
-            candidates.append(share_dir / 'config' / 'modules_config.json')
-        except PackageNotFoundError:
-            pass
-
-        for path in candidates:
-            if path.exists():
-                return str(path)
-
-        # 見つからない場合は先頭候補を返して、呼び出し側のエラーログに実パスを出す
-        return str(candidates[0]) if candidates else 'config/modules_config.json'
-
-    # --- 1. コールバック処理 (目標値のキャッシュ更新) ---
-    def make_mdd_cmd_callback(self, name):
-        def callback(msg):
-            self.mdd_targets[name] = [float(t) for t in msg.targets]
-        return callback
-
-    def make_servo_cmd_callback(self, name):
-        def callback(msg):
-            self.servo_angles[name] = [int(a) for a in msg.angles]
-        return callback
-
-    def make_solenoid_cmd_callback(self, name):
-        def callback(msg):
-            self.solenoid_valves[name] = [bool(v) for v in msg.valves]
-        return callback
+        wheel_rps = self.kinematics.compute_from_ros_twist(
+            msg.linear.x, msg.linear.y, msg.angular.z
+        )
+        plugin.set_targets_direct(wheel_rps)
+        self.last_cmd_vel_time = now
+        self.cmd_vel_active = True
 
     # --- 2. 10ms周期 CANコマンド一括送信タイマー (100Hz) ---
     def publish_all_control_commands(self):
         """
-        登録されているすべてのモジュールに対して、最新の指令値を10ms（100Hz）周期でCANバスへ送信する
+        登録されているすべてのモジュールプラグインに対して、10ms（100Hz）周期でCANバスへ送信する
         """
-        # パラメータ送信中は設定フレームの上書きを防ぐため周期送信を一時停止する
         if self.is_sending_params:
             return
 
-        for module in self.config.get('modules', []):
-            name = module['name']
-            mtype = module['type']
-            base_id = int(module['base_id'], 16)
+        # cmd_vel ウォッチドッグ: 外部 cmd_vel が途絶えたら安全のため足回りを0停止
+        if self.cmd_vel_active and self.cmd_vel_timeout_sec > 0:
+            if (time.monotonic() - self.last_cmd_vel_time) > self.cmd_vel_timeout_sec:
+                target_mdd_name = self.kinematics.drive_module_name
+                plugin = self.module_plugins.get(target_mdd_name)
+                if isinstance(plugin, MddModulePlugin):
+                    plugin.set_targets_direct([0.0, 0.0, 0.0, 0.0])
+                self.cmd_vel_active = False
 
-            if mtype == 'mdd':
-                # 制御実行中(is_running == True)でないときは、不要なバス負荷と上書きを避けるため0x220を送信しない
-                if not self.is_running:
-                    continue
-                targets = self.mdd_targets.get(name, [0.0, 0.0, 0.0, 0.0])
-
-                cmd_id = base_id + 0x20  # 例: 0x220
-                try:
-                    targets_int = [max(-32768, min(32767, int(t * 10))) for t in targets]
-                    payload = struct.pack('<hhhh', *targets_int)
-                except Exception as e:
-                    self.get_logger().error(f"MDD目標値の周期エンコード失敗 ({name}): {str(e)}")
-                    continue
-
-                frame = Frame()
-                frame.header.stamp = self.get_clock().now().to_msg()
-                frame.id = cmd_id
-                frame.dlc = 8
-                frame.is_extended = False
-                frame.is_rtr = False
-                frame.data = list(payload)
+        active_running = self.is_running and (not self.emergency_stopped)
+        for plugin in self.module_plugins.values():
+            frames = plugin.build_periodic_tx_frames(active_running)
+            for frame in frames:
                 self.can_tx_pub.publish(frame)
 
-            elif mtype == 'servo':
-                # サーボはいつでも最新の指令値（デフォルト90度）を常に10msで送信
-                angles = self.servo_angles.get(name, [90, 90, 90, 90, 90, 90])
-                payload = list(angles[:6])
-                payload = [min(a, 180) for a in payload]
-                while len(payload) < 6:
-                    payload.append(90)
-
-                frame = Frame()
-                frame.header.stamp = self.get_clock().now().to_msg()
-                frame.id = base_id  # 通常 0x100
-                frame.dlc = 6
-                frame.is_extended = False
-                frame.is_rtr = False
-                frame.data = payload + [0]*(8-len(payload))
-                self.can_tx_pub.publish(frame)
-
-            elif mtype == 'solenoid':
-                # 電磁弁も常に最新のON/OFF状態を10msで送信
-                valves = self.solenoid_valves.get(name, [False] * 12)
-                byte0 = 0
-                byte1 = 0
-                for i in range(min(len(valves), 12)):
-                    if valves[i]:
-                        if i < 8:
-                            byte0 |= (1 << i)
-                        else:
-                            byte1 |= (1 << (i - 8))
-
-                frame = Frame()
-                frame.header.stamp = self.get_clock().now().to_msg()
-                frame.id = base_id  # 通常 0x300
-                frame.dlc = 2
-                frame.is_extended = False
-                frame.is_rtr = False
-                frame.data = [byte0, byte1] + [0]*6
-                self.can_tx_pub.publish(frame)
-
-    # --- 3. CAN ➔ ROS2 フィードバック変換処理 (NUC ➔ PC) ---
-    def handle_can_rx_callback(self, frame):
-        can_id = frame.id
-
+    # --- 3. CAN ➔ ROS2 フィードバック変換処理 ---
+    def handle_can_rx_callback(self, frame: Frame):
         try:
-            # 現在キャッシュに登録されているMDD Base IDを走査
-            for base_id, cache in self.mdd_feedback_cache.items():
-                # A. ステータス返信 (Base ID + 0x30 = 0x230)
-                if can_id == (base_id + 0x30):
-                    if frame.dlc < 6:
-                        continue
-                    data = bytes(frame.data[:6])
-                    # アンパック (Limit SW1-4, Error Code, System Status)
-                    cache['limit_switches'] = [bool(b) for b in data[0:4]]
-                    cache['error_code'] = data[4]
-
-                    prev_status = cache.get('system_status', 0)
-                    raw_status = int(data[5])
-                    cache['system_status'] = raw_status
-
-                    if raw_status == 1:
-                        self.mdd_param_confirmed[base_id] = True
-                    else:
-                        sent_at = self.mdd_param_sent_at.get(base_id, 0.0)
-                        in_grace_period = (time.monotonic() - sent_at) < 1.5
-                        if not self.is_sending_params and not in_grace_period:
-                            if self.mdd_param_confirmed.get(base_id, False) or (prev_status == 1 and self.is_running):
-                                self.mdd_param_confirmed[base_id] = False
-                                self.is_running = False
-                                module_name = ""
-                                for module in self.config.get('modules', []):
-                                    if int(module['base_id'], 16) == base_id:
-                                        module_name = module['name']
-                                        break
-                                for m_name in self.mdd_targets:
-                                    self.mdd_targets[m_name] = [0.0, 0.0, 0.0, 0.0]
-                                warn_msg = f"マイコン '{module_name}' ({hex(base_id)}) の待機状態へのリセットを検知したため、PC側の制御フラグを安全にリセットしました。"
-                                self.get_logger().warn(warn_msg)
-                                self.publish_ui_log(f"[SYSTEM] {warn_msg}")
-
-                    self.publish_mdd_feedback(base_id)
-
-                # B. エンコーダ角度 (Base ID + 0x40 = 0x240)
-                elif can_id == (base_id + 0x40):
-                    if frame.dlc < 8:
-                        continue
-                    # int16_t * 4 のデコード (リトルエンディアン)
-                    angles_raw = struct.unpack('<hhhh', bytes(frame.data[:8]))
-                    # 0.1 deg 単位を度(degree)に変換
-                    cache['angles'] = [float(a) / 10.0 for a in angles_raw]
-                    
-                    self.publish_mdd_feedback(base_id)
-
-                # C. エンコーダ回転速度 (Base ID + 0x50 = 0x250)
-                elif can_id == (base_id + 0x50):
-                    if frame.dlc < 8:
-                        continue
-                    # int16_t * 4 のデコード
-                    speeds_raw = struct.unpack('<hhhh', bytes(frame.data[:8]))
-                    # 0.01 rps 単位を rps に変換
-                    cache['speeds'] = [float(s) / 100.0 for s in speeds_raw]
-                    
-                    self.publish_mdd_feedback(base_id)
+            for plugin in self.module_plugins.values():
+                if plugin.handle_can_rx(frame):
+                    break
         except Exception as e:
             self.get_logger().error(f"CAN受信コールバック処理中にエラーが発生しました: {str(e)}")
-
-    def publish_mdd_feedback(self, base_id):
-        """
-        キャッシュされたMDDフィードバックデータを結合してROS2トピックに配信する
-        """
-        # base_idに対応するモジュール名を探す
-        module_name = ""
-        for module in self.config.get('modules', []):
-            if int(module['base_id'], 16) == base_id:
-                module_name = module['name']
-                break
-        
-        if not module_name:
-            return
-
-        cache = self.mdd_feedback_cache[base_id]
-        
-        msg = MddFeedback()
-        msg.limit_switches = cache['limit_switches']
-        msg.error_code = cache['error_code']
-        msg.system_status = cache['system_status']
-        msg.angles = cache['angles']
-        msg.speeds = cache['speeds']
-
-        topic_name = f"/altair/{module_name}/feedback"
-        if topic_name in self.publishers_dict:
-            self.publishers_dict[topic_name].publish(msg)
 
     # --- 4. 複数MDD構成時のKeepaliveおよび個別MDDパラメータ送信ヘルパー ---
     def send_keepalive_to_mdds(self, mdd_modules):
         """他のMDDのパラメータ送信中に、既に制御開始したMDDがCAN受信タイムアウト(500ms)しないよう0x22xを送る"""
         for mod in mdd_modules:
-            base_id = int(mod['base_id'], 16)
+            base_id = int(str(mod['base_id']), 16)
             if self.mdd_param_confirmed.get(base_id, False) or self.mdd_param_sent_at.get(base_id, 0.0) > 0.0:
                 frame = Frame()
                 frame.header.stamp = self.get_clock().now().to_msg()
@@ -413,7 +248,7 @@ class ModuleManager(Node):
                 self.can_tx_pub.publish(frame)
 
     def send_single_mdd_params(self, module, all_mdd_modules):
-        base_id = int(module['base_id'], 16)
+        base_id = int(str(module['base_id']), 16)
         params = module.get('parameters', {})
 
         # 4つのモータ (m1〜m4) のゲイン・直径・方向を送信 (35ms間隔)
@@ -486,12 +321,19 @@ class ModuleManager(Node):
         self.get_logger().info("スタート制御要求を受信しました。パラメータの送信を開始します。")
 
         self.is_sending_params = True
+        self.emergency_stopped = False
         try:
-            # 送信前に最新の設定ファイルを読み込んで反映
             config_path = self.get_config_path()
             if os.path.exists(config_path):
                 with open(config_path, 'r', encoding='utf-8') as f:
                     self.config = json.load(f)
+
+            # 非MDDカスタムプラグインで初期化フレームを持つものがあれば送出
+            for plugin in self.module_plugins.values():
+                if not isinstance(plugin, MddModulePlugin):
+                    for frame in plugin.build_init_frames():
+                        self.can_tx_pub.publish(frame)
+                        time.sleep(0.02)
 
             mdd_modules = [m for m in self.config.get('modules', []) if m.get('type') == 'mdd']
             if not mdd_modules:
@@ -502,7 +344,7 @@ class ModuleManager(Node):
                 return response
 
             for mod in mdd_modules:
-                base_id = int(mod['base_id'], 16)
+                base_id = int(str(mod['base_id']), 16)
                 self.mdd_param_confirmed[base_id] = False
                 self.mdd_param_sent_at[base_id] = 0.0
                 if base_id in self.mdd_feedback_cache:
@@ -512,7 +354,7 @@ class ModuleManager(Node):
             for round_num in range(1, max_rounds + 1):
                 pending_mdds = [
                     mod for mod in mdd_modules
-                    if not self.mdd_param_confirmed.get(int(mod['base_id'], 16), False)
+                    if not self.mdd_param_confirmed.get(int(str(mod['base_id']), 16), False)
                 ]
                 if not pending_mdds:
                     break
@@ -525,21 +367,20 @@ class ModuleManager(Node):
                 for mod in pending_mdds:
                     self.send_single_mdd_params(mod, mdd_modules)
 
-                # 最大 400ms 間、40ms ごとに keepalive を送りながら全MDDからの完了応答 (0x230 data[5] == 1) を待機
                 wait_start = time.monotonic()
                 while (time.monotonic() - wait_start) < 0.40:
-                    if all(self.mdd_param_confirmed.get(int(m['base_id'], 16), False) for m in mdd_modules):
+                    if all(self.mdd_param_confirmed.get(int(str(m['base_id']), 16), False) for m in mdd_modules):
                         break
                     self.send_keepalive_to_mdds(mdd_modules)
                     time.sleep(0.040)
 
-                if all(self.mdd_param_confirmed.get(int(m['base_id'], 16), False) for m in mdd_modules):
+                if all(self.mdd_param_confirmed.get(int(str(m['base_id']), 16), False) for m in mdd_modules):
                     break
 
             unconfirmed_mdds = [
                 f"{m['name']}({m['base_id']})"
                 for m in mdd_modules
-                if not self.mdd_param_confirmed.get(int(m['base_id'], 16), False)
+                if not self.mdd_param_confirmed.get(int(str(m['base_id']), 16), False)
             ]
             confirmed_count = len(mdd_modules) - len(unconfirmed_mdds)
 
@@ -575,9 +416,7 @@ class ModuleManager(Node):
         return response
 
     def handle_reload_config_service(self, request, response):
-        """
-        設定ファイル更新時にトピックを動的再生成するサービスハンドラー
-        """
+        """設定ファイル更新時にトピックを動的再生成するサービスハンドラー"""
         _ = request
         self.get_logger().info("モジュール設定のリロード要求を受信しました。トピックを再生成します。")
         try:
@@ -593,28 +432,24 @@ class ModuleManager(Node):
     def handle_config_sync_callback(self, msg):
         """
         WebServerから送信された最新のモジュール構成設定を受信し、
-        NUC側の modules_config.json に上書き保存する
+        modules_config.json に上書き保存する
         """
         self.get_logger().info("モジュール構成同期メッセージを受信しました。")
         try:
             config_data = json.loads(msg.data)
             config_path = self.get_config_path()
-            
-            # ディレクトリの存在確認
             Path(config_path).parent.mkdir(parents=True, exist_ok=True)
-            
             with open(config_path, 'w', encoding='utf-8') as f:
                 json.dump(config_data, f, indent=2, ensure_ascii=False)
-                
-            self.get_logger().info(f"NUC側の設定ファイルを同期保存しました: {config_path}")
+            self.get_logger().info(f"設定ファイルを同期保存しました: {config_path}")
         except Exception as e:
             self.get_logger().error(f"構成同期データの保存に失敗しました: {str(e)}")
+
 
 def main(args=None):
     rclpy.init(args=args)
     node = ModuleManager()
-    
-    # ReentrantCallbackGroupを適切に動作させるため、MultiThreadedExecutorを使用
+
     executor = rclpy.executors.MultiThreadedExecutor()
     executor.add_node(node)
     try:
@@ -624,6 +459,7 @@ def main(args=None):
     finally:
         node.destroy_node()
         rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()

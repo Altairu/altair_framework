@@ -1,4 +1,23 @@
 {
+  "chassis": {
+    "drive_module": "MDD1",
+    "type": "4_MECANUM",
+    "turning_diameter_mm": 300.0,
+    "coord_frame": "ros",
+    "cmd_vel_timeout_sec": 0.5,
+    "motor_mapping": {
+      "lf": "m1",
+      "rf": "m2",
+      "lr": "m3",
+      "rr": "m4"
+    },
+    "motor_inverted": {
+      "lf": false,
+      "rf": false,
+      "lr": false,
+      "rr": false
+    }
+  },
   "modules": [
     {
       "name": "MDD1",

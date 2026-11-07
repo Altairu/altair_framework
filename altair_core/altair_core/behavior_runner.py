@@ -12,6 +12,7 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
 from altair_interfaces.srv import StartBehavior
+from altair_core.paths import get_user_behaviors_dir, get_workspace_root
 
 class BehaviorRunner(Node):
     def __init__(self):
@@ -76,9 +77,17 @@ class BehaviorRunner(Node):
             return response
 
         try:
+            ws_root = get_workspace_root()
+            env = os.environ.copy()
+            altair_core_pkg_dir = str(ws_root / "altair_core")
+            existing_py_path = env.get("PYTHONPATH", "")
+            env["PYTHONPATH"] = f"{altair_core_pkg_dir}:{existing_py_path}" if existing_py_path else altair_core_pkg_dir
+
             # 動作プログラムを別プロセスとして起動 (グループリーダー化して子孫プロセスもキル可能にする)
             self.current_process = subprocess.Popen(
-                ["python3", script_path],
+                [sys.executable, script_path],
+                cwd=str(ws_root),
+                env=env,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,  # 標準エラーも標準出力にマージしてキャプチャ
                 text=True,
@@ -111,29 +120,9 @@ class BehaviorRunner(Node):
 
     def get_script_path(self, name):
         """
-        動作スクリプトファイルの絶対パスを決定する
-        優先: user_behaviors/ > altair_core/user_behaviors/
+        動作スクリプトファイルの絶対パスを決定する (user_behaviors/ 単一管理)
         """
-        paths = [
-            # 0. user_behaviors/ ディレクトリを最優先
-            f"user_behaviors/{name}",
-            f"./user_behaviors/{name}",
-            # 1. ワークスペースのローカルソースパス
-            f"c:/Users/106no/Documents/GitHub/altair_framework/user_behaviors/{name}",
-            # 2. ROS2シェアディレクトリ
-            os.path.join(os.path.expanduser('~'), f"ros2_ws/src/altair_framework/user_behaviors/{name}"),
-            # 3. 相対パスフォールバック
-            f"./src/altair_framework/user_behaviors/{name}",
-            # 4. 旧パス (後方互換性)
-            f"c:/Users/106no/Documents/GitHub/altair_framework/altair_core/user_behaviors/{name}",
-            os.path.join(os.path.expanduser('~'), f"ros2_ws/src/altair_framework/altair_core/user_behaviors/{name}"),
-            f"./src/altair_framework/altair_core/user_behaviors/{name}"
-        ]
-        for p in paths:
-            if os.path.exists(p):
-                return p
-        # すべてのパス探索失敗時は、user_behaviors/ を返す
-        return f"user_behaviors/{name}"
+        return str(get_user_behaviors_dir() / name)
 
     # --- 動作スクリプトの停止 ---
     def handle_stop_behavior_service(self, request, response):

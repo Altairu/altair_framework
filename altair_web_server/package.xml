@@ -8,6 +8,8 @@
   <license>MIT</license>
 
   <depend>rclpy</depend>
+  <depend>std_msgs</depend>
+  <depend>sensor_msgs</depend>
   <depend>altair_interfaces</depend>
   <depend>can_msgs</depend>
 

@@ -8,13 +8,15 @@ log/
 *.pyc
 *.pyo
 *.pyd
+*.egg-info/
 .pytest_cache/
 .mypy_cache/
 
-# Custom user behaviors (Blockly generated)
-altair_core/user_behaviors/blockly_behavior.py
+# Runtime / Local configuration
+network_config.json
+.antigravitycli/
 
-# OS generated files
+# OS & Editor generated files
 .DS_Store
 Thumbs.db
 wiki_setup/

@@ -15,16 +15,24 @@ from pydantic import BaseModel
 import rclpy
 from rclpy.node import Node
 from rclpy.callback_groups import ReentrantCallbackGroup
-from ament_index_python.packages import PackageNotFoundError, get_package_share_directory
+from altair_core.paths import (
+    get_config_path,
+    get_frontend_dir as resolve_frontend_dir,
+    get_network_config_path,
+    get_profiles_dir as resolve_profiles_dir,
+    get_user_behaviors_dir as resolve_user_behaviors_dir,
+)
 
 # ROS2 メッセージ・サービス
 from std_msgs.msg import String
+from sensor_msgs.msg import Joy
 from can_msgs.msg import Frame
 from altair_interfaces.msg import CanStatus, MddFeedback, MddCommand, ServoCommand, SolenoidCommand
 from altair_interfaces.srv import ConnectCan, ConnectEthCan, GetAvailablePorts, TriggerControl, StartBehavior
 from std_srvs.srv import Trigger
 
 app = FastAPI()
+
 
 # 接続中の WebSocket クライアント管理
 class ConnectionManager:
@@ -44,8 +52,8 @@ class ConnectionManager:
             try:
                 await connection.send_json(message)
             except Exception:
-                # 切れていたらスキップ
                 pass
+
 
 manager = ConnectionManager()
 
@@ -93,7 +101,7 @@ class WebServerROSNode(Node):
 
         # 汎用的に動的生成されたMDDフィードバックをキャプチャするサブスクライバ
         self.mdd_feedbacks = {}
-        
+
         # サービスクライアントの作成
         self.get_ports_client = self.create_client(GetAvailablePorts, '/altair/can/get_ports')
         self.connect_can_client = self.create_client(ConnectCan, '/altair/can/connect')
@@ -105,7 +113,8 @@ class WebServerROSNode(Node):
         # パブリッシャ辞書 (ブラウザからの操作指令をROS2トピックへ投げる用)
         self.publishers_dict = {}
 
-        # ゲームコントローラー状態のパブリッシャ
+        # ゲームコントローラー状態のパブリッシャ (ROS2標準 Joy & 従来互換 JSON)
+        self.joy_pub = self.create_publisher(Joy, '/altair/joy', 10)
         self.gamepad_pub = self.create_publisher(String, '/altair/gamepad/state', 10)
 
         # モジュール構成同期用パブリッシャ (操縦PCからNUCへの同期用)
@@ -127,12 +136,12 @@ class WebServerROSNode(Node):
         try:
             with open(config_path, 'r', encoding='utf-8') as f:
                 config = json.load(f)
-            
+
             for module in config.get('modules', []):
                 if module['type'] == 'mdd':
                     name = module['name']
                     topic = f"/altair/{name}/feedback"
-                    
+
                     if topic not in self.mdd_feedbacks:
                         self.get_logger().info(f"[WebNode] MDDフィードバック購読を開始: {topic}")
                         self.mdd_feedbacks[topic] = self.create_subscription(
@@ -147,7 +156,6 @@ class WebServerROSNode(Node):
         def callback(msg):
             if not manager.active_connections:
                 return
-            # WebSocket経由でブラウザに配信
             telemetry_data = {
                 "type": "mdd_feedback",
                 "name": name,
@@ -159,7 +167,6 @@ class WebServerROSNode(Node):
                     "speeds": [float(x) for x in msg.speeds]
                 }
             }
-            # asyncio イベントループを通じて WebSocket 送信を実行
             asyncio.run_coroutine_threadsafe(
                 manager.broadcast(telemetry_data),
                 self.loop
@@ -217,50 +224,15 @@ class WebServerROSNode(Node):
         asyncio.run_coroutine_threadsafe(manager.broadcast(log_data), self.loop)
 
     def get_config_path(self):
-        """
-        モジュール構成ファイルの絶対パスを探索して返す
-        """
-        candidates = []
-
-        # 明示指定があれば最優先
-        env_path = os.getenv('ALTAIR_MODULES_CONFIG')
-        if env_path:
-            candidates.append(Path(env_path).expanduser())
-
-        # 開発時の代表的な相対パス・ソースツリー優先
-        cwd = Path.cwd()
-        candidates.append(cwd / 'altair_core' / 'config' / 'modules_config.json')
-        candidates.append(cwd / 'config' / 'modules_config.json')
-
-        # モジュールファイル基準の相対パス
-        this_file = Path(__file__).resolve()
-        candidates.append(this_file.parent.parent / 'config' / 'modules_config.json')
-
-        # ワークスペース内開発時の altair_core 基準の相対パス
-        if len(this_file.parents) >= 3:
-            candidates.append(this_file.parents[2] / 'altair_core' / 'config' / 'modules_config.json')
-        if len(this_file.parents) >= 5:
-            candidates.append(this_file.parents[4] / 'altair_core' / 'config' / 'modules_config.json')
-
-        # ROS2インストール先 (share/altair_core/config)
-        try:
-            share_dir = Path(get_package_share_directory('altair_core'))
-            candidates.append(share_dir / 'config' / 'modules_config.json')
-        except PackageNotFoundError:
-            pass
-
-        for path in candidates:
-            if path.exists():
-                return str(path)
-
-        return "modules_config.json"
+        """モジュール構成ファイルの絶対パスを探索して返す"""
+        return get_config_path()
 
     # --- コマンドパブリッシュヘルパー ---
     def publish_mdd_cmd(self, name, targets):
         topic = f"/altair/{name}/cmd"
         if topic not in self.publishers_dict:
             self.publishers_dict[topic] = self.create_publisher(MddCommand, topic, 10)
-        
+
         msg = MddCommand()
         msg.targets = [float(t) for t in targets]
         self.publishers_dict[topic].publish(msg)
@@ -269,7 +241,7 @@ class WebServerROSNode(Node):
         topic = f"/altair/{name}/cmd"
         if topic not in self.publishers_dict:
             self.publishers_dict[topic] = self.create_publisher(ServoCommand, topic, 10)
-        
+
         msg = ServoCommand()
         msg.angles = [int(a) for a in angles]
         self.publishers_dict[topic].publish(msg)
@@ -278,7 +250,7 @@ class WebServerROSNode(Node):
         topic = f"/altair/{name}/cmd"
         if topic not in self.publishers_dict:
             self.publishers_dict[topic] = self.create_publisher(SolenoidCommand, topic, 10)
-        
+
         msg = SolenoidCommand()
         msg.valves = [bool(v) for v in valves]
         self.publishers_dict[topic].publish(msg)
@@ -287,35 +259,44 @@ class WebServerROSNode(Node):
 # --- グローバルなROSノードインスタンスの初期化 ---
 ros_node: WebServerROSNode = None
 
+
 class ConnectRequest(BaseModel):
     port: str
     auto_connect: bool
+
 
 class ConnectEthRequest(BaseModel):
     target_ip: str = "192.168.2.123"
     target_port: int = 5000
     can_channel: str = "can1"
 
+
 class ChannelEthRequest(BaseModel):
     can_channel: str = "can1"
+
 
 class StartBehaviorRequest(BaseModel):
     behavior_name: str
 
+
 class BehaviorFileRequest(BaseModel):
     name: str
+
 
 class MddCmdRequest(BaseModel):
     name: str
     targets: list[float]
 
+
 class ServoCmdRequest(BaseModel):
     name: str
     angles: list[int]
 
+
 class SolenoidCmdRequest(BaseModel):
     name: str
     valves: list[bool]
+
 
 class SaveBlocklyRequest(BaseModel):
     code: str
@@ -324,8 +305,8 @@ class SaveBlocklyRequest(BaseModel):
 
 def load_saved_eth_config() -> dict:
     default_cfg = {"target_ip": "192.168.2.123", "target_port": 5000, "can_channel": "can1"}
-    config_file = "network_config.json"
-    if os.path.exists(config_file):
+    config_file = get_network_config_path()
+    if config_file.exists():
         try:
             with open(config_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -340,7 +321,7 @@ def load_saved_eth_config() -> dict:
 
 
 def save_eth_config(cfg: dict):
-    config_file = "network_config.json"
+    config_file = get_network_config_path()
     try:
         with open(config_file, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=2, ensure_ascii=False)
@@ -355,32 +336,34 @@ async def get_ports():
     """NUC側の利用可能なシリアルポート一覧を取得"""
     if not ros_node.get_ports_client.wait_for_service(timeout_sec=0.5):
         return {"ports": []}
-    
+
     req = GetAvailablePorts.Request()
     future = ros_node.get_ports_client.call_async(req)
-    
+
     while not future.done():
         await asyncio.sleep(0.05)
-    
+
     res = future.result()
     return {"ports": list(res.ports)}
+
 
 @app.post("/api/connect")
 async def connect_can(req_data: ConnectRequest):
     """シリアルポート接続（手動/自動）の指示"""
     if not ros_node.connect_can_client.wait_for_service(timeout_sec=1.0):
         raise HTTPException(status_code=503, detail="NUCのCAN接続サービスが利用できません。")
-    
+
     req = ConnectCan.Request()
     req.port = req_data.port
     req.auto_connect = req_data.auto_connect
-    
+
     future = ros_node.connect_can_client.call_async(req)
     while not future.done():
         await asyncio.sleep(0.05)
-        
+
     res = future.result()
     return {"success": res.success, "message": res.message}
+
 
 @app.get("/api/eth_can/config")
 async def get_eth_can_config():
@@ -389,6 +372,7 @@ async def get_eth_can_config():
     if ros_node:
         ros_node.active_can_channel = cfg["can_channel"]
     return cfg
+
 
 @app.post("/api/eth_can/connect")
 async def connect_eth_can(req_data: ConnectEthRequest):
@@ -429,6 +413,7 @@ async def connect_eth_can(req_data: ConnectEthRequest):
     res = future.result()
     return {"success": res.success, "message": res.message}
 
+
 @app.post("/api/eth_can/channel")
 async def set_eth_can_channel(req_data: ChannelEthRequest):
     """Ethernet-CAN の使用CANチャンネル (CAN1 / CAN2 / CAN1+2) を即時切替"""
@@ -454,6 +439,7 @@ async def set_eth_can_channel(req_data: ChannelEthRequest):
 
     label = "CAN2" if can_channel == "can2" else ("CAN1+2" if can_channel == "both" else "CAN1")
     return {"success": True, "message": f"使用CANチャンネルを {label} に設定しました。"}
+
 
 @app.post("/api/eth_can/disconnect")
 async def disconnect_eth_can():
@@ -482,65 +468,56 @@ async def disconnect_eth_can():
 
     return {"success": False, "message": "Ethernet-CAN ブリッジサービスが利用できません。"}
 
+
 @app.post("/api/start_control")
 async def start_control():
     """パラメータ送信と制御開始のトリガー"""
     if not ros_node.start_control_client.wait_for_service(timeout_sec=1.0):
         raise HTTPException(status_code=503, detail="Module Managerの制御開始サービスが利用できません。")
-    
+
     req = TriggerControl.Request()
     future = ros_node.start_control_client.call_async(req)
     while not future.done():
         await asyncio.sleep(0.05)
-        
+
     res = future.result()
     return {"success": res.success, "message": res.message}
+
 
 @app.post("/api/behavior/start")
 async def start_behavior(req_data: StartBehaviorRequest):
     """Python動作プログラムの起動"""
     if not ros_node.start_behavior_client.wait_for_service(timeout_sec=1.0):
         raise HTTPException(status_code=503, detail="Behavior Runnerが起動していません。")
-    
+
     req = StartBehavior.Request()
     req.behavior_name = req_data.behavior_name
-    
+
     future = ros_node.start_behavior_client.call_async(req)
     while not future.done():
         await asyncio.sleep(0.05)
-        
+
     res = future.result()
     return {"success": res.success, "message": res.message}
+
 
 @app.post("/api/behavior/stop")
 async def stop_behavior():
     """Python動作プログラムの停止"""
     if not ros_node.stop_behavior_client.wait_for_service(timeout_sec=1.0):
         raise HTTPException(status_code=503, detail="Behavior Runnerが起動していません。")
-    
+
     req = Trigger.Request()
     future = ros_node.stop_behavior_client.call_async(req)
     while not future.done():
         await asyncio.sleep(0.05)
-        
+
     res = future.result()
     return {"success": res.success, "message": res.message}
 
 
 def get_user_behaviors_dir() -> str:
-    paths = [
-        "c:/Users/106no/Documents/GitHub/altair_framework/altair_core/user_behaviors",
-        "./altair_core/user_behaviors",
-        "user_behaviors",
-        "./user_behaviors",
-        os.path.join(os.path.expanduser('~'), "ros2_ws/src/altair_framework/altair_core/user_behaviors"),
-        "./src/altair_framework/altair_core/user_behaviors"
-    ]
-    for p in paths:
-        if os.path.isdir(p):
-            return os.path.abspath(p)
-    os.makedirs("user_behaviors", exist_ok=True)
-    return os.path.abspath("user_behaviors")
+    return str(resolve_user_behaviors_dir())
 
 
 @app.post("/api/behavior/save_blockly")
@@ -551,16 +528,16 @@ async def save_blockly(req_data: SaveBlocklyRequest):
     try:
         with open(dest_file, "w", encoding="utf-8") as f:
             f.write(req_data.code)
-            
-        # XMLレイアウトデータも同じフォルダに保存
+
         if req_data.xml:
             xml_file = os.path.join(dest_dir, "blockly_workspace.xml")
             with open(xml_file, "w", encoding="utf-8") as f:
                 f.write(req_data.xml)
-                
+
         return {"success": True, "message": "Blocklyコードとレイアウトを正常に保存しました。"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"保存に失敗しました: {str(e)}")
+
 
 @app.get("/api/behavior/list")
 async def list_behaviors():
@@ -575,6 +552,7 @@ async def list_behaviors():
         return {"success": True, "behaviors": behaviors}
     except Exception as e:
         return {"success": False, "behaviors": [], "error": str(e)}
+
 
 @app.post("/api/behavior/create")
 async def create_behavior(req_data: BehaviorFileRequest):
@@ -601,12 +579,13 @@ import sys
 import os
 import rclpy
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "altair_core"))
 from altair_core.base_behavior import AltairBehavior
 
 
 class CustomBehavior(AltairBehavior):
     def on_init(self):
+        self.set_state("MAIN")
         self.get_logger().info("{safe_name} を初期化しました。")
 
     def loop(self):
@@ -630,6 +609,7 @@ if __name__ == "__main__":
     except Exception as e:
         return {"success": False, "message": f"スクリプト作成失敗: {e}"}
 
+
 @app.post("/api/behavior/delete")
 async def delete_behavior(req_data: BehaviorFileRequest):
     """指定された動作スクリプトを削除"""
@@ -645,6 +625,7 @@ async def delete_behavior(req_data: BehaviorFileRequest):
         return {"success": True, "message": f"スクリプト '{safe_name}' を削除しました。"}
     except Exception as e:
         return {"success": False, "message": f"削除失敗: {e}"}
+
 
 @app.post("/api/behavior/open_folder")
 async def open_behavior_folder():
@@ -662,6 +643,7 @@ async def open_behavior_folder():
     except Exception as e:
         return {"success": False, "message": f"フォルダーを開けませんでした ({dest_dir}): {e}"}
 
+
 @app.get("/api/behavior/get_blockly_workspace")
 async def get_blockly_workspace():
     """保存されているBlocklyのブロックレイアウト(XML文字列)を取得"""
@@ -673,27 +655,16 @@ async def get_blockly_workspace():
                 return {"success": True, "xml": f.read()}
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"読み込みに失敗しました: {str(e)}")
-            
-    # まだ保存されていない場合は初期のエントリポイントのみを置いたデフォルト状態を返す
+
     default_xml = '<xml xmlns="https://developers.google.com/blockly/xml"><block type="event_macro" id="initial_entry" x="30" y="30"></block></xml>'
     return {"success": True, "xml": default_xml}
+
 
 # --- プロファイル管理 (REST API) ---
 
 def get_profiles_dir():
-    # プロファイル保存ディレクトリの探索
-    paths = [
-        "c:/Users/106no/Documents/GitHub/altair_framework/altair_core/profiles",
-        "./altair_core/profiles",
-        os.path.join(os.path.expanduser('~'), 'ros2_ws/src/altair_framework/altair_core/profiles'),
-        "./src/altair_framework/altair_core/profiles",
-        "profiles"
-    ]
-    for p in paths:
-        if os.path.exists(p):
-            return p
-    os.makedirs("profiles", exist_ok=True)
-    return "profiles"
+    return str(resolve_profiles_dir())
+
 
 @app.get("/api/profiles")
 async def list_profiles():
@@ -705,20 +676,20 @@ async def list_profiles():
             profiles.append(f.replace('.json', ''))
     return {"profiles": profiles}
 
+
 @app.post("/api/profiles/load")
 async def load_profile(name: str):
     """指定されたプロファイルをロードして modules_config.json を上書き"""
     pdir = get_profiles_dir()
     src = os.path.join(pdir, f"{name}.json")
-    
+
     if not os.path.exists(src):
         raise HTTPException(status_code=404, detail="プロファイルが見つかりません。")
 
     dest = ros_node.get_config_path()
     try:
         shutil.copy2(src, dest)
-        
-        # ロードしたプロファイルの設定をNUC側へパブリッシュして同期する
+
         with open(dest, 'r', encoding='utf-8') as f:
             config_data = json.load(f)
         sync_msg = String()
@@ -729,7 +700,6 @@ async def load_profile(name: str):
             req = Trigger.Request()
             std_srv.call_async(req)
 
-        # WebServerノード内のMDDサブスクライバも再構築
         ros_node.mdd_feedbacks.clear()
         ros_node.sync_mdd_subscriptions()
 
@@ -737,13 +707,14 @@ async def load_profile(name: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"適用に失敗しました: {str(e)}")
 
+
 @app.post("/api/profiles/save")
 async def save_profile(name: str):
     """現在のモジュール設定を新しいプロファイル名で保存"""
     dest_dir = get_profiles_dir()
     dest = os.path.join(dest_dir, f"{name}.json")
     src = ros_node.get_config_path()
-    
+
     if not os.path.exists(src):
         raise HTTPException(status_code=404, detail="現在の設定ファイルが見つかりません。")
 
@@ -753,12 +724,13 @@ async def save_profile(name: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"保存に失敗しました: {str(e)}")
 
+
 @app.post("/api/profiles/delete")
 async def delete_profile(name: str):
     """指定されたプロファイルを削除"""
     pdir = get_profiles_dir()
     target = os.path.join(pdir, f"{name}.json")
-    
+
     if not os.path.exists(target):
         raise HTTPException(status_code=404, detail="プロファイルが見つかりません。")
 
@@ -767,6 +739,7 @@ async def delete_profile(name: str):
         return {"success": True, "message": f"プロファイル '{name}' を削除しました。"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"削除に失敗しました: {str(e)}")
+
 
 @app.get("/api/config")
 async def get_current_config():
@@ -777,6 +750,7 @@ async def get_current_config():
             return json.load(f)
     return {"modules": []}
 
+
 @app.post("/api/config/update")
 async def update_current_config(config_data: dict):
     """ブラウザからの設定変更を受け取り、modules_config.json を直接上書き保存"""
@@ -784,19 +758,16 @@ async def update_current_config(config_data: dict):
     try:
         with open(dest, 'w', encoding='utf-8') as f:
             json.dump(config_data, f, indent=2, ensure_ascii=False)
-            
-        # 最新の設定をNUC側へパブリッシュして同期する
+
         sync_msg = String()
         sync_msg.data = json.dumps(config_data, ensure_ascii=False)
         ros_node.config_sync_pub.publish(sync_msg)
-            
-        # ROS2側にリロード要求を送る
+
         std_srv = ros_node.create_client(Trigger, '/altair/reload_config')
         if std_srv.wait_for_service(timeout_sec=1.0):
             req = Trigger.Request()
             std_srv.call_async(req)
 
-        # WebServerノード内のMDDサブスクライバも再構築
         ros_node.mdd_feedbacks.clear()
         ros_node.sync_mdd_subscriptions()
 
@@ -812,13 +783,12 @@ async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     try:
         while True:
-            # クライアントからの操作指示をリアルタイムで受信
             data = await websocket.receive_text()
             msg = json.loads(data)
-            
+
             msg_type = msg.get("type")
             name = msg.get("name")
-            
+
             if msg_type == "mdd_cmd":
                 ros_node.publish_mdd_cmd(name, msg.get("targets", []))
             elif msg_type == "servo_cmd":
@@ -826,10 +796,21 @@ async def websocket_endpoint(websocket: WebSocket):
             elif msg_type == "solenoid_cmd":
                 ros_node.publish_solenoid_cmd(name, msg.get("valves", []))
             elif msg_type == "gamepad_state":
+                axes_raw = msg.get("axes", [])
+                buttons_raw = msg.get("buttons", [])
+
+                # ROS 2 標準 sensor_msgs/msg/Joy トピックへ配信
+                joy_msg = Joy()
+                joy_msg.header.stamp = ros_node.get_clock().now().to_msg()
+                joy_msg.axes = [float(a) for a in axes_raw]
+                joy_msg.buttons = [1 if bool(b) else 0 for b in buttons_raw]
+                ros_node.joy_pub.publish(joy_msg)
+
+                # 後方互換用の JSON 文字列トピックへも配信
                 ros_msg = String()
                 ros_msg.data = json.dumps({
-                    "axes": msg.get("axes", []),
-                    "buttons": msg.get("buttons", [])
+                    "axes": axes_raw,
+                    "buttons": buttons_raw
                 })
                 ros_node.gamepad_pub.publish(ros_msg)
 
@@ -842,39 +823,11 @@ async def websocket_endpoint(websocket: WebSocket):
 # --- 静的フロントエンドファイルの配備 ---
 
 def get_frontend_dir():
-    candidates = []
+    return str(resolve_frontend_dir())
 
-    # 開発時の代表的な Windows ローカル Git パスを最優先
-    windows_git_path = Path("c:/Users/106no/Documents/GitHub/altair_framework/altair_web_server/frontend")
-    if windows_git_path.exists():
-        return str(windows_git_path)
-
-    cwd = Path.cwd()
-    candidates.append(cwd / 'altair_web_server' / 'frontend')
-    candidates.append(cwd / 'frontend')
-
-    # ROS2インストール先のshareディレクトリ
-    try:
-        share_dir = Path(get_package_share_directory('altair_web_server'))
-        candidates.append(share_dir / 'frontend')
-    except PackageNotFoundError:
-        pass
-
-    this_file = Path(__file__).resolve()
-    candidates.append(this_file.parents[1] / 'frontend')
-
-    if len(this_file.parents) >= 5:
-        candidates.append(this_file.parents[4] / 'altair_web_server' / 'frontend')
-
-    for path in candidates:
-        if path.exists():
-            return str(path)
-
-    return str(candidates[0]) if candidates else 'frontend'
 
 frontend_dir = get_frontend_dir()
 if os.path.exists(frontend_dir):
-    # html=True で / -> index.html と配下静的ファイルを一括配信
     app.mount("/", StaticFiles(directory=frontend_dir, html=True, follow_symlink=True), name="frontend")
 
 
@@ -884,26 +837,22 @@ def run_ros2_spin(node):
     executor.add_node(node)
     executor.spin()
 
+
 def main(args=None):
     rclpy.init(args=args)
 
-    # FastAPI用の明示的な非同期イベントループを作成
     loop = asyncio.new_event_loop()
 
-    # グローバルなROS2ノードの作成
     global ros_node
     ros_node = WebServerROSNode(loop)
 
-    # ROS2のスピンを別スレッドで開始
     ros_thread = threading.Thread(target=run_ros2_spin, args=(ros_node,))
     ros_thread.daemon = True
     ros_thread.start()
 
-    # サーバーのアクセス先IPアドレスを自動検出して表示
     import socket
     local_ips = []
     try:
-        # 外部接続可能なインターフェースから実IPを取得
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
         primary_ip = s.getsockname()[0]
@@ -928,7 +877,6 @@ def main(args=None):
         print(f"   WiFi / LAN: http://{ip}:8000/")
     print("=======================================================\n")
 
-    # Uvicorn サーバーの設定と明示的ループでの起動
     config = uvicorn.Config(
         app,
         host="0.0.0.0",
@@ -943,8 +891,8 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     finally:
-        # 終了処理
         rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()

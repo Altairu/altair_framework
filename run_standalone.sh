@@ -9,6 +9,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 cd "$SCRIPT_DIR"
 
 USE_USB=0
+USE_SIM=0
 TARGET_IP="192.168.2.123"
 TARGET_PORT="5000"
 CAN_CHANNEL="can1"
@@ -19,6 +20,7 @@ show_help() {
 
 オプション:
   --eth              Ethernet-CAN 変換モジュールを使用 (推奨 / デフォルト)
+  --sim              実機レス・仮想CANシミュレータモードで起動 (ハードウェア不要)
   --usb              従来の USB-to-CAN (slcand) を使用 (非推奨)
   --ip <IPアドレス>  Ethernet-CAN のIPアドレスを指定 (初期値: 192.168.2.123)
   --port <ポート>    Ethernet-CAN のポート番号を指定 (初期値: 5000)
@@ -31,10 +33,17 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --usb)
             USE_USB=1
+            USE_SIM=0
+            shift
+            ;;
+        --sim)
+            USE_SIM=1
+            USE_USB=0
             shift
             ;;
         --eth)
             USE_USB=0
+            USE_SIM=0
             shift
             ;;
         --ip)
@@ -63,21 +72,19 @@ done
 
 echo "====== Altair Framework: Starting Standalone System (Single PC) ======"
 
-# 1. 実行ファイル存在チェック & ソース更新検知による自動ビルド
+# 1. 実行ファイル存在チェック & ビルド
 SHOULD_BUILD=0
 if [ ! -f "install/setup.bash" ]; then
     SHOULD_BUILD=1
-elif [ "altair_interfaces/srv/ConnectEthCan.srv" -nt "install/setup.bash" ]; then
-    SHOULD_BUILD=1
-elif [ ! -f "install/altair_core/lib/altair_core/module_manager" ] || [ ! -f "install/altair_web_server/lib/altair_web_server/web_server_node" ]; then
+elif [ ! -f "install/altair_core/lib/altair_core/module_manager" ] || [ ! -f "install/altair_core/lib/altair_core/virtual_can_node" ] || [ ! -f "install/altair_web_server/lib/altair_web_server/web_server_node" ]; then
     SHOULD_BUILD=1
 elif [ "$USE_USB" -eq 1 ] && [ ! -f "install/altair_can_bridge/lib/altair_can_bridge/can_bridge_node" ]; then
     SHOULD_BUILD=1
-elif [ "$USE_USB" -eq 0 ] && [ ! -f "install/altair_eth_can_bridge/lib/altair_eth_can_bridge/eth_can_bridge_node" ]; then
+elif [ "$USE_USB" -eq 0 ] && [ "$USE_SIM" -eq 0 ] && [ ! -f "install/altair_eth_can_bridge/lib/altair_eth_can_bridge/eth_can_bridge_node" ]; then
     SHOULD_BUILD=1
-elif [ "$USE_USB" -eq 0 ] && [ "altair_eth_can_bridge/src/eth_can_bridge_node.cpp" -nt "install/altair_eth_can_bridge/lib/altair_eth_can_bridge/eth_can_bridge_node" ]; then
+elif [ "$USE_USB" -eq 0 ] && [ "$USE_SIM" -eq 0 ] && [ "altair_eth_can_bridge/src/eth_can_bridge_node.cpp" -nt "install/altair_eth_can_bridge/lib/altair_eth_can_bridge/eth_can_bridge_node" ]; then
     SHOULD_BUILD=1
-elif [ "$USE_USB" -eq 1 ] && [ "altair_can_bridge/src/can_bridge_node.cpp" -nt "install/altair_can_bridge/lib/altair_can_bridge/can_bridge_node" ]; then
+elif [ "altair_interfaces/srv/ConnectEthCan.srv" -nt "install/setup.bash" ]; then
     SHOULD_BUILD=1
 fi
 
@@ -106,12 +113,16 @@ cleanup() {
 trap cleanup SIGINT SIGTERM
 
 # 3. CANブリッジノードをバックグラウンドで起動
-if [ "$USE_USB" -eq 1 ]; then
+if [ "$USE_SIM" -eq 1 ]; then
+    echo "1. 仮想CANシミュレータノード (Virtual CAN Simulator) を起動中..."
+    ros2 run altair_core virtual_can_node &
+    PID_BRIDGE=$!
+elif [ "$USE_USB" -eq 1 ]; then
     echo "1. USB-to-CAN ブリッジノードを起動中..."
     ros2 run altair_can_bridge can_bridge_node &
     PID_BRIDGE=$!
 else
-    echo "1. Ethernet-CAN ブリッジノードを起動中 (${TARGET_IP}:${TARGET_PORT}, チャンネル: ${CAN_CHANNEL})..."
+    echo "1. Ethernet-CAN ブリッジノードを起動中 (${TARGET_IP}:${TARGET_PORT})..."
     ros2 run altair_eth_can_bridge eth_can_bridge_node \
         --ros-args \
         -p target_ip:="${TARGET_IP}" \

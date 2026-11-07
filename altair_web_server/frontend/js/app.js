@@ -2716,7 +2716,8 @@ import rclpy
 import os
 import time
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.extend([_root, os.path.join(_root, "altair_core")])
 from altair_core.base_behavior import AltairBehavior
 
 class BlocklyBehavior(AltairBehavior):
