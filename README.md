@@ -77,7 +77,8 @@ altair_framework/
 │           ├── base_module.py   # プラグイン基底クラス & @register_module デコレータ
 │           ├── mdd_module.py    # 4ch DCモータドライバ (MDD) プラグイン
 │           ├── servo_module.py  # 6ch サーボモータプラグイン
-│           └── solenoid_module.py # 12ch 電磁弁プラグイン
+│           ├── solenoid_module.py # 12ch 電磁弁プラグイン
+│           └── robomas_module.py # DJI RoboMaster モータープラグイン (M3508/M2006/GM6020)
 ├── altair_web_server/           # FastAPI サーバーと WebUI フロントエンド
 ├── profiles/                    # モジュール構成プロファイル保存ディレクトリ (*.json)
 ├── user_behaviors/              # 【拡張ポイント】自律動作プログラム (*.py) の配置場所
@@ -171,6 +172,8 @@ chmod +x altair_can_bridge/scripts/setup_slcan.sh
 | `/altair/<mdd_name>/feedback` | `altair_interfaces/msg/MddFeedback` | `module_manager` ➔ 外部 / Behavior<br>(100Hz / 10ms周期) | **MDD フィードバック（自己位置推定ノード等の入力用）**。<br>・`bool[4] limit_switches`: リミットスイッチ1〜4の状態<br>・`float32[4] angles`: エンコーダ現在角度 [deg]<br>・`float32[4] speeds`: エンコーダ現在速度 [rps]<br>・`uint8 error_code`: エラーフラグ<br>・`uint8 system_status`: `0`=Setup待機, `1`=制御実行中 |
 | `/altair/<servo_name>/cmd` | `altair_interfaces/msg/ServoCommand` | 外部 / Behavior ➔ `module_manager` | 6ch サーボ目標角度 (`uint8[6] angles`, `0`〜`180`度)。 |
 | `/altair/<solenoid_name>/cmd` | `altair_interfaces/msg/SolenoidCommand` | 外部 / Behavior ➔ `module_manager` | 12ch 電磁弁 ON/OFF 状態 (`bool[12] valves`)。 |
+| `/altair/<robomas_name>/cmd` | `altair_interfaces/msg/RobomasCommand` | 外部 / Behavior ➔ `module_manager` | RoboMaster モーター指令 (`mode`, `target`, `reset_zero`)。 |
+| `/altair/<robomas_name>/feedback` | `altair_interfaces/msg/RobomasFeedback` | `module_manager` ➔ Web UI / Behavior | RoboMaster モーター状態 (累積角度, 生角度, 回転数, 電流, 温度)。 |
 | `/altair/can/tx` | `can_msgs/msg/Frame` | `module_manager` ➔ CANブリッジ<br>(100Hz) | PC から CAN バスへ送出する生 CAN フレーム。 |
 | `/altair/can/rx` | `can_msgs/msg/Frame` | CANブリッジ ➔ `module_manager`<br>(100Hz) | CAN バスから受信した生 CAN フレーム。 |
 | `/altair/can/status` | `altair_interfaces/msg/CanStatus` | CANブリッジ ➔ `web_server`<br>(1Hz) | CAN ブリッジの接続状態・ポート名・ビットレート・エラー情報。 |
@@ -201,6 +204,9 @@ chmod +x altair_can_bridge/scripts/setup_slcan.sh
 | `0x240` *(BaseID+0x40)* | MCU ➔ PC | **MDD** | 4ch エンコーダ現在角度 (`int16` × 4, `0.1 deg` 単位) | 8 B | 10 ms |
 | `0x250` *(BaseID+0x50)* | MCU ➔ PC | **MDD** | 4ch エンコーダ現在速度 (`int16` × 4, `0.01 rps` 単位) | 8 B | 10 ms |
 | `0x300` *(BaseID)* | PC ➔ MCU | **Solenoid** | 12ch 電磁弁 ON/OFF ビットマップ (`uint16` リトルエンディアン) | 2 B | 10 ms |
+| `0x200` / `0x1FF` | PC ➔ ESC | **RoboMaster M3508 / M2006** | 4軸電流指令 (各軸 `int16` ビッグエンディアン, ID 1〜4 が `0x200` / ID 5〜8 が `0x1FF`) | 8 B | 10 ms |
+| `0x1FF` / `0x2FF` | PC ➔ Motor | **RoboMaster GM6020** | 4軸電圧指令 (各軸 `int16` ビッグエンディアン, ID 1〜4 が `0x1FF` / ID 5〜7 が `0x2FF`) | 8 B | 10 ms |
+| `0x201`〜`0x20B` | ESC / Motor ➔ PC | **RoboMaster 共通** | フィードバック (角度 `0〜8191`, 回転数 rpm, 電流, 温度, ビッグエンディアン) | 8 B | ~1 ms |
 
 ---
 
@@ -289,11 +295,13 @@ class MyBehavior(AltairBehavior):
 
 ## WebUI の機能
 
-* **Dashboard**: `mdd` / `servo` / `solenoid` のモジュールカードが動的に生成され、スライダーやトグルボタンで低遅延の直接操作が可能です。リミットスイッチの状態やエンコーダ実測データもリアルタイムで描画します。
-* **Profiles**: `profiles/*.json` のモジュール構成をワンクリックで切り替えます。JSONファイルとしてローカルにエクスポート / インポートが可能です。
-* **Controller**: スマートフォンやPCに接続されたゲームコントローラー（PS5等）を自動検出し、`/altair/joy` (`sensor_msgs/msg/Joy`) および `/altair/gamepad/state` へリアルタイム配信します。
-* **Programs**: `user_behaviors/` ディレクトリ内の任意の Python スクリプトを WebUI から動的に選択・起動・停止できます。スクリプト内の `print()` やエラー出力もリアルタイムでストリーミングされます。
-* **Automation**: Google Blockly を用いて、ブラウザ上でブロックを組み合わせて自動化マクロを作成して実行します。差動二輪・メカナム・3輪/4輪オムニのロボット運動学制御もサポートしています。
+* Dashboard: `mdd` / `servo` / `solenoid` / `robomas` のモジュールカードが動的に生成され、スライダーやトグルボタンで低遅延の直接操作が可能です。リミットスイッチの状態やエンコーダ実測データ、RoboMaster モーターの累積角度 / 回転数 / 電流 / 温度もリアルタイムで描画します。
+* モジュール追加時の初期値と CAN チャンネル: モジュール追加モーダルでは `MDD1` (`0x200`) / `Servo1` (`0x100`) / `SV1` (`0x300`) / `RM1` (モーター ID `1`) が初期値として設定されます。Ethernet-CAN 利用時は各モジュールごとに `can_channel` (`can1` / `can2` / `both` / 全体設定に従う) を設定できます。
+* RoboMaster 制御と `--sim` 対応: 制御モードは `current` / `voltage` / `speed_pid` / `position_pid` に対応し、PID 初期値は P のみ (`vel_kp=20.0`, `pos_kp=3.0`, I と D は `0.0`) です。`--sim` 起動時も `/altair/config_sync` を通じて `VirtualRobomasState` が構成を同期し、CAN TX フレームの送信およびフィードバックのシミュレーションが動作します。
+* Profiles: `profiles/*.json` のモジュール構成をワンクリックで切り替えます。JSONファイルとしてローカルにエクスポート / インポートが可能です。
+* Controller: スマートフォンやPCに接続されたゲームコントローラー（PS5等）を自動検出し、`/altair/joy` (`sensor_msgs/msg/Joy`) および `/altair/gamepad/state` へリアルタイム配信します。
+* Programs: `user_behaviors/` ディレクトリ内の任意の Python スクリプトを WebUI から動的に選択・起動・停止できます。スクリプト内の `print()` やエラー出力もリアルタイムでストリーミングされます。
+* Automation: Google Blockly を用いて、ブラウザ上でブロックを組み合わせて自動化マクロを作成して実行します。差動二輪・メカナム・3輪/4輪オムニのロボット運動学制御や RoboMaster 制御ブロックもサポートしています。
 
 ---
 
