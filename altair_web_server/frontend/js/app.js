@@ -1105,7 +1105,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const mode = rm.control_mode || (model === "gm6020" ? "voltage" : "current");
     const meta = getRobomasModeMeta(mode, model);
     const velKp = rm.vel_kp ?? 20.0;
-    const velKi = rm.vel_ki ?? 0.5;
+    const velKi = rm.vel_ki ?? 0.0;
     const velKd = rm.vel_kd ?? 0.0;
     const posKp = rm.pos_kp ?? 3.0;
     const posKi = rm.pos_ki ?? 0.0;
@@ -2425,7 +2425,7 @@ document.addEventListener("DOMContentLoaded", () => {
             mod.robomas = {
               motor_model: rmModel,
               control_mode: rmMode,
-              vel_kp: 20.0, vel_ki: 0.5, vel_kd: 0.0,
+              vel_kp: 20.0, vel_ki: 0.0, vel_kd: 0.0,
               pos_kp: 3.0, pos_ki: 0.0, pos_kd: 0.0,
               max_speed_rpm: 300.0,
               max_output: rmModel === "gm6020" && rmMode !== "current" ? 25000.0 : 10000.0,
@@ -2460,7 +2460,7 @@ document.addEventListener("DOMContentLoaded", () => {
         newMod.robomas = {
           motor_model: rmModel,
           control_mode: rmMode,
-          vel_kp: 20.0, vel_ki: 0.5, vel_kd: 0.0,
+          vel_kp: 20.0, vel_ki: 0.0, vel_kd: 0.0,
           pos_kp: 3.0, pos_ki: 0.0, pos_kd: 0.0,
           max_speed_rpm: 300.0,
           max_output: rmModel === "gm6020" && rmMode !== "current" ? 25000.0 : 10000.0,

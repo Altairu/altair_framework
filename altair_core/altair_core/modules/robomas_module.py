@@ -128,7 +128,7 @@ class RobomasModulePlugin(BaseModulePlugin):
             rm_cfg.get("control_mode", "voltage" if self.motor_model == "gm6020" else "current")
         ).lower()
         self.vel_kp = float(rm_cfg.get("vel_kp", 20.0))
-        self.vel_ki = float(rm_cfg.get("vel_ki", 0.5))
+        self.vel_ki = float(rm_cfg.get("vel_ki", 0.0))
         self.vel_kd = float(rm_cfg.get("vel_kd", 0.0))
         self.pos_kp = float(rm_cfg.get("pos_kp", 3.0))
         self.pos_ki = float(rm_cfg.get("pos_ki", 0.0))
