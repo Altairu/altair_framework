@@ -150,7 +150,11 @@ class ModuleManager(Node):
         for module_cfg in self.config.get('modules', []):
             name = module_cfg['name']
             mtype = module_cfg['type']
-            base_id = int(str(module_cfg['base_id']), 16)
+            raw_id = str(module_cfg.get('base_id', '0')).strip()
+            try:
+                base_id_disp = hex(int(raw_id, 16)) if raw_id.lower().startswith("0x") else raw_id
+            except ValueError:
+                base_id_disp = raw_id
 
             plugin_cls = get_module_plugin_class(mtype)
             if plugin_cls is None:
@@ -160,7 +164,7 @@ class ModuleManager(Node):
             plugin = plugin_cls(self, module_cfg)
             plugin.setup_ros_interfaces()
             self.module_plugins[name] = plugin
-            self.get_logger().info(f"モジュールプラグインを登録: {name} (タイプ: {mtype}, BaseID: {hex(base_id)})")
+            self.get_logger().info(f"モジュールプラグインを登録: {name} (タイプ: {mtype}, ID: {base_id_disp})")
 
     def get_config_path(self):
         """モジュール構成ファイルの絶対パスを探索して返す"""

@@ -15,6 +15,7 @@ from altair_interfaces.msg import CanStatus
 from altair_interfaces.srv import ConnectCan, ConnectEthCan, GetAvailablePorts
 from altair_core.paths import get_config_path
 from altair_core.kinematics import ChassisKinematics
+from altair_core.modules.robomas_module import parse_robomas_motor_id, get_robomas_can_ids
 
 try:
     import tf2_ros
@@ -104,6 +105,39 @@ class VirtualSolenoidState:
         self.valves = [False] * 12
 
 
+class VirtualRobomasState:
+    """仮想 RoboMaster モーター1台分の内部状態"""
+    def __init__(self, name: str, motor_model: str, motor_id: int, can_channel: str = ""):
+        self.name = name
+        self.motor_model = motor_model
+        self.motor_id = motor_id
+        self.can_channel = can_channel
+        self.tx_can_id, self.slot_idx, self.rx_can_id = get_robomas_can_ids(motor_model, motor_id)
+        self.cmd_val = 0
+        self.angle_deg = 0.0
+        self.raw_angle = 0
+        self.speed_rpm = 0.0
+        self.torque_current = 0
+        self.temperature = 32
+
+    def step(self, dt: float):
+        if self.motor_model == "gm6020":
+            max_rpm = 320.0
+            max_cmd = 30000.0
+        elif self.motor_model == "m2006":
+            max_rpm = 500.0
+            max_cmd = 16384.0
+        else:
+            max_rpm = 482.0
+            max_cmd = 16384.0
+
+        target_rpm = (float(self.cmd_val) / max_cmd) * max_rpm
+        self.speed_rpm += (target_rpm - self.speed_rpm) * min(1.0, dt * 15.0)
+        self.angle_deg += (self.speed_rpm / 60.0) * 360.0 * dt
+        self.raw_angle = int(((self.angle_deg % 360.0) / 360.0) * 8192.0) & 0x1FFF
+        self.torque_current = int(max(-16384, min(16384, self.cmd_val)))
+
+
 class VirtualCanNode(Node):
     """
     実機レス（ハードウェアなし）で Altair Framework 全体の動作確認・デバッグを可能にする
@@ -144,6 +178,9 @@ class VirtualCanNode(Node):
         self.create_subscription(
             Empty, "/altair/sim/reset_pose", self.on_reset_pose, 10, callback_group=self.callback_group
         )
+        self.create_subscription(
+            String, "/altair/config_sync", self.on_config_sync, 10, callback_group=self.callback_group
+        )
 
         # WebUI からの接続要求サービス応答
         self.create_service(GetAvailablePorts, "/altair/can/get_ports", self.handle_get_ports)
@@ -154,6 +191,7 @@ class VirtualCanNode(Node):
         self.virtual_mdds: Dict[int, VirtualMddState] = {}
         self.virtual_servos: Dict[int, VirtualServoState] = {}
         self.virtual_solenoids: Dict[int, VirtualSolenoidState] = {}
+        self.virtual_robomas: List[VirtualRobomasState] = []
 
         # 運動学 & オドメトリ状態
         self.kinematics: Optional[ChassisKinematics] = None
@@ -182,6 +220,11 @@ class VirtualCanNode(Node):
         )
 
     def _load_configuration(self):
+        self.virtual_mdds.clear()
+        self.virtual_servos.clear()
+        self.virtual_solenoids.clear()
+        self.virtual_robomas.clear()
+
         config_path = get_config_path()
         if os.path.exists(config_path):
             try:
@@ -193,8 +236,20 @@ class VirtualCanNode(Node):
                 for mod in cfg.get("modules", []):
                     mod_type = mod.get("type")
                     mod_name = mod.get("name", "Module")
-                    base_id_str = str(mod.get("base_id", "0x200"))
-                    base_id = int(base_id_str, 16) if base_id_str.startswith("0x") else int(base_id_str)
+                    base_id_str = str(mod.get("base_id", "0x200")).strip()
+                    mod_ch = str(mod.get("can_channel", "")).strip().lower()
+
+                    if mod_type == "robomas":
+                        rm_cfg = mod.get("robomas") or {}
+                        model = str(rm_cfg.get("motor_model", "m3508")).lower()
+                        mid = parse_robomas_motor_id(base_id_str, model)
+                        if mid is not None:
+                            self.virtual_robomas.append(
+                                VirtualRobomasState(mod_name, model, mid, mod_ch)
+                            )
+                        continue
+
+                    base_id = int(base_id_str, 16) if base_id_str.lower().startswith("0x") else int(base_id_str)
 
                     if mod_type == "mdd":
                         self.virtual_mdds[base_id] = VirtualMddState(mod_name, base_id)
@@ -209,13 +264,19 @@ class VirtualCanNode(Node):
                 self.get_logger().error(f"シミュレータ設定の読み込みに失敗しました: {e}")
 
         # デフォルト MDD のフォールバック
-        if not self.virtual_mdds:
+        if not self.virtual_mdds and not self.virtual_robomas:
             self.virtual_mdds[0x200] = VirtualMddState("MDD1", 0x200)
             self.drive_mdd_base_id = 0x200
         if not self.virtual_servos:
             self.virtual_servos[0x100] = VirtualServoState("SERVO1", 0x100)
         if not self.virtual_solenoids:
             self.virtual_solenoids[0x300] = VirtualSolenoidState("VALVE1", 0x300)
+
+    def on_config_sync(self, msg: String):
+        """WebUI でのモジュール構成変更をシミュレータ側へ即時反映する"""
+        _ = msg
+        self._load_configuration()
+        self.get_logger().info("[VirtualCAN] モジュール設定を再読み込みしました。")
 
     def handle_get_ports(self, request, response):
         _ = request
@@ -301,6 +362,21 @@ class VirtualCanNode(Node):
                     sol.valves[8 + i] = bool((b1 >> i) & 1)
                 return
 
+        # 2.5 RoboMaster モーター (0x200 / 0x1FF / 0x2FF)
+        if can_id in (0x200, 0x1FF, 0x2FF) and frame.dlc >= 8 and self.virtual_robomas:
+            tx_ch = (frame.header.frame_id or "").strip().lower()
+            slots = struct.unpack(">hhhh", bytes(frame.data[:8]))
+            matched_rm = False
+            for rm in self.virtual_robomas:
+                if rm.tx_can_id != can_id:
+                    continue
+                if tx_ch in ("can1", "can2") and rm.can_channel in ("can1", "can2") and tx_ch != rm.can_channel:
+                    continue
+                rm.cmd_val = int(slots[rm.slot_idx])
+                matched_rm = True
+            if matched_rm:
+                return
+
         # 3. MDD モジュール
         base_id = can_id & 0xFF00
         if 0x200 <= can_id <= 0x2FF and base_id not in self.virtual_mdds:
@@ -367,6 +443,24 @@ class VirtualCanNode(Node):
             speed_frame.dlc = 8
             speed_frame.data = list(struct.pack("<hhhh", *speeds_int))
             self.can_rx_pub.publish(speed_frame)
+
+        # 仮想 RoboMaster モーター更新 & フィードバックフレーム (0x201..0x20B)
+        for rm in list(self.virtual_robomas):
+            rm.step(dt)
+            rm_frame = Frame()
+            rm_frame.header.stamp = now_msg
+            if rm.can_channel in ("can1", "can2"):
+                rm_frame.header.frame_id = rm.can_channel
+            rm_frame.id = rm.rx_can_id
+            rm_frame.dlc = 8
+            rm_frame.is_extended = False
+            rm_frame.is_rtr = False
+            spd_i16 = max(-32768, min(32767, int(round(rm.speed_rpm))))
+            cur_i16 = max(-32768, min(32767, int(rm.torque_current)))
+            rm_frame.data = list(
+                struct.pack(">HhhBB", rm.raw_angle, spd_i16, cur_i16, rm.temperature, 0)
+            )
+            self.can_rx_pub.publish(rm_frame)
 
         # 足回りオドメトリ積算
         drive_mdd = self.virtual_mdds.get(self.drive_mdd_base_id)
@@ -465,6 +559,17 @@ class VirtualCanNode(Node):
                     "valves": s.valves,
                 }
                 for s in self.virtual_solenoids.values()
+            ],
+            "robomas": [
+                {
+                    "name": rm.name,
+                    "model": rm.motor_model,
+                    "motor_id": rm.motor_id,
+                    "angle_deg": round(rm.angle_deg, 1),
+                    "speed_rpm": round(rm.speed_rpm, 1),
+                    "cmd": rm.cmd_val,
+                }
+                for rm in self.virtual_robomas
             ],
         }
         msg = String()

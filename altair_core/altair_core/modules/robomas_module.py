@@ -213,7 +213,12 @@ class RobomasModulePlugin(BaseModulePlugin):
         self.target = val
 
     def is_manually_active(self) -> bool:
-        return (not self.force_stop) and abs(self.target) > 0.0001
+        if self.force_stop:
+            return False
+        mode = self.mode_override if self.mode_override else self.control_mode
+        if mode == "position_pid" and abs(self.angle_deg) > 0.5:
+            return True
+        return abs(self.target) > 0.0001
 
     def compute_output(self, now_monotonic: float) -> int:
         if self.last_pid_time is None:
