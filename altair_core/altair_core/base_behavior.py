@@ -16,6 +16,7 @@ from altair_core.modules import (
     MddClient,
     ServoClient,
     SolenoidClient,
+    RobomasClient,
     discover_module_plugins,
     get_module_plugin_class,
 )

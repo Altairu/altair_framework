@@ -7,6 +7,7 @@ from altair_core.modules.base_module import BaseModulePlugin, MODULE_REGISTRY, r
 from altair_core.modules.mdd_module import MddClient, MddModulePlugin
 from altair_core.modules.servo_module import ServoClient, ServoModulePlugin
 from altair_core.modules.solenoid_module import SolenoidClient, SolenoidModulePlugin
+from altair_core.modules.robomas_module import RobomasClient, RobomasModulePlugin
 
 
 def discover_module_plugins():
@@ -40,4 +41,6 @@ __all__ = [
     "ServoModulePlugin",
     "SolenoidClient",
     "SolenoidModulePlugin",
+    "RobomasClient",
+    "RobomasModulePlugin",
 ]

@@ -20,6 +20,7 @@ from altair_core.paths import get_config_path
 from altair_core.kinematics import ChassisKinematics
 from altair_core.modules import BaseModulePlugin, discover_module_plugins, get_module_plugin_class
 from altair_core.modules.mdd_module import MddModulePlugin
+from altair_core.modules.robomas_module import RobomasModulePlugin
 
 
 class ModuleManager(Node):
@@ -170,10 +171,26 @@ class ModuleManager(Node):
         self.emergency_stopped = bool(msg.data)
         if self.emergency_stopped:
             self.is_running = False
+            sent_rm_zero = set()
             for plugin in self.module_plugins.values():
                 if isinstance(plugin, MddModulePlugin):
                     plugin.set_targets_direct([0.0, 0.0, 0.0, 0.0])
-            self.get_logger().warn("[E-STOP] 緊急停止信号を受信しました。全MDD出力を即時停止しました。")
+                elif isinstance(plugin, RobomasModulePlugin):
+                    plugin.stop_immediately()
+                    if plugin.tx_can_id is not None:
+                        key = (plugin.can_channel, plugin.tx_can_id)
+                        if key not in sent_rm_zero:
+                            sent_rm_zero.add(key)
+                            zf = Frame()
+                            zf.header.stamp = self.get_clock().now().to_msg()
+                            zf.header.frame_id = plugin.can_channel
+                            zf.id = plugin.tx_can_id
+                            zf.dlc = 8
+                            zf.is_extended = False
+                            zf.is_rtr = False
+                            zf.data = [0] * 8
+                            self.can_tx_pub.publish(zf)
+            self.get_logger().warn("[E-STOP] 緊急停止信号を受信しました。全MDD/RoboMaster出力を即時停止しました。")
             self.publish_ui_log("[E-STOP] 緊急停止信号を受信しました。")
         else:
             self.get_logger().info("[E-STOP] 緊急停止が解除されました。再開するには /altair/start_control を呼んでください。")
@@ -218,10 +235,42 @@ class ModuleManager(Node):
                 self.cmd_vel_active = False
 
         active_running = self.is_running and (not self.emergency_stopped)
+        now_monotonic = time.monotonic()
+        rm_groups = {}
+
         for plugin in self.module_plugins.values():
+            if isinstance(plugin, RobomasModulePlugin):
+                if plugin.tx_can_id is None:
+                    continue
+                should_send = active_running or (not self.emergency_stopped and plugin.is_manually_active())
+                out_val = plugin.compute_output(now_monotonic) if should_send else 0
+                if not should_send:
+                    plugin.output_cmd = 0
+                key = (plugin.can_channel, plugin.tx_can_id)
+                if key not in rm_groups:
+                    rm_groups[key] = ([0, 0, 0, 0], False)
+                slots, grp_send = rm_groups[key]
+                slots[plugin.slot_idx] = out_val
+                if should_send:
+                    rm_groups[key] = (slots, True)
+                continue
+
             frames = plugin.build_periodic_tx_frames(active_running)
             for frame in frames:
                 self.can_tx_pub.publish(frame)
+
+        for (mod_ch, tx_id), (slots, grp_send) in rm_groups.items():
+            if not grp_send:
+                continue
+            rm_frame = Frame()
+            rm_frame.header.stamp = self.get_clock().now().to_msg()
+            rm_frame.header.frame_id = mod_ch
+            rm_frame.id = tx_id
+            rm_frame.dlc = 8
+            rm_frame.is_extended = False
+            rm_frame.is_rtr = False
+            rm_frame.data = list(struct.pack(">hhhh", *slots))
+            self.can_tx_pub.publish(rm_frame)
 
     # --- 3. CAN ➔ ROS2 フィードバック変換処理 ---
     def handle_can_rx_callback(self, frame: Frame):
@@ -338,7 +387,10 @@ class ModuleManager(Node):
 
             # 非MDDカスタムプラグインで初期化フレームを持つものがあれば送出
             for plugin in self.module_plugins.values():
-                if not isinstance(plugin, MddModulePlugin):
+                if isinstance(plugin, RobomasModulePlugin):
+                    plugin.force_stop = False
+                    plugin.reset_pid()
+                elif not isinstance(plugin, MddModulePlugin):
                     for frame in plugin.build_init_frames():
                         self.can_tx_pub.publish(frame)
                         time.sleep(0.02)

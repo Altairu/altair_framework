@@ -27,7 +27,15 @@ from altair_core.paths import (
 from std_msgs.msg import String, Empty
 from sensor_msgs.msg import Joy
 from can_msgs.msg import Frame
-from altair_interfaces.msg import CanStatus, MddFeedback, MddCommand, ServoCommand, SolenoidCommand
+from altair_interfaces.msg import (
+    CanStatus,
+    MddFeedback,
+    MddCommand,
+    ServoCommand,
+    SolenoidCommand,
+    RobomasCommand,
+    RobomasFeedback,
+)
 from altair_interfaces.srv import ConnectCan, ConnectEthCan, GetAvailablePorts, TriggerControl, StartBehavior
 from std_srvs.srv import Trigger
 
@@ -156,6 +164,17 @@ class WebServerROSNode(Node):
                             self.make_mdd_feedback_callback(name), 10,
                             callback_group=self.callback_group
                         )
+                elif module['type'] == 'robomas':
+                    name = module['name']
+                    topic = f"/altair/{name}/feedback"
+
+                    if topic not in self.mdd_feedbacks:
+                        self.get_logger().info(f"[WebNode] RoboMasterフィードバック購読を開始: {topic}")
+                        self.mdd_feedbacks[topic] = self.create_subscription(
+                            RobomasFeedback, topic,
+                            self.make_robomas_feedback_callback(name), 10,
+                            callback_group=self.callback_group
+                        )
         except Exception as e:
             self.get_logger().error(f"MDDトピック同期失敗: {str(e)}")
 
@@ -172,6 +191,32 @@ class WebServerROSNode(Node):
                     "system_status": int(msg.system_status),
                     "angles": [float(x) for x in msg.angles],
                     "speeds": [float(x) for x in msg.speeds]
+                }
+            }
+            asyncio.run_coroutine_threadsafe(
+                manager.broadcast(telemetry_data),
+                self.loop
+            )
+        return callback
+
+    def make_robomas_feedback_callback(self, name):
+        def callback(msg):
+            if not manager.active_connections:
+                return
+            telemetry_data = {
+                "type": "robomas_feedback",
+                "name": name,
+                "data": {
+                    "raw_angle": int(msg.raw_angle),
+                    "single_angle_deg": float(msg.single_angle_deg),
+                    "angle_deg": float(msg.angle_deg),
+                    "speed_rpm": int(msg.speed_rpm),
+                    "torque_current": int(msg.torque_current),
+                    "current_a": float(msg.current_a),
+                    "temperature": int(msg.temperature),
+                    "output_cmd": int(msg.output_cmd),
+                    "target": float(msg.target),
+                    "control_mode": str(msg.control_mode),
                 }
             }
             asyncio.run_coroutine_threadsafe(
@@ -260,6 +305,17 @@ class WebServerROSNode(Node):
 
         msg = SolenoidCommand()
         msg.valves = [bool(v) for v in valves]
+        self.publishers_dict[topic].publish(msg)
+
+    def publish_robomas_cmd(self, name, target=0.0, mode="", reset_zero=False):
+        topic = f"/altair/{name}/cmd"
+        if topic not in self.publishers_dict:
+            self.publishers_dict[topic] = self.create_publisher(RobomasCommand, topic, 10)
+
+        msg = RobomasCommand()
+        msg.target = float(target)
+        msg.mode = str(mode or "")
+        msg.reset_zero = bool(reset_zero)
         self.publishers_dict[topic].publish(msg)
 
     def on_sim_state(self, msg: String):
@@ -836,6 +892,15 @@ async def websocket_endpoint(websocket: WebSocket):
                 ros_node.publish_servo_cmd(name, msg.get("angles", []))
             elif msg_type == "solenoid_cmd":
                 ros_node.publish_solenoid_cmd(name, msg.get("valves", []))
+            elif msg_type == "robomas_cmd":
+                ros_node.publish_robomas_cmd(
+                    name,
+                    target=msg.get("target", 0.0),
+                    mode=msg.get("mode", ""),
+                    reset_zero=False
+                )
+            elif msg_type == "robomas_reset_zero":
+                ros_node.publish_robomas_cmd(name, target=0.0, mode="", reset_zero=True)
             elif msg_type == "gamepad_state":
                 axes_raw = msg.get("axes", [])
                 buttons_raw = msg.get("buttons", [])

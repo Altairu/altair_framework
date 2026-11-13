@@ -16,6 +16,8 @@ set(msg_files
   "msg/MddCommand.msg"
   "msg/ServoCommand.msg"
   "msg/SolenoidCommand.msg"
+  "msg/RobomasCommand.msg"
+  "msg/RobomasFeedback.msg"
 )
 
 # カスタムサービスファイルの登録
