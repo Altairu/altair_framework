@@ -236,10 +236,13 @@ class ModuleManager(Node):
     def send_keepalive_to_mdds(self, mdd_modules):
         """他のMDDのパラメータ送信中に、既に制御開始したMDDがCAN受信タイムアウト(500ms)しないよう0x22xを送る"""
         for mod in mdd_modules:
+            name = mod['name']
             base_id = int(str(mod['base_id']), 16)
-            if self.mdd_param_confirmed.get(base_id, False) or self.mdd_param_sent_at.get(base_id, 0.0) > 0.0:
+            mod_ch = BaseModulePlugin.normalize_can_channel(mod.get('can_channel', ''))
+            if self.mdd_param_confirmed.get(name, False) or self.mdd_param_sent_at.get(name, 0.0) > 0.0:
                 frame = Frame()
                 frame.header.stamp = self.get_clock().now().to_msg()
+                frame.header.frame_id = mod_ch
                 frame.id = base_id + 0x20
                 frame.dlc = 8
                 frame.is_extended = False
@@ -248,7 +251,9 @@ class ModuleManager(Node):
                 self.can_tx_pub.publish(frame)
 
     def send_single_mdd_params(self, module, all_mdd_modules):
+        name = module['name']
         base_id = int(str(module['base_id']), 16)
+        mod_ch = BaseModulePlugin.normalize_can_channel(module.get('can_channel', ''))
         params = module.get('parameters', {})
 
         # 4つのモータ (m1〜m4) のゲイン・直径・方向を送信 (35ms間隔)
@@ -268,6 +273,7 @@ class ModuleManager(Node):
 
             frame = Frame()
             frame.header.stamp = self.get_clock().now().to_msg()
+            frame.header.frame_id = mod_ch
             frame.id = motor_id
             frame.dlc = 8
             frame.is_extended = False
@@ -293,6 +299,7 @@ class ModuleManager(Node):
 
         mode_frame = Frame()
         mode_frame.header.stamp = self.get_clock().now().to_msg()
+        mode_frame.header.frame_id = mod_ch
         mode_frame.id = base_id + 0x10
         mode_frame.dlc = 4
         mode_frame.is_extended = False
@@ -300,13 +307,14 @@ class ModuleManager(Node):
         mode_frame.data = mode_payload
         self.can_tx_pub.publish(mode_frame)
 
-        self.mdd_param_sent_at[base_id] = time.monotonic()
+        self.mdd_param_sent_at[name] = time.monotonic()
         self.get_logger().info(f"モード設定送信: {module['name']} (ID:{hex(base_id + 0x10)}) モード={modes}")
         time.sleep(0.040)
 
         # 起動直後のマイコンのCAN受信タイムアウト防止用として初期目標値(0)を即座に送信
         zero_frame = Frame()
         zero_frame.header.stamp = self.get_clock().now().to_msg()
+        zero_frame.header.frame_id = mod_ch
         zero_frame.id = base_id + 0x20
         zero_frame.dlc = 8
         zero_frame.is_extended = False
@@ -344,17 +352,17 @@ class ModuleManager(Node):
                 return response
 
             for mod in mdd_modules:
-                base_id = int(str(mod['base_id']), 16)
-                self.mdd_param_confirmed[base_id] = False
-                self.mdd_param_sent_at[base_id] = 0.0
-                if base_id in self.mdd_feedback_cache:
-                    self.mdd_feedback_cache[base_id]['system_status'] = 0
+                name = mod['name']
+                self.mdd_param_confirmed[name] = False
+                self.mdd_param_sent_at[name] = 0.0
+                if name in self.mdd_feedback_cache:
+                    self.mdd_feedback_cache[name]['system_status'] = 0
 
             max_rounds = 6
             for round_num in range(1, max_rounds + 1):
                 pending_mdds = [
                     mod for mod in mdd_modules
-                    if not self.mdd_param_confirmed.get(int(str(mod['base_id']), 16), False)
+                    if not self.mdd_param_confirmed.get(mod['name'], False)
                 ]
                 if not pending_mdds:
                     break
@@ -369,18 +377,18 @@ class ModuleManager(Node):
 
                 wait_start = time.monotonic()
                 while (time.monotonic() - wait_start) < 0.40:
-                    if all(self.mdd_param_confirmed.get(int(str(m['base_id']), 16), False) for m in mdd_modules):
+                    if all(self.mdd_param_confirmed.get(m['name'], False) for m in mdd_modules):
                         break
                     self.send_keepalive_to_mdds(mdd_modules)
                     time.sleep(0.040)
 
-                if all(self.mdd_param_confirmed.get(int(str(m['base_id']), 16), False) for m in mdd_modules):
+                if all(self.mdd_param_confirmed.get(m['name'], False) for m in mdd_modules):
                     break
 
             unconfirmed_mdds = [
                 f"{m['name']}({m['base_id']})"
                 for m in mdd_modules
-                if not self.mdd_param_confirmed.get(int(str(m['base_id']), 16), False)
+                if not self.mdd_param_confirmed.get(m['name'], False)
             ]
             confirmed_count = len(mdd_modules) - len(unconfirmed_mdds)
 

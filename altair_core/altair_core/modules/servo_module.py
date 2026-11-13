@@ -64,6 +64,7 @@ class ServoModulePlugin(BaseModulePlugin):
 
         frame = Frame()
         frame.header.stamp = self.node.get_clock().now().to_msg()
+        frame.header.frame_id = self.can_channel
         frame.id = self.base_id
         frame.dlc = 6
         frame.is_extended = False

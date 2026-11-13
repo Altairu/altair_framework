@@ -33,8 +33,26 @@ class BaseModulePlugin:
         self.name: str = module_config["name"]
         base_id_raw = module_config.get("base_id", "0x000")
         self.base_id: int = int(base_id_raw, 16) if isinstance(base_id_raw, str) else int(base_id_raw)
+        self.can_channel: str = self.normalize_can_channel(module_config.get("can_channel", ""))
         self._subscriptions = []
         self._publishers = []
+
+    @staticmethod
+    def normalize_can_channel(ch) -> str:
+        val = str(ch or "").strip().lower()
+        if val in ("can1", "can2", "both"):
+            return val
+        return ""
+
+    def matches_rx_channel(self, frame: Frame) -> bool:
+        """
+        受信フレームのチャンネルが自モジュールの設定と一致するか判定する。
+        SocketCAN ("can0") や未指定の場合は互換性維持のため常に一致とみなす。
+        """
+        frame_ch = (frame.header.frame_id or "").strip().lower()
+        if frame_ch in ("can1", "can2") and self.can_channel in ("can1", "can2"):
+            return frame_ch == self.can_channel
+        return True
 
     def create_module_subscription(self, msg_type, topic: str, callback, qos: int = 10):
         sub = self.node.create_subscription(

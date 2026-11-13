@@ -112,6 +112,8 @@ private:
   struct PendingTxItem
   {
     uint16_t can_id;
+    bool send_can1;
+    bool send_can2;
     bool is_config_frame;
     uint8_t payload[20];
   };
@@ -211,6 +213,9 @@ private:
       send_can1 = true;
     } else if (msg->header.frame_id == "can2") {
       send_can2 = true;
+    } else if (msg->header.frame_id == "both") {
+      send_can1 = true;
+      send_can2 = true;
     } else if (active_ch == "can2") {
       send_can2 = true;
     } else if (active_ch == "both") {
@@ -236,15 +241,20 @@ private:
     }
 
     item.can_id = standard_id;
+    item.send_can1 = send_can1;
+    item.send_can2 = send_can2;
     item.is_config_frame = is_config_can_id(standard_id);
 
     std::lock_guard<std::mutex> lock(tx_queue_mutex_);
     if (item.is_config_frame) {
-      // 同一CAN IDの古い設定フレームがキューに残っていれば削除して滞留・洪水化を防ぐ
+      // 同一CAN ID・同一チャンネルの古い設定フレームがキューに残っていれば削除して滞留・洪水化を防ぐ
       tx_queue_.erase(
         std::remove_if(tx_queue_.begin(), tx_queue_.end(),
           [&](const PendingTxItem& existing) {
-            return existing.is_config_frame && existing.can_id == item.can_id;
+            return existing.is_config_frame &&
+                   existing.can_id == item.can_id &&
+                   existing.send_can1 == item.send_can1 &&
+                   existing.send_can2 == item.send_can2;
           }),
         tx_queue_.end());
 
@@ -253,9 +263,12 @@ private:
         tx_queue_.push_back(item);
       }
     } else {
-      // 周期制御フレーム (0x220, 0x100, 0x300等) は同一CAN IDの未送信フレームがあれば最新値で上書きして遅延蓄積を防ぐ
+      // 周期制御フレーム (0x220, 0x100, 0x300等) は同一CAN ID・同一チャンネルの未送信フレームがあれば最新値で上書きして遅延蓄積を防ぐ
       for (auto & existing : tx_queue_) {
-        if (!existing.is_config_frame && existing.can_id == item.can_id) {
+        if (!existing.is_config_frame &&
+            existing.can_id == item.can_id &&
+            existing.send_can1 == item.send_can1 &&
+            existing.send_can2 == item.send_can2) {
           std::memcpy(existing.payload, item.payload, sizeof(item.payload));
           return;
         }
@@ -382,8 +395,10 @@ private:
                 diag2.tec, diag2.rec, diag2.lec);
             }
 
+            // モジュール単位で CAN1 / CAN2 を個別に割り当てた場合でもフィードバックを受信できるよう、
+            // 60B パケットに含まれる CAN1 (0..9) と CAN2 (10..19) の両方を常に確認する
             // 1. CAN1 受信フレームの復元 (オフセット 0..9)
-            if (active_ch == "can1" || active_ch == "both") {
+            {
               uint16_t can1_id = static_cast<uint16_t>(
                 ((static_cast<uint16_t>(rx_buffer[0]) << 8) | rx_buffer[1]) & 0x7FF);
               if (can1_id != 0) {
@@ -414,7 +429,7 @@ private:
             }
 
             // 2. CAN2 受信フレームの復元 (オフセット 10..19)
-            if (active_ch == "can2" || active_ch == "both") {
+            {
               uint16_t can2_id = static_cast<uint16_t>(
                 ((static_cast<uint16_t>(rx_buffer[10]) << 8) | rx_buffer[11]) & 0x7FF);
               if (can2_id != 0) {

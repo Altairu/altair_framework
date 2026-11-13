@@ -77,9 +77,9 @@ class MddModulePlugin(BaseModulePlugin):
 
         # ModuleManager 側の互換辞書にも参照を保持
         self.node.mdd_targets[self.name] = self.targets
-        self.node.mdd_feedback_cache[self.base_id] = self.feedback_cache
-        self.node.mdd_param_confirmed[self.base_id] = False
-        self.node.mdd_param_sent_at[self.base_id] = 0.0
+        self.node.mdd_feedback_cache[self.name] = self.feedback_cache
+        self.node.mdd_param_confirmed[self.name] = False
+        self.node.mdd_param_sent_at[self.name] = 0.0
 
     def _on_cmd(self, msg: MddCommand):
         self.targets = [float(t) for t in msg.targets[:4]]
@@ -111,6 +111,7 @@ class MddModulePlugin(BaseModulePlugin):
 
         frame = Frame()
         frame.header.stamp = self.node.get_clock().now().to_msg()
+        frame.header.frame_id = self.can_channel
         frame.id = self.base_id + 0x20
         frame.dlc = 8
         frame.is_extended = False
@@ -119,6 +120,8 @@ class MddModulePlugin(BaseModulePlugin):
         return [frame]
 
     def handle_can_rx(self, frame: Frame) -> bool:
+        if not self.matches_rx_channel(frame):
+            return False
         can_id = frame.id
         # A. ステータス返信 (Base ID + 0x30)
         if can_id == (self.base_id + 0x30):
@@ -134,16 +137,16 @@ class MddModulePlugin(BaseModulePlugin):
 
             if raw_status == 1:
                 self.param_confirmed = True
-                self.node.mdd_param_confirmed[self.base_id] = True
+                self.node.mdd_param_confirmed[self.name] = True
             else:
-                sent_at = self.node.mdd_param_sent_at.get(self.base_id, 0.0)
+                sent_at = self.node.mdd_param_sent_at.get(self.name, 0.0)
                 in_grace_period = (time.monotonic() - sent_at) < 1.5
                 if not self.node.is_sending_params and not in_grace_period:
-                    if self.node.mdd_param_confirmed.get(self.base_id, False) or (
+                    if self.node.mdd_param_confirmed.get(self.name, False) or (
                         prev_status == 1 and self.node.is_running
                     ):
                         self.param_confirmed = False
-                        self.node.mdd_param_confirmed[self.base_id] = False
+                        self.node.mdd_param_confirmed[self.name] = False
                         self.node.is_running = False
                         for p in self.node.module_plugins.values():
                             if isinstance(p, MddModulePlugin):
