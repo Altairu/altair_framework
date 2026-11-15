@@ -15,7 +15,11 @@ setup(
         # フロントエンド静的ファイルのインストール
         ('share/' + package_name + '/frontend', glob('frontend/*.html')),
         ('share/' + package_name + '/frontend/css', glob('frontend/css/*.css')),
+        ('share/' + package_name + '/frontend/css/vendor', glob('frontend/css/vendor/*.css')),
+        ('share/' + package_name + '/frontend/css/webfonts', glob('frontend/css/webfonts/*')),
         ('share/' + package_name + '/frontend/js', glob('frontend/js/*.js')),
+        ('share/' + package_name + '/frontend/js/vendor', glob('frontend/js/vendor/*.js')),
+        ('share/' + package_name + '/frontend/js/vendor/media', glob('frontend/js/vendor/media/*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
