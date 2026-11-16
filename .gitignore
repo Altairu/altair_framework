@@ -20,3 +20,6 @@ network_config.json
 .DS_Store
 Thumbs.db
 wiki_setup/
+# Antigravity Deck hooks
+.agents/hooks.json
+.agents/scripts/deck-hook.mjs
