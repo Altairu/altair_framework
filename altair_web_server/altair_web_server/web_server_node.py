@@ -1,5 +1,6 @@
 import os
 import json
+import math
 import shutil
 import threading
 import asyncio
@@ -323,7 +324,11 @@ class WebServerROSNode(Node):
         try:
             if isinstance(can_id, bool):
                 return
-            if isinstance(can_id, (int, float)):
+            if isinstance(can_id, int):
+                sid = int(can_id)
+            elif isinstance(can_id, float):
+                if not math.isfinite(can_id) or not can_id.is_integer():
+                    return
                 sid = int(can_id)
             else:
                 sid = int(str(can_id).strip(), 0)
@@ -332,12 +337,21 @@ class WebServerROSNode(Node):
         except Exception:
             return
 
+        if not isinstance(data, (list, tuple, bytes, bytearray)):
+            return
+
         payload = []
-        for x in list(data or [])[:8]:
+        for x in list(data)[:8]:
             try:
-                v = int(round(float(x)))
+                if isinstance(x, bool):
+                    v = int(x)
+                else:
+                    f = float(x)
+                    if not math.isfinite(f):
+                        return
+                    v = int(round(f))
             except Exception:
-                v = 0
+                return
             payload.append(max(0, min(255, v)))
 
         ch = str(channel or "default").strip().lower()
@@ -979,7 +993,9 @@ if os.path.exists(frontend_dir):
 
 # --- ROS2 ノードスピン実行スレッドの管理 ---
 def run_ros2_spin(node):
-    executor = rclpy.executors.MultiThreadedExecutor()
+    executor = rclpy.executors.MultiThreadedExecutor(
+        num_threads=max(4, os.cpu_count() or 4)
+    )
     executor.add_node(node)
     executor.spin()
 

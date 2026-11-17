@@ -1,5 +1,7 @@
 // C++ 標準ヘッダー
+#include <algorithm>
 #include <chrono>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
@@ -104,8 +106,9 @@ private:
     if (msg->is_extended) {
       frame.can_id |= CAN_EFF_FLAG;
     }
-    frame.can_dlc = msg->dlc;
-    memcpy(frame.data, msg->data.data(), msg->dlc);
+    const uint8_t dlc = std::min<uint8_t>(msg->dlc, 8);
+    frame.can_dlc = dlc;
+    memcpy(frame.data, msg->data.data(), dlc);
 
     // SocketCANに書き込み
     int bytes_sent = write(can_socket_, &frame, sizeof(struct can_frame));
@@ -183,9 +186,10 @@ private:
       rx_msg->id = rx_msg->is_extended ? (frame.can_id & CAN_EFF_MASK) : (frame.can_id & CAN_SFF_MASK);
       rx_msg->is_rtr = (frame.can_id & CAN_RTR_FLAG) != 0;
       rx_msg->is_error = (frame.can_id & CAN_ERR_FLAG) != 0;
-      rx_msg->dlc = frame.can_dlc;
-      
-      std::copy(frame.data, frame.data + frame.can_dlc, rx_msg->data.begin());
+      const uint8_t rx_dlc = std::min<uint8_t>(frame.can_dlc, 8);
+      rx_msg->dlc = rx_dlc;
+
+      std::copy(frame.data, frame.data + rx_dlc, rx_msg->data.begin());
 
       // パブリッシュ
       can_rx_pub_->publish(*rx_msg);
