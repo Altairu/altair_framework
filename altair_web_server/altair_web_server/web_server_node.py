@@ -120,6 +120,7 @@ class WebServerROSNode(Node):
 
         # パブリッシャ辞書 (ブラウザからの操作指令をROS2トピックへ投げる用)
         self.publishers_dict = {}
+        self.can_tx_pub = self.create_publisher(Frame, '/altair/can/tx', 100)
 
         # ゲームコントローラー状態のパブリッシャ (ROS2標準 Joy & 従来互換 JSON)
         self.joy_pub = self.create_publisher(Joy, '/altair/joy', 10)
@@ -317,6 +318,39 @@ class WebServerROSNode(Node):
         msg.mode = str(mode or "")
         msg.reset_zero = bool(reset_zero)
         self.publishers_dict[topic].publish(msg)
+
+    def publish_raw_can_tx(self, can_id, data, channel="default"):
+        try:
+            if isinstance(can_id, bool):
+                return
+            if isinstance(can_id, (int, float)):
+                sid = int(can_id)
+            else:
+                sid = int(str(can_id).strip(), 0)
+            if not (1 <= sid <= 0x7FF):
+                return
+        except Exception:
+            return
+
+        payload = []
+        for x in list(data or [])[:8]:
+            try:
+                v = int(round(float(x)))
+            except Exception:
+                v = 0
+            payload.append(max(0, min(255, v)))
+
+        ch = str(channel or "default").strip().lower()
+        msg = Frame()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id = ch if ch in ("can1", "can2", "both") else ""
+        msg.id = sid
+        msg.is_rtr = False
+        msg.is_extended = False
+        msg.is_error = False
+        msg.dlc = len(payload)
+        msg.data = payload + [0] * (8 - len(payload))
+        self.can_tx_pub.publish(msg)
 
     def on_sim_state(self, msg: String):
         if not manager.active_connections:
@@ -901,6 +935,12 @@ async def websocket_endpoint(websocket: WebSocket):
                 )
             elif msg_type == "robomas_reset_zero":
                 ros_node.publish_robomas_cmd(name, target=0.0, mode="", reset_zero=True)
+            elif msg_type == "raw_can_tx":
+                ros_node.publish_raw_can_tx(
+                    msg.get("id"),
+                    msg.get("data", []),
+                    msg.get("channel", "default"),
+                )
             elif msg_type == "gamepad_state":
                 axes_raw = msg.get("axes", [])
                 buttons_raw = msg.get("buttons", [])
